@@ -1,0 +1,67 @@
+{
+  "name": "phone-app-checker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Check which messaging apps (Telegram, WhatsApp, Zalo, Viber, LINE) a list of consenting people's phone numbers is registered on and export a CSV report.",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QuocHuannn/phone-app-checker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/QuocHuannn/phone-app-checker/issues"
+  },
+  "homepage": "https://github.com/QuocHuannn/phone-app-checker#readme",
+  "keywords": [
+    "telegram",
+    "whatsapp",
+    "zalo",
+    "viber",
+    "line",
+    "phone-number",
+    "contact-discovery",
+    "csv",
+    "cli",
+    "typescript",
+    "nodejs",
+    "macos"
+  ],
+  "type": "module",
+  "bin": {
+    "phone-app-checker": "./bin/phone-app-checker.js"
+  },
+  "scripts": {
+    "cli": "node --disable-warning=ExperimentalWarning src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "smoke": "node --disable-warning=ExperimentalWarning tests/smoke/cli-smoke.ts",
+    "release:build": "bash scripts/build-release.sh",
+    "release:verify": "bash scripts/verify-release.sh",
+    "licenses": "node scripts/generate-third-party-licenses.mjs",
+    "licenses:check": "node scripts/generate-third-party-licenses.mjs --check"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "dependencies": {
+    "@evex/linejs": "npm:@jsr/evex__linejs@^3.4.2",
+    "@mtcute/node": "^0.32.4",
+    "baileys": "^7.0.0-rc14",
+    "commander": "^15.0.0",
+    "csv-parse": "^7.0.3",
+    "csv-stringify": "^6.9.0",
+    "libphonenumber-js": "^1.13.15",
+    "qrcode-terminal": "^0.12.0",
+    "zca-js": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/qrcode-terminal": "^0.12.2",
+    "jsqr": "^1.4.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  },
+  "overrides": {
+    "thrift": "^0.25.0"
+  }
+}

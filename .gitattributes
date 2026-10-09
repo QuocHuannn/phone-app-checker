@@ -1,0 +1,14 @@
+* text=auto eol=lf
+
+*.sh text eol=lf
+release/phone-app-checker text eol=lf
+*.awk text eol=lf
+
+*.png binary
+*.gif binary
+*.jpg binary
+*.gz binary
+
+# Generated from package-lock.json by `npm run licenses`
+THIRD_PARTY_LICENSES.md linguist-generated=true
+package-lock.json linguist-generated=true

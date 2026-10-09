@@ -1,0 +1,60 @@
+# ---------------------------------------------------------------------------
+# Allow-list: everything at the top level is ignored unless it is listed here.
+# This keeps login sessions, result databases, customer CSVs, internal notes
+# and build output out of the repository even when a new file is dropped in.
+# ---------------------------------------------------------------------------
+/*
+!/.editorconfig
+!/.gitattributes
+!/.github/
+!/.gitignore
+!/.gitleaks.toml
+!/.npmrc
+!/CHANGELOG.md
+!/CODE_OF_CONDUCT.md
+!/CONTRIBUTING.md
+!/LICENSE
+!/README.md
+!/SECURITY.md
+!/THIRD_PARTY_LICENSES.md
+!/bin/
+!/checker.config.example.json
+!/docs/
+!/package-lock.json
+!/package.json
+!/release/
+!/scripts/
+!/src/
+!/tests/
+!/tsconfig.json
+!/vitest.config.ts
+
+# Maintainer-only helper that shares a build through a temporary tunnel; not part of the project.
+/scripts/serve-release.sh
+
+# ---------------------------------------------------------------------------
+# Hard deny at any depth (these win over the allow-list above).
+# ---------------------------------------------------------------------------
+# Login sessions, SQLite results, customer phone numbers
+data/
+checker.config.json
+*.csv
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+login-qr*.png
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Build output and tooling noise
+node_modules/
+dist/
+*.tsbuildinfo
+*.log
+.DS_Store

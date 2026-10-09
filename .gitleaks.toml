@@ -1,0 +1,10 @@
+# Used by `gitleaks detect` (https://github.com/gitleaks/gitleaks).
+title = "phone-app-checker"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Documented placeholder api_hash used in docs and tests (not a real key)"
+regexTarget = "match"
+regexes = ['''0123456789abcdef0123456789abcdef''', '''abcdef0123456789abcdef0123456789''', '''deadbeefcafe0123deadbeefcafe0123''']

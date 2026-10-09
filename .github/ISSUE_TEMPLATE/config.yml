@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability (private)
+    url: https://github.com/QuocHuannn/phone-app-checker/security/advisories/new
+    about: Report security problems privately. Do not open a public issue.
+  - name: Responsible use and privacy law
+    url: https://github.com/QuocHuannn/phone-app-checker/blob/main/docs/responsible-use.md
+    about: What the tool is for, platform terms, consent, and why results are not proof. Not legal advice.

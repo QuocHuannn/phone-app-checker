@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/config.ts';
 import { saveTelegramCredentials } from '../src/config-write.ts';
 import { runMenu, type CommandResult, type MenuHost } from '../src/menu.ts';
@@ -28,6 +28,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -213,6 +214,9 @@ describe('rich main menu (arrow keys on a real terminal)', () => {
     ['TERM=dumb', { TERM: 'dumb' }],
     ['no TERM', {}],
   ])('%s: the classic numbered menu, no escape sequence of ours at all', async (_name, env) => {
+    // Node's own readline redraws the prompt line with cursor escapes unless the host TERM is "dumb"; that is
+    // not ours and depends on the shell running the tests, so pin it. `env` below is what the menu itself sees.
+    vi.stubEnv('TERM', 'dumb');
     const tty = fakeTty();
     const { host } = build(tty.io, { env });
     const done = runMenu(host);

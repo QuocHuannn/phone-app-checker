@@ -332,11 +332,17 @@ describe('destructive-path ownership: shared folders and the installation tree',
       const tree = () => join(userHome, 'Applications', 'phone-app-checker');
 
       it.each([
-        ['the tree itself', () => tree()],
-        ['a folder inside it', () => join(tree(), 'home')],
-        ['a folder inside an installed version', () => join(tree(), '0.1.0', 'data')],
-        ['the tree under another letter case', () => join(userHome, 'applications', 'Phone-App-Checker', 'home')],
-      ])('refuses %s before writing anything', (_name, pick) => {
+        ['the tree itself', () => tree(), false],
+        ['a folder inside it', () => join(tree(), 'home'), false],
+        ['a folder inside an installed version', () => join(tree(), '0.1.0', 'data'), false],
+        ['the tree under another letter case', () => join(userHome, 'applications', 'Phone-App-Checker', 'home'), true],
+      ])('refuses %s before writing anything', (_name, pick, needsCaseInsensitiveVolume) => {
+        if (needsCaseInsensitiveVolume) {
+          // The refusal resolves existing ancestors on disk, so another spelling only matches on a case-insensitive
+          // volume (macOS default); on a case-sensitive one (Linux) it is a different path and there is nothing to refuse.
+          mkdirSync(join(dir, 'CaseProbe'));
+          if (statSync(join(dir, 'caseprobe'), { throwIfNoEntry: false }) === undefined) return;
+        }
         const target = pick();
         expect(() => use(target)).toThrow(/installation folder.*install\.sh replaces and uninstall\.sh deletes/s);
         expect(statSync(tree(), { throwIfNoEntry: false })).toBeUndefined();

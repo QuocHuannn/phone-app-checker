@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { closeSync, constants, openSync, readSync } from 'node:fs';
+import { StringDecoder } from 'node:string_decoder';
+import { parse as createCsvParser } from 'csv-parse';
 import { parse } from 'csv-parse/sync';
 import { normalizePhone } from './phone.ts';
 import { terminalSafe, type PhoneNumber } from './types.ts';
@@ -130,9 +132,155 @@ function describeColumns(header: string[]): string {
   return shown.join(', ');
 }
 
+/**
+ * Turns parsed CSV records into the deduplicated entry list. Records arrive one at a time (the
+ * whole-file parser feeds the same builder), so a file never needs all its rows in memory: the
+ * first row plus at most SAMPLE_ROWS more are held until the phone column is known, after that a
+ * record is reduced to one entry and dropped.
+ */
+class PhoneColumnBuilder {
+  private readonly wanted: string | undefined;
+  private readonly defaultRegion: string;
+  private buffered: string[][] = [];
+  private firstRow: string[] | undefined;
+  private col = -1;
+  private hasHeader = false;
+  private decided = false;
+  private atEnd = false;
+  /** `--column <index>` validity needs the widest row in the file, so its failure waits for EOF. */
+  private numericWanted: { text: string; value: number } | undefined;
+  /** An error the batch parse would report; held so the empty-file check keeps its precedence. */
+  private pendingError: Error | undefined;
+  private sawCell = false;
+  private maxWidth = 0;
+  private rows = 0;
+  private readonly seen = new Set<string>();
+  private readonly entries: InputEntry[] = [];
+  private duplicates = 0;
+
+  constructor(options: ParseOptions) {
+    const wanted = options.column?.trim();
+    this.wanted = wanted === '' ? undefined : wanted;
+    this.defaultRegion = options.defaultRegion;
+  }
+
+  add(record: string[]): void {
+    this.firstRow ??= record;
+    this.maxWidth = Math.max(this.maxWidth, record.length);
+    if (!this.sawCell && record.some((cell) => cell.trim() !== '')) this.sawCell = true;
+    if (this.pendingError !== undefined) return;
+    if (this.decided) {
+      this.consume(record);
+      return;
+    }
+    this.buffered.push(record);
+    this.tryDecide();
+  }
+
+  private isPhone(cell: string | undefined): boolean {
+    return normalizePhone(cell ?? '', this.defaultRegion) !== null;
+  }
+
+  /** Digits and phone punctuation only, 7+ digits: a customer entry (maybe invalid), not a column title. */
+  private looksLikePhone(cell: string | undefined): boolean {
+    const text = (cell ?? '').trim();
+    return /^\+?[\d\s().-]+$/.test(text) && text.replace(/\D/g, '').length >= 7;
+  }
+
+  /** Resolve the phone column as soon as the buffered records allow it; later rows stream through. */
+  private tryDecide(): void {
+    const first = this.buffered[0];
+    if (first === undefined) return;
+    const wanted = this.wanted;
+    if (wanted !== undefined) {
+      const byName = first.findIndex((h) => h.trim().toLowerCase() === wanted.toLowerCase());
+      if (byName >= 0) {
+        this.col = byName;
+        this.hasHeader = true;
+        this.decideDone();
+        return;
+      }
+      if (/^\d+$/.test(wanted) && Number(wanted) >= 1) {
+        this.col = Number(wanted) - 1;
+        this.numericWanted = { text: wanted, value: Number(wanted) };
+        this.hasHeader = !this.isPhone(first[this.col]) && !this.looksLikePhone(first[this.col]);
+        this.decideDone();
+        return;
+      }
+      this.pendingError = new Error(`Column "${wanted}" not found. Columns: ${describeColumns(first)}`);
+      return;
+    }
+    if (first.some((cell) => this.isPhone(cell)) || first.some((cell) => this.looksLikePhone(cell))) {
+      // bestPhoneColumn samples the first SAMPLE_ROWS rows; decide once that many are seen or the file ends.
+      if (!this.atEnd && this.buffered.length < SAMPLE_ROWS) return;
+      this.hasHeader = false;
+      this.col = bestPhoneColumn(this.buffered, this.defaultRegion);
+      if (this.col < 0) this.col = first.findIndex((cell) => this.looksLikePhone(cell));
+      this.decideDone();
+      return;
+    }
+    const hint = first.findIndex((h) => HEADER_HINT.test(normalizeHeader(h)));
+    if (hint >= 0) {
+      this.col = hint;
+      this.hasHeader = true;
+      this.decideDone();
+      return;
+    }
+    // The fallback samples the first SAMPLE_ROWS data rows: the header row plus that many buffered.
+    if (!this.atEnd && this.buffered.length < SAMPLE_ROWS + 1) return;
+    this.hasHeader = true;
+    this.col = bestPhoneColumn(this.buffered.slice(1), this.defaultRegion);
+    if (this.col < 0) {
+      this.pendingError = new Error(
+        `Cannot find a phone column. Name its header "phone" (or use --column). Columns: ${describeColumns(first)}`,
+      );
+      return;
+    }
+    this.decideDone();
+  }
+
+  /** The buffered records are reclassified now that the column (and header) is known. */
+  private decideDone(): void {
+    const buffered = this.buffered;
+    this.buffered = [];
+    this.decided = true;
+    for (let i = this.hasHeader ? 1 : 0; i < buffered.length; i += 1) this.consume(buffered[i] as string[]);
+  }
+
+  private consume(record: string[]): void {
+    this.rows += 1;
+    const input = record[this.col] ?? '';
+    const phone = normalizePhone(input, this.defaultRegion);
+    const key = phone ? phone.e164 : `invalid:${input.trim()}`;
+    if (this.seen.has(key)) {
+      this.duplicates += 1;
+      return;
+    }
+    this.seen.add(key);
+    this.entries.push({ input, phone });
+  }
+
+  /** End of input: the empty-file check runs first, then the deferred `--column <index>` width check. */
+  finish(): ParsedInput {
+    this.atEnd = true;
+    if (!this.decided && this.pendingError === undefined) this.tryDecide();
+    if (!this.sawCell) throw new Error('CSV file is empty');
+    if (this.pendingError !== undefined) throw this.pendingError;
+    if (this.numericWanted !== undefined && this.numericWanted.value > this.maxWidth) {
+      throw new Error(`Column "${this.numericWanted.text}" not found. Columns: ${describeColumns(this.firstRow as string[])}`);
+    }
+    return {
+      entries: this.entries,
+      column: this.hasHeader ? (this.firstRow?.[this.col] ?? '').trim() : `#${this.col + 1}`,
+      hasHeader: this.hasHeader,
+      rows: this.rows,
+      duplicates: this.duplicates,
+    };
+  }
+}
+
 /** Parse CSV text, locate the phone column, normalize to E.164 and deduplicate. */
 export function parsePhoneCsv(text: string, options: ParseOptions): ParsedInput {
-  const { defaultRegion } = options;
   let rows: string[][];
   try {
     rows = parse(text, {
@@ -146,67 +294,9 @@ export function parsePhoneCsv(text: string, options: ParseOptions): ParsedInput 
     // csv-parse can quote the offending record in its message: keep escape sequences out of the terminal.
     throw new Error(`Cannot parse CSV: ${terminalSafe((error as Error).message, 500)}`, { cause: error });
   }
-  const first = rows[0];
-  if (first === undefined || rows.every((row) => row.every((cell) => cell.trim() === ''))) {
-    throw new Error('CSV file is empty');
-  }
-  const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
-  const isPhone = (cell: string | undefined) => normalizePhone(cell ?? '', defaultRegion) !== null;
-  /** Digits and phone punctuation only, 7+ digits: a customer entry (maybe invalid), not a column title. */
-  const looksLikePhone = (cell: string | undefined) => {
-    const text = (cell ?? '').trim();
-    return /^\+?[\d\s().-]+$/.test(text) && text.replace(/\D/g, '').length >= 7;
-  };
-
-  let col = -1;
-  let hasHeader: boolean;
-  const wanted = options.column?.trim();
-  if (wanted !== undefined && wanted !== '') {
-    const byName = first.findIndex((h) => h.trim().toLowerCase() === wanted.toLowerCase());
-    if (byName >= 0) {
-      col = byName;
-      hasHeader = true;
-    } else if (/^\d+$/.test(wanted) && Number(wanted) >= 1 && Number(wanted) <= width) {
-      col = Number(wanted) - 1;
-      hasHeader = !isPhone(first[col]) && !looksLikePhone(first[col]);
-    } else {
-      throw new Error(`Column "${wanted}" not found. Columns: ${describeColumns(first)}`);
-    }
-  } else if (first.some(isPhone) || first.some(looksLikePhone)) {
-    hasHeader = false;
-    col = bestPhoneColumn(rows, defaultRegion);
-    if (col < 0) col = first.findIndex(looksLikePhone);
-  } else {
-    hasHeader = true;
-    col = first.findIndex((h) => HEADER_HINT.test(normalizeHeader(h)));
-    if (col < 0) col = bestPhoneColumn(rows.slice(1), defaultRegion);
-    if (col < 0) {
-      throw new Error(`Cannot find a phone column. Name its header "phone" (or use --column). Columns: ${describeColumns(first)}`);
-    }
-  }
-
-  const data = hasHeader ? rows.slice(1) : rows;
-  const seen = new Set<string>();
-  const entries: InputEntry[] = [];
-  let duplicates = 0;
-  for (const row of data) {
-    const input = row[col] ?? '';
-    const phone = normalizePhone(input, defaultRegion);
-    const key = phone ? phone.e164 : `invalid:${input.trim()}`;
-    if (seen.has(key)) {
-      duplicates += 1;
-      continue;
-    }
-    seen.add(key);
-    entries.push({ input, phone });
-  }
-  return {
-    entries,
-    column: hasHeader ? (first[col] ?? '').trim() : `#${col + 1}`,
-    hasHeader,
-    rows: data.length,
-    duplicates,
-  };
+  const builder = new PhoneColumnBuilder(options);
+  for (const row of rows) builder.add(row);
+  return builder.finish();
 }
 
 /**
@@ -227,15 +317,118 @@ export function decodeCsvBytes(bytes: Buffer, label = 'The file'): string {
   return bytes.toString('utf8');
 }
 
+/** Bytes pulled from the input file per `readSync`; records and sniff text stay bounded by it. */
+const READ_CHUNK = 256 * 1024;
+
+/** csv-parse exposes its incremental record engine as `parser.api.parse`; it is not in the type surface. */
+interface CsvParserEngine {
+  api: {
+    parse: (chunk: Buffer | undefined, end: boolean, push: (record: string[]) => void, close: () => void) => Error | undefined;
+  };
+}
+
+/** True once the sniffed text holds every line `sniffDelimiter` can look at: the 21st line break ends it. */
+function sniffDelimiterReady(text: string): boolean {
+  return (text.match(/\r\n|\r|\n/g)?.length ?? 0) > SNIFF_LINES;
+}
+
+function newParser(delim: string): CsvParserEngine {
+  return createCsvParser({
+    bom: true,
+    delimiter: delim,
+    skip_empty_lines: true,
+    relax_column_count: true,
+    relax_quotes: true,
+  }) as unknown as CsvParserEngine;
+}
+
+/**
+ * Read a CSV file without holding its bytes or rows: the file is pulled in fixed chunks, decoded
+ * incrementally (the UTF-16 byte-order marks of `decodeCsvBytes` are handled the same way), and
+ * csv-parse's record engine is fed each chunk so records reach the column builder one at a time.
+ */
 export function readPhoneCsv(path: string, options: ParseOptions): ParsedInput {
-  let bytes: Buffer;
-  try {
-    bytes = readFileSync(path);
-  } catch (error) {
+  const describe = (error: unknown): Error => {
     const code = (error as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT') throw new Error(`File not found: ${path}`, { cause: error });
-    if (code === 'EISDIR') throw new Error(`${path} is a folder, not a CSV file`, { cause: error });
-    throw new Error(`Cannot read ${path}: ${(error as Error).message}`, { cause: error });
+    if (code === 'ENOENT') return new Error(`File not found: ${path}`, { cause: error });
+    if (code === 'EISDIR') return new Error(`${path} is a folder, not a CSV file`, { cause: error });
+    return new Error(`Cannot read ${path}: ${(error as Error).message}`, { cause: error });
+  };
+  let fd: number;
+  try {
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  } catch (error) {
+    throw describe(error);
   }
-  return parsePhoneCsv(decodeCsvBytes(bytes, path), options);
+  const builder = new PhoneColumnBuilder(options);
+  // Set at the first chunk, once the byte-order mark (or its absence) names the encoding.
+  let utf16: 'le' | 'be' | undefined;
+  let decoder: StringDecoder | undefined;
+  // Leftover odd byte of a UTF-16 stream carried into the next chunk; a UTF-16 unit is two bytes.
+  let carry = Buffer.alloc(0);
+  // Decoded text waiting for the delimiter sniff; cleared as soon as the parser takes over.
+  let sniffed = '';
+  let parser: CsvParserEngine | undefined;
+  /** Errors come back from the engine instead of being thrown; the wording is the batch parser's. */
+  const feed = (chunk: Buffer | undefined, end: boolean): void => {
+    const error = parser?.api.parse(chunk, end, (record) => builder.add(record), () => {});
+    if (error !== undefined) throw new Error(`Cannot parse CSV: ${terminalSafe(error.message, 500)}`, { cause: error });
+  };
+  try {
+    for (;;) {
+      const buf = Buffer.allocUnsafe(READ_CHUNK);
+      let bytesRead: number;
+      try {
+        bytesRead = readSync(fd, buf, 0, READ_CHUNK, null);
+      } catch (error) {
+        throw describe(error);
+      }
+      const eof = bytesRead === 0;
+      let chunk = buf.subarray(0, bytesRead);
+      if (decoder === undefined) {
+        // First chunk (or an empty file): name the encoding the way decodeCsvBytes does.
+        if (chunk.length >= 2 && chunk[0] === 0xff && chunk[1] === 0xfe) utf16 = 'le';
+        else if (chunk.length >= 2 && chunk[0] === 0xfe && chunk[1] === 0xff) utf16 = 'be';
+        decoder = new StringDecoder(utf16 === undefined ? 'utf8' : 'utf16le');
+        chunk = chunk.subarray(utf16 === undefined ? 0 : 2);
+      }
+      let text: string;
+      if (utf16 === undefined) {
+        // A NUL byte never occurs in a text CSV: it means a binary file (an .xlsx workbook, a PDF)
+        // or UTF-16 without a byte order mark, and decoding it as UTF-8 would produce garbage.
+        if (chunk.includes(0)) {
+          throw new Error(
+            `${path} is not a plain-text CSV (it contains binary data, e.g. an .xlsx workbook). ` +
+              'In Excel use File > Save As > "CSV UTF-8 (Comma delimited)".',
+          );
+        }
+        text = decoder.write(chunk);
+      } else {
+        const pair = Buffer.concat([carry, chunk]);
+        const even = pair.length - (pair.length % 2);
+        // `pair` is fresh per chunk; keep the odd tail byte for the next pair (BE is swapped into LE).
+        carry = Buffer.from(pair.subarray(even));
+        text = decoder.write(utf16 === 'be' ? Buffer.from(pair.subarray(0, even)).swap16() : pair.subarray(0, even));
+      }
+      if (parser === undefined) {
+        sniffed += text;
+        if (sniffDelimiterReady(sniffed) || eof) {
+          parser = newParser(sniffDelimiter(sniffed));
+          feed(Buffer.from(sniffed, 'utf8'), false);
+          sniffed = '';
+        }
+      } else {
+        feed(Buffer.from(text, 'utf8'), false);
+      }
+      if (eof) break;
+    }
+    // Flush the decoder tail (a unit split across chunks, or the odd byte of a truncated UTF-16
+    // stream), then the parser's end-of-input state; records reach the builder all along.
+    const tail = (decoder as StringDecoder).end(carry);
+    if (tail !== '') feed(Buffer.from(tail, 'utf8'), false);
+    feed(undefined, true);
+  } finally {
+    closeSync(fd);
+  }
+  return builder.finish();
 }

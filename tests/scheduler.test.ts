@@ -618,6 +618,53 @@ describe('one bad batch does not take down the account', () => {
     expect(h.logs.join('\n')).not.toContain('dropped for the rest of this run');
     expect(h.store.getAccount('telegram', 'a').disabledReason).toBeNull();
   });
+  it('serves a failed batch from the retry queue after the fresh numbers, and settles it', async () => {
+    const h = harness(makeConfig({ batchSize: 2, minIntervalMs: 0, errorCooldownMs: 0 }));
+    let callNo = 0;
+    const handler: Handler = (account, batch) => {
+      callNo += 1;
+      if (callNo === 1) throw new Error('transient lookup failure');
+      return allYes(account, batch, callNo);
+    };
+    const [summary] = await h.run({ numbers: numbers(6), handlers: { telegram: handler } });
+
+    // The first batch goes to the retry queue, the rest of the input is checked first, and the
+    // retried numbers are removed from their own (small) queue when the answer finally arrives.
+    expect(h.calls.map((c) => c.e164s)).toEqual([
+      [num(0).e164, num(1).e164],
+      [num(2).e164, num(3).e164],
+      [num(4).e164, num(5).e164],
+      [num(0).e164, num(1).e164],
+    ]);
+    for (const n of numbers(6)) expect(status(h.store, 'telegram', n)).toBe('yes');
+    expect(summary).toMatchObject({ answered: 6, remaining: 0, errors: 1, stopped: 'done' });
+  });
+
+  it('keeps only the unanswered tail of a retried batch queued after a partial answer', async () => {
+    const h = harness(makeConfig({ batchSize: 2, minIntervalMs: 0, errorCooldownMs: 0 }));
+    const calls: string[][] = [];
+    const handler: Handler = (account, batch) => {
+      calls.push(batch.map((n) => n.e164));
+      if (calls.length === 1) throw new Error('transient lookup failure');
+      if (calls.length === 4) {
+        // The retried batch answers its first number but is cut off before the second.
+        throw new RateLimited('cut off', 1, new Map([[(batch[0] as PhoneNumber).e164, 'yes']]));
+      }
+      return allYes(account, batch, calls.length);
+    };
+    const [summary] = await h.run({ numbers: numbers(6), handlers: { telegram: handler } });
+
+    expect(calls).toEqual([
+      [num(0).e164, num(1).e164],
+      [num(2).e164, num(3).e164],
+      [num(4).e164, num(5).e164],
+      [num(0).e164, num(1).e164],
+      [num(1).e164],
+    ]);
+    for (const n of numbers(6)) expect(status(h.store, 'telegram', n)).toBe('yes');
+    expect(summary).toMatchObject({ answered: 6, remaining: 0, errors: 1, stopped: 'done' });
+  });
+
 
   it('does not park batches while nothing succeeds: a real outage still drops the account', async () => {
     const h = harness(makeConfig({ batchSize: 1, minIntervalMs: 0 }));

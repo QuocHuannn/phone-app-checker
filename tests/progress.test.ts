@@ -9,7 +9,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function setup(options: { mode: 'bar' | 'lines'; columns?: number; rich?: boolean }) {
+function setup(options: { mode: 'bar' | 'lines'; columns?: number; rich?: boolean; tickMs?: number }) {
   vi.useFakeTimers();
   let clock = 1_000_000;
   const writes: string[] = [];
@@ -22,11 +22,16 @@ function setup(options: { mode: 'bar' | 'lines'; columns?: number; rich?: boolea
     stream: { write: (text) => writes.push(text) },
     line: (text) => lines.push(text),
     now: () => clock,
+    ...(options.tickMs === undefined ? {} : { tickMs: options.tickMs }),
   });
+  // In bar mode `update` only records; the line is drawn by the interval. Firing the timers without
+  // moving `clock` draws the recorded state at the same instant the old synchronous draw showed.
+  const draw = () => vi.advanceTimersByTime(options.tickMs ?? 150);
   return {
     renderer,
     writes,
     lines,
+    draw,
     advance: (ms: number) => {
       clock += ms;
       vi.advanceTimersByTime(ms);
@@ -50,6 +55,7 @@ describe('ProgressRenderer on a rich terminal (bar)', () => {
     t.renderer.update(event('telegram', 100, 100));
     t.renderer.update(event('whatsapp', 100, 100));
     t.renderer.update(event('telegram', 100, 40));
+    t.draw();
     const text = t.screen();
     expect(text).toMatch(/^⠋|^[⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
     expect(text).toContain('30% 60/200');
@@ -66,6 +72,7 @@ describe('ProgressRenderer on a rich terminal (bar)', () => {
     const t = setup({ mode: 'bar' });
     t.renderer.update(event('zalo', 10, 10));
     t.renderer.update(event('zalo', 10, 0));
+    t.draw();
     expect(t.screen()).toContain('100% 10/10');
     expect(t.screen()).not.toContain('zalo 10/10');
     expect(t.screen()).not.toContain('░');
@@ -87,6 +94,7 @@ describe('ProgressRenderer on a rich terminal (bar)', () => {
   it('finish() erases the bar and later updates are ignored', () => {
     const t = setup({ mode: 'bar' });
     t.renderer.update(event('zalo', 10, 5));
+    t.draw();
     t.renderer.finish();
     expect(t.writes.at(-1)).toBe(`\r${ESC}[2K`);
     const count = t.writes.length;
@@ -103,6 +111,7 @@ describe('ProgressRenderer on a rich terminal (bar)', () => {
     expect(t.screen()).not.toContain('ETA');
     t.advance(9000);
     t.renderer.update(event('zalo', 100, 50));
+    t.draw();
     // 50 numbers in 10 s: 50 left take 10 s.
     expect(t.screen()).toContain('ETA 10 s');
     t.renderer.finish();
@@ -113,12 +122,15 @@ describe('ProgressRenderer on a rich terminal (bar)', () => {
     t.renderer.update(event('telegram', 10, 5));
     const resume = new Date(t.now() + 90 * 60_000);
     t.renderer.update(event('telegram', 10, 5, { until: resume.getTime(), kind: 'cooldown' }));
+    t.draw();
     const hh = String(resume.getHours()).padStart(2, '0');
     const mm = String(resume.getMinutes()).padStart(2, '0');
     expect(t.screen()).toContain(`resting until ${hh}:${mm}`);
     t.renderer.update(event('telegram', 10, 5, { until: t.now() + 4000, kind: 'pacing' }));
+    t.draw();
     expect(t.screen()).toContain('pacing 4 s');
     t.renderer.update(event('telegram', 10, 5));
+    t.draw();
     expect(t.screen()).not.toContain('resting');
     expect(t.screen()).not.toContain('pacing');
     t.renderer.finish();
@@ -129,7 +141,8 @@ describe('ProgressRenderer on a rich terminal (bar)', () => {
       const t = setup({ mode: 'bar', columns });
       for (const app of ['telegram', 'whatsapp', 'zalo', 'viber', 'line'] as const) t.renderer.update(event(app, 1234, 1000));
       t.renderer.update(event('telegram', 1234, 1000, { until: t.now() + 3_600_000, kind: 'cooldown' }));
-      for (const text of t.writes.map(stripAnsi)) expect(displayWidth(text.replace(/^\r\u001b?\[?2?K?/, '')), `@${columns}`).toBeLessThanOrEqual(columns - 1);
+      t.draw();
+      for (const text of t.writes.map(stripAnsi)) expect(displayWidth(text.replace(/^\r?\[?2?K?/, '')), `@${columns}`).toBeLessThanOrEqual(columns - 1);
       t.renderer.finish();
     }
   });
@@ -142,6 +155,7 @@ describe('ProgressRenderer on a rich terminal (bar)', () => {
       t.writes.push(`LOG:${message}\n`);
     });
     t.renderer.update(event('zalo', 10, 5));
+    t.draw();
     const before = t.writes.length;
     say('zalo: 5 checked, 5 left');
     const tail = t.writes.slice(before);

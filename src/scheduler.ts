@@ -152,12 +152,12 @@ function refreshDay(state: AccountState, now: number): AccountState {
 
 /** Numbers that still need a check for one app: in scope and without a fresh yes/not_found. */
 export function selectPending(
-  options: Pick<SchedulerOptions, 'store' | 'numbers' | 'maxAgeMs' | 'inScope'>,
+  options: Pick<SchedulerOptions, 'store' | 'numbers' | 'maxAgeMs' | 'inScope'> & { stored?: Map<string, StoredResult> },
   app: App,
   now: number,
 ): PhoneNumber[] {
   const inScope = options.inScope ?? ((a: App, n: PhoneNumber) => APP_SCOPE[a](n));
-  const stored = options.store.allResults(app);
+  const stored = options.stored ?? options.store.allResults(app);
   return options.numbers.filter((n) => inScope(app, n) && !isFresh(stored.get(n.e164), now, options.maxAgeMs));
 }
 
@@ -202,9 +202,11 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
   const log = (message: string) => (options.log ?? (() => {}))(`${app}: ${message}`);
   const pacing = config.apps[app];
 
-  const needed = selectPending(options, app, now());
-  // Numbers that already hold an older yes/not_found: if this run cannot refresh them, they keep it.
+  // The app's results table is read once and shared by the pending selection and the stale-result
+  // bookkeeping below; the same scan used to run three times per app per run.
   const storedBefore = options.store.allResults(app);
+  const needed = selectPending({ ...options, stored: storedBefore }, app, now());
+  // Numbers that already hold an older yes/not_found: if this run cannot refresh them, they keep it.
   const staleBefore = new Set(
     needed.filter((n) => storedBefore.get(n.e164)?.status !== undefined && storedBefore.get(n.e164)?.status !== 'unknown').map((n) => n.e164),
   );
@@ -482,15 +484,22 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
         store.saveAccount(next);
         for (const state of lifted) store.saveAccount(state);
       });
-      // Answered numbers leave whichever queue they came from.
-      const settle = (list: PhoneNumber[]) => {
-        for (let i = list.length - 1; i >= 0; i -= 1) {
-          if (answers.has((list[i] as PhoneNumber).e164)) list.splice(i, 1);
+      // Answered numbers leave whichever queue they came from. Answers only name numbers of the
+      // batch, which is the first `head` entries of `pending`: compact just that head, then one
+      // splice — a full scan with a splice per answer was quadratic on large inputs.
+      const settle = (list: PhoneNumber[], head: number) => {
+        const end = Math.min(head, list.length);
+        let removed = 0;
+        for (let i = 0; i < end; i += 1) {
+          const n = list[i] as PhoneNumber;
+          if (answers.has(n.e164)) removed += 1;
+          else if (removed > 0) list[i - removed] = n;
         }
+        if (removed > 0) list.splice(end - removed, removed);
       };
-      settle(pending);
+      settle(pending, batch.length);
       if (retryBatch !== undefined) {
-        settle(retryBatch.numbers);
+        settle(retryBatch.numbers, Number.POSITIVE_INFINITY);
         const index = retries.indexOf(retryBatch);
         if (retryBatch.numbers.length === 0 && index >= 0) retries.splice(index, 1);
       }

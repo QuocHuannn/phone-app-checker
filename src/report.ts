@@ -15,6 +15,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { stringify } from 'csv-stringify/sync';
+import { stringify as createCsvStringifier } from 'csv-stringify';
 import { APP_SCOPE } from './adapters/index.ts';
 import type { InputEntry } from './csv.ts';
 import { isFresh } from './scheduler.ts';
@@ -86,10 +87,12 @@ export function buildReport(
   entries: InputEntry[],
   apps: readonly App[],
   freshness: ReportFreshness,
+  /** Results already loaded per app; maps missing an app fall back to one `allResults` call. */
+  stored?: Partial<Record<App, Map<string, StoredResult>>>,
 ): ReportRow[] {
   const selected = new Set<App>(apps);
-  const stored = {} as Record<App, Map<string, StoredResult>>;
-  for (const app of APPS) stored[app] = selected.has(app) ? store.allResults(app) : new Map();
+  const results = {} as Record<App, Map<string, StoredResult>>;
+  for (const app of APPS) results[app] = stored?.[app] ?? (selected.has(app) ? store.allResults(app) : new Map());
 
   return entries.map((entry): ReportRow => {
     const statuses = {} as Record<App, Status>;
@@ -105,7 +108,7 @@ export function buildReport(
         statuses[app] = 'skipped';
         continue;
       }
-      const result = stored[app].get(phone.e164);
+      const result = results[app].get(phone.e164);
       statuses[app] = result?.status ?? 'unknown';
       if (result && (lastCheckedAt === undefined || result.checkedAt > lastCheckedAt)) lastCheckedAt = result.checkedAt;
       // Only a yes/not_found is an observation about the number; an `unknown` row only records an attempt.
@@ -130,26 +133,30 @@ export function neutralizeFormula(value: string): string {
   return FORMULA_START.test(value) ? `'${value}` : value;
 }
 
-/** Deterministic CSV text: fixed column order, `\n` line endings, ISO-8601 UTC timestamps. */
+/** One report row as CSV cells; shared by the buffered formatter and the streaming writer. */
+function reportCells(row: ReportRow): string[] {
+  return [
+    // The input cell is customer-supplied text: neutralize spreadsheet formulas unless it is a
+    // valid number written with only phone characters. e164/country/status cells are ours.
+    row.e164 !== '' && PLAIN_PHONE_TEXT.test(row.input) ? row.input : neutralizeFormula(row.input),
+    row.e164,
+    row.country,
+    ...APPS.map((app) => row.statuses[app]),
+    row.lastCheckedAt === undefined ? '' : new Date(row.lastCheckedAt).toISOString(),
+    ...APPS.map((app) => {
+      const at = row.observations[app]?.checkedAt;
+      return at === undefined || !Number.isFinite(at) ? '' : new Date(at).toISOString();
+    }),
+    ...APPS.map((app) => {
+      const observation = row.observations[app];
+      return observation === undefined ? '' : observation.stale ? 'yes' : 'no';
+    }),
+  ];
+}
+
 export function formatReportCsv(rows: ReportRow[]): string {
   return stringify(
-    rows.map((row) => [
-      // The input cell is customer-supplied text: neutralize spreadsheet formulas unless it is a
-      // valid number written with only phone characters. e164/country/status cells are ours.
-      row.e164 !== '' && PLAIN_PHONE_TEXT.test(row.input) ? row.input : neutralizeFormula(row.input),
-      row.e164,
-      row.country,
-      ...APPS.map((app) => row.statuses[app]),
-      row.lastCheckedAt === undefined ? '' : new Date(row.lastCheckedAt).toISOString(),
-      ...APPS.map((app) => {
-        const at = row.observations[app]?.checkedAt;
-        return at === undefined || !Number.isFinite(at) ? '' : new Date(at).toISOString();
-      }),
-      ...APPS.map((app) => {
-        const observation = row.observations[app];
-        return observation === undefined ? '' : observation.stale ? 'yes' : 'no';
-      }),
-    ]),
+    rows.map(reportCells),
     { header: true, columns: [...REPORT_COLUMNS] },
   );
 }
@@ -323,10 +330,15 @@ function removeStaleTemps(dest: string): void {
   }
 }
 
+/** Serialized CSV accumulates to this size before it is written to the file. */
+const WRITE_FLUSH_SIZE = 256 * 1024;
+
 /**
  * Write the report atomically: an exclusive, unpredictable mode-0600 temp file in the destination
- * directory, fsynced, then renamed over the destination. Never follows a symlink and never
- * touches a pre-existing temp path.
+ * directory, fsynced, then renamed over the destination. Never follows a symlink and never touches
+ * a pre-existing temp path. Rows are serialized one at a time through csv-stringify's incremental
+ * engine and flushed to the file, so the whole CSV string is never held in memory; the bytes are
+ * identical to `formatReportCsv(rows)`.
  */
 export function writeReport(path: string, rows: ReportRow[], target: ReportTarget = {}): void {
   const dest = checkReportTarget(path, target);
@@ -335,9 +347,42 @@ export function writeReport(path: string, rows: ReportRow[], target: ReportTarge
   const fd = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
   try {
     try {
-      const data = Buffer.from(formatReportCsv(rows), 'utf8');
-      let offset = 0;
-      while (offset < data.length) offset += writeSync(fd, data, offset, data.length - offset);
+      // The Stringifier's transform api is what its stream wrapper calls for every record; driving
+      // it directly keeps this writer synchronous like the rest of the store/report layer while a
+      // serialized row is written as soon as it exists, never buffered into one report string.
+      const stringifier = createCsvStringifier({ header: true, columns: [...REPORT_COLUMNS] }) as unknown as {
+        api: {
+          __transform: (record: string[], push: (chunk: string) => void) => Error | undefined;
+          bom: (push: (chunk: string) => void) => unknown;
+          headers: (push: (chunk: string) => void) => Error | undefined;
+        };
+      };
+      let pending = '';
+      const push = (chunk: string) => {
+        pending += chunk;
+        if (pending.length >= WRITE_FLUSH_SIZE) {
+          const data = Buffer.from(pending, 'utf8');
+          pending = '';
+          writeSync(fd, data, 0, data.length);
+        }
+      };
+      const flush = () => {
+        if (pending === '') return;
+        const data = Buffer.from(pending, 'utf8');
+        pending = '';
+        writeSync(fd, data, 0, data.length);
+      };
+      for (const row of rows) {
+        const error = stringifier.api.__transform(reportCells(row), push);
+        if (error !== undefined) throw error;
+      }
+      if (rows.length === 0) {
+        // An empty report is still the header line, which the engine emits from its flush step.
+        stringifier.api.bom(push);
+        const error = stringifier.api.headers(push);
+        if (error !== undefined) throw error;
+      }
+      flush();
       fsyncSync(fd);
     } finally {
       closeSync(fd);

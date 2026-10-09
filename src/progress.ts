@@ -66,7 +66,11 @@ export class ProgressRenderer {
     this.now = options.now ?? Date.now;
   }
 
-  /** Record an app's new state and draw it. */
+  /**
+   * Record an app's new state. In `bar` mode the line is redrawn on the tick timer only (updating
+   * per batch used to draw once per call, which dominates once several accounts report at once);
+   * `lines` mode keeps its own throttle. `wrapLog` and `finish` still draw immediately.
+   */
   update(event: ProgressEvent): void {
     if (this.finished) return;
     const first = this.startedAt === undefined;
@@ -78,7 +82,6 @@ export class ProgressRenderer {
     }
     if (snapshot.total === 0) return;
     if (this.options.mode === 'bar') {
-      this.draw();
       if (this.timer === undefined) {
         this.timer = setInterval(() => this.draw(), this.options.tickMs ?? 150);
         this.timer.unref();
@@ -103,12 +106,13 @@ export class ProgressRenderer {
     };
   }
 
-  /** Stop animating and remove the bar. In `lines` mode, write a last line when something was reported. */
+  /** Stop animating, draw the final state once (a run can finish between ticks), and remove the bar. In `lines` mode, write a last line when something was reported. */
   finish(): void {
     if (this.finished) return;
     this.finished = true;
     clearInterval(this.timer);
     this.timer = undefined;
+    if (this.options.mode === 'bar') this.draw();
     this.erase();
     if (this.options.mode === 'lines' && this.lineWritten) {
       const snapshot = this.snapshot();

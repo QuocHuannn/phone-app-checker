@@ -302,6 +302,24 @@ export function formatDuration(ms: number): string {
   return `${hours} h ${String(minutes % 60).padStart(2, '0')} min`;
 }
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * A clock time in local time, `HH:MM` when it falls on the same local calendar day as `now`
+ * (default: the real current time), `DD Mon HH:MM` otherwise — so a resume tomorrow or next week
+ * is never ambiguous. Replaces `toISOString()` in user-visible text, which was always UTC.
+ */
+export function formatLocalTime(ms: number, now?: number): string {
+  const at = new Date(ms);
+  const time = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  const ref = new Date(now ?? Date.now());
+  const sameDay =
+    at.getFullYear() === ref.getFullYear() && at.getMonth() === ref.getMonth() && at.getDate() === ref.getDate();
+  return sameDay ? time : `${pad(at.getDate())} ${MONTH_NAMES[at.getMonth()]} ${time}`;
+}
+
+const pad = (n: number): string => String(n).padStart(2, '0');
+
 export type Tone = 'info' | 'ok' | 'warn' | 'error';
 
 export interface BoxLine {

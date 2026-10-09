@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_APPS, type Config } from '../src/config.ts';
 import type { ProgressEvent } from '../src/progress.ts';
 import { describeRun, isFresh, MAX_BATCH_FAILURES, MAX_CONSECUTIVE_ERRORS, runChecks, type AppRunSummary } from '../src/scheduler.ts';
+import { formatLocalTime } from '../src/ui.ts';
 import { nextLocalMidnight, Store } from '../src/store.ts';
 import {
   AccountBanned,
@@ -732,7 +733,7 @@ describe('one bad batch does not take down the account', () => {
 });
 
 describe('attempted vs conclusive vs inconclusive, and the INCOMPLETE banner', () => {
-  const banner = (summaries: AppRunSummary[]) => describeRun(summaries).banner.join('\n');
+  const banner = (summaries: AppRunSummary[]) => describeRun(summaries, undefined, NOON).banner.join('\n');
 
   it('a refresh that comes back unknown keeps the old answer, counts as inconclusive and is never "done"', async () => {
     const h = harness(makeConfig({ batchSize: 10 }));
@@ -795,7 +796,7 @@ describe('attempted vs conclusive vs inconclusive, and the INCOMPLETE banner', (
     });
     const text = banner(summaries);
     expect(text).toContain('cooldown');
-    expect(text).toContain(`Next resume: ${new Date(NOON + 10_000).toISOString()}`);
+    expect(text).toContain(`Next resume: ${formatLocalTime(NOON + 10_000, NOON)}`);
   });
 
   it('daily cap with --no-wait: daily cap reason, resume at local midnight', async () => {
@@ -811,7 +812,7 @@ describe('attempted vs conclusive vs inconclusive, and the INCOMPLETE banner', (
       resumeAt: nextLocalMidnight(NOON),
     });
     expect(banner(summaries)).toContain('daily cap');
-    expect(banner(summaries)).toContain(`Next resume: ${new Date(nextLocalMidnight(NOON)).toISOString()}`);
+    expect(banner(summaries)).toContain(`Next resume: ${formatLocalTime(nextLocalMidnight(NOON), NOON)}`);
   });
 
   it('unexpected errors are counted and named', async () => {

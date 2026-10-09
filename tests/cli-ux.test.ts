@@ -134,18 +134,22 @@ describe('check --progress lines', () => {
 });
 
 describe('check on a rich terminal', () => {
-  it('draws the progress bar on the display, in place, and removes it before the summary', async () => {
+  it('draws the run dashboard on the display and erases the frame before the summary', async () => {
     await run(['check', csv, '--out', out], { display: display(100), printDisplay: display(100), env: RICH_ENV });
     const drawn = screen.join('');
-    expect(drawn).toContain(`\r${ESC}[2K`);
-    const frames = stripAnsi(drawn).split('\r').filter((part) => part !== '');
-    expect(frames.some((frame) => /\d+% \d+\/3/.test(frame))).toBe(true);
-    expect(frames.some((frame) => frame.includes('100% 3/3'))).toBe(true);
-    expect(screen.at(-1)).toBe(`\r${ESC}[2K`);
-    // The bar is only ever drawn with carriage returns: it never adds a line of its own.
-    expect(drawn).not.toContain('\n');
-    // The run's own log lines are still all in the log, intact.
-    expect(logs.some((line) => /telegram: a: \d checked, \d left/.test(line))).toBe(true);
+    // Multi-line framed dashboard: header, per-account rows, totals bar, counts and the run log path.
+    const text = stripAnsi(drawn);
+    expect(text).toContain('Checking customers.csv');
+    for (const label of ['APP', 'ACCOUNT', 'STATE', 'DONE']) expect(text).toContain(label);
+    expect(text).toMatch(/telegram\s+a\s+.*0\/2/);
+    expect(text).toContain('3 of 3 checks');
+    expect(text).toContain('yes 2 · not_found 1 · unknown 0');
+    expect(text).toMatch(/Log: .*check-.*\.log/);
+    // The whole frame is taken down at the end: cursor up over every row, then erase below.
+    expect(drawn).toMatch(/\[\d+A\r\[J/);
+    // The dashboard lives on the display stream only; the run's own log lines stay in the log.
+    expect(logs.join('\n')).not.toContain('ACCOUNT');
+    expect(logs.some((line) => /telegram: a: \d checked, \d left/.test(line))).toBe(false);
   });
 
   it('colours the summary table (yes green, not_found yellow, zero counts dim) and keeps the columns aligned', async () => {

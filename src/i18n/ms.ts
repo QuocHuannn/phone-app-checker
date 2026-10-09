@@ -223,4 +223,141 @@ export const ms = {
   qrGatePrompt: ({ alt }) =>
     `Besarkan tetingkap, kemudian tekan Enter untuk mencuba semula${alt === '' ? '' : `, atau taip c untuk ${alt}`} (b = kembali): `,
   tgLoginTitle: 'Log masuk ke Telegram',
+
+  // v0.2.0: papan pemuka larian langsung, log larian, ringkasan, bendera --plain.
+  dashTitle: ({ file, numbers }: { file: string; numbers: number }) => `Menyemak ${file} · ${numbers} nombor`,
+  dashElapsed: ({ time }: { time: string }) => `Berlalu ${time}`,
+  dashSpeed: ({ rate }: { rate: number }) => `${rate} seminit`,
+  dashEta: ({ left, clock }: { left: string; clock: string }) => `baki kira-kira ${left} · siap kira-kira ${clock}`,
+  dashColApp: 'APLIKASI',
+  dashColAccount: 'AKAUN',
+  dashColState: 'STATUS',
+  dashColDone: 'SIAP',
+  dashColStatus: 'KEPUTUSAN',
+  dashColLast: 'AKHIR',
+  dashWorking: 'bekerja',
+  dashWaiting: 'menunggu',
+  dashResting: ({ clock, left }: { clock: string; left: string }) => `berehat · sambung semula ${clock} (dalam ${left})`,
+  dashDisabled: 'dinyahaktifkan',
+  dashDone: 'siap',
+  dashStatusCounts: ({ yes, notFound, unknown }: { yes: number; notFound: number; unknown: number }) =>
+    `${yes}y ${notFound}nf ${unknown}u`,
+  dashChecks: ({ done, total, numbers, apps }: { done: number; total: number; numbers: number; apps: number }) =>
+    `${done} daripada ${total} semakan (${numbers} nombor x ${apps} ${apps === 1 ? 'aplikasi' : 'aplikasi'})`,
+  dashCounts: ({ yes, notFound, unknown }: { yes: number; notFound: number; unknown: number }) =>
+    `yes ${yes} · not_found ${notFound} · unknown ${unknown}`,
+  dashHintStop: 'Ctrl+C menamatkan kumpulan ini dan menyimpan laporan.',
+  dashDetailsFile: ({ path }: { path: string }) => `Log terperinci: ${path}`,
+  progressPercent: ({ percent, done, total }: { percent: number; done: number; total: number }) =>
+    `kemajuan ${percent}% ${done}/${total}`,
+  progressEta: ({ time }: { time: string }) => `anggaran ${time}`,
+  progressPacing: ({ time }: { time: string }) => `rentak ${time}`,
+  progressRestingUntil: ({ clock }: { clock: string }) => `berehat sehingga ${clock}`,
+  summaryDone: ({ time, numbers, unfinished }: { time: string; numbers: number; unfinished: number }) =>
+    `Selesai dalam ${time} · ${numbers} nombor · ${unfinished} belum selesai`,
+  summaryNumbers: ({ total, valid, invalid }: { total: number; valid: number; invalid: number }) =>
+    `Nombor: ${total} unik (${valid} valid, ${invalid} invalid)`,
+  summaryAccountsUsed: ({ list }: { list: string }) => `Akaun digunakan: ${list}`,
+  summaryColApp: 'aplikasi',
+  summaryColYes: 'yes',
+  summaryColNotFound: 'not_found',
+  summaryColUnknown: 'unknown',
+  summaryColSkipped: 'skipped',
+  summaryColInvalid: 'invalid',
+  summaryColCountry: 'negara',
+  summaryYesByCountry: 'Berdaftar (yes) mengikut negara:',
+  summaryStale: ({ apps, count }: { apps: string; count: number }) =>
+    `USANG: ${apps} — ${count} keputusan yes/not_found ${count === 1 ? 'yang' : 'yang'} melebihi usia maksimum atau bertarikh pada masa hadapan ` +
+    '(lihat <app>_checked_at / <app>_stale dalam laporan): dikekalkan, tidak disahkan semula.',
+  summaryFootnote:
+    '`not_found` juga boleh bermaksud orang itu menyembunyikan nombornya daripada carian; `unknown` = belum disemak atau diperlahankan.',
+  cliNoValidNumbers: ({ invalid }: { invalid: number }) =>
+    `tiada nombor telefon yang sah (${invalid} invalid); semak --column serta lajur telefon dan kod negara dalam fail`,
+  cliCsvColumn: ({ name }: { name: string }) => `lajur "${name}"`,
+  cliCsvColumnIndex: ({ index }: { index: string }) => `lajur ${index} (tiada baris pengepala)`,
+  cliCsvRead: ({ file, labelled, rows, unique, invalid, duplicates }: { file: string; labelled: string; rows: number; unique: number; invalid: number; duplicates: number }) =>
+    `${file}: menggunakan ${labelled}; ${rows} ${rows === 1 ? 'baris' : 'baris'}, ${unique} unik` +
+    `${duplicates === 0 ? '' : `, ${duplicates} ${duplicates === 1 ? 'pendua' : 'pendua'} digabungkan`}, ${invalid} invalid`,
+  cliReportWritten: ({ path }: { path: string }) => `Laporan disimpan ke ${path}`,
+  cliInterruptOnce: 'Gangguan diterima: menyelesaikan kumpulan semasa, kemudian menulis laporan (Ctrl-C sekali lagi untuk paksa keluar)...',
+  cliInterruptOnceParallel:
+    'Gangguan diterima: menunggu kumpulan yang sedang berjalan, kemudian menulis laporan (Ctrl-C sekali lagi untuk paksa keluar)...',
+  cliInterruptTwice: 'Gangguan kedua, keluar sekarang.',
+  cliWarnNoValid: ({ reason }: { reason: string }) => `AMARAN: ${reason}. Laporan di atas hanya menyenaraikan baris invalid.`,
+  cliColApp: 'aplikasi',
+  cliColAccount: 'akaun',
+  cliColState: 'status',
+  cliColUsedToday: 'digunakan hari ini',
+  cliColBatchTime: 'masa kumpulan (purata / terakhir)',
+  cliAccountReady: 'sedia',
+  cliAccountDisabled: ({ reason }: { reason: string }) => `DINYAHAKTIFKAN: ${reason}`,
+  cliAccountCooling: ({ time }: { time: string }) => `cooldown sehingga ${time}`,
+  cliNoAccounts: 'Belum ada akaun. Log masuk dahulu (item menu 2, atau jalankan: phone-app-checker login <app> --account <name>).',
+  cliNoResetState: ({ app, account }: { app: string; account: string }) =>
+    `Tiada status direkodkan untuk akaun "${account}" bagi ${app}; tiada apa untuk diset semula.`,
+  cliResetDone: ({ app, account }: { app: string; account: string }) =>
+    `Cooldown dan penanda dinyahaktifkan untuk akaun "${account}" bagi ${app} telah dikosongkan.`,
+  revealPrompt: 'o = tunjuk dalam Finder · Enter = menu',
+  revealDone: 'Laporan ditunjukkan dalam Finder.',
+  revealFailed: 'Tidak dapat membuka Finder; laluan ada di atas.',
+  schNoAccounts: ({ numbers, app }: { numbers: number; app: string }) =>
+    `tiada akaun, ${numbers} ${numbers === 1 ? 'nombor' : 'nombor'} belum disemak. Jalankan: login ${app} --account <name>`,
+  schToCheck: ({ numbers, accounts }: { numbers: number; accounts: number }) =>
+    `${numbers} ${numbers === 1 ? 'nombor' : 'nombor'} untuk disemak dengan ${accounts} ${accounts === 1 ? 'akaun' : 'akaun'}`,
+  schFailedBefore: ({ count }: { count: number }) =>
+    `${count} ${count === 1 ? 'nombor' : 'nombor'} gagal dalam larian terdahulu: menyemaknya paling akhir, satu demi satu`,
+  schRateLimited: ({ account, time }: { account: string; time: string }) => `${account}: terhad kadar, berehat sehingga ${time}`,
+  schBanned: ({ account, reason, app }: { account: string; reason: string; app: string }) =>
+    `AMARAN ${account}: akaun dinyahaktifkan (${reason}). Baikinya, kemudian: login ${app} --account ${account}`,
+  schBatchError: ({ account, errors, max, reason }: { account: string; errors: number; max: number; reason: string }) =>
+    `${account}: ralat (${errors}/${max}): ${reason}`,
+  schParked: ({ count, failures }: { count: number; failures: number }) =>
+    `${count} ${count === 1 ? 'nombor' : 'nombor'} gagal ${failures} kali dalam larian yang sebaliknya berfungsi; ` +
+    'dibiarkan unknown untuk larian ini (tiada akaun diletakkan pada cooldown untuknya)',
+  schDropped: ({ account }: { account: string }) => `${account}: digugurkan untuk baki larian ini selepas ralat berulang`,
+  schBatchTimeout: ({ account, count }: { account: string; count: number }) =>
+    `${account}: satu kumpulan ${count} ${count === 1 ? 'nombor' : 'nombor'} tidak kembali tepat pada masanya; nombornya kekal unknown dan dikira dalam had hari ini`,
+  schNoUsable: ({ count }: { count: number }) =>
+    `tiada akaun boleh guna lagi (dinyahaktifkan atau gagal), ${count} ${count === 1 ? 'nombor' : 'nombor'} tidak disemak`,
+  schAllBlockedNowait: ({ count }: { count: number }) =>
+    `semua akaun sedang cooldown atau mencapai had harian, ${count} ${count === 1 ? 'nombor' : 'nombor'} tidak disemak (--no-wait)`,
+  schAllResting: ({ time, count }: { time: string; count: number }) =>
+    `semua akaun sedang berehat; sambung semula pada ${time} (baki ${count})`,
+  schChecked: ({ account, count, left }: { account: string; count: number; left: number }) =>
+    `${account}: ${count} disemak, baki ${left}`,
+  schCloseError: ({ account, reason }: { account: string; reason: string }) =>
+    `${account}: ralat semasa menutup sesi: ${reason}`,
+  schStoppedByError: ({ reason }: { reason: string }) => `dihentikan oleh ralat tidak dijangka: ${reason}`,
+  runComplete: 'semua muktamad',
+  runNotConclusive: 'selesai, TIDAK muktamad',
+  runStopDone: 'selesai',
+  runStopAborted: 'dihentikan',
+  runStopNoAccounts: 'tiada akaun boleh guna',
+  runStopBlocked: 'disekat',
+  runStopAdapterError: 'adapter tidak dapat dimuatkan',
+  runKept: ({ count }: { count: number }) => `, ${count} mengekalkan keputusan lama`,
+  runLine: ({ app, needed, attempted, conclusive, inconclusive, kept, remaining, label }: { app: string; needed: number; attempted: number; conclusive: number; inconclusive: number; kept: string; remaining: number; label: string }) =>
+    `${app}: perlu ${needed}, dicuba ${attempted}, muktamad ${conclusive}, ` +
+    `tidak muktamad ${inconclusive}${kept}, tiada jawapan ${remaining} (${label})`,
+  runIncomplete: ({ inconclusive, needed }: { inconclusive: number; needed: number }) =>
+    `INCOMPLETE: ${inconclusive} daripada ${needed} ${needed === 1 ? 'semakan' : 'semakan'} tiada jawapan yes/not_found baharu.`,
+  runNotFinal:
+    'Laporan ini BUKAN muktamad: sel bertanda unknown belum disemak, dan yes/not_found yang lebih lama mungkin usang.',
+  runAppLine: ({ app, inconclusive, attempted, conclusive }: { app: string; inconclusive: number; attempted: number; conclusive: number }) =>
+    `${app}: ${inconclusive} tidak muktamad (${attempted} dicuba, ${conclusive} muktamad)`,
+  runReasonNoAccounts: ({ app }: { app: string }) =>
+    `no_accounts: tiada akaun ${app} boleh guna (log masuk, atau baiki yang dinyahaktifkan: login ${app} --account <name>)`,
+  runReasonAdapterError: ({ app }: { app: string }) => `adapter_error: adapter ${app} tidak dapat dimuatkan`,
+  runReasonAborted: 'aborted: larian dihentikan',
+  runReasonCooldown: 'cooldown: setiap akaun berehat selepas had kadar atau ralat',
+  runReasonDailyCap: 'daily cap: setiap akaun boleh guna telah mencapai had hariannya',
+  runReasonErrors: ({ count }: { count: number }) => `errors: ${count} ${count === 1 ? 'kumpulan' : 'kumpulan'} gagal`,
+  runReasonParked: ({ batches, numbers }: { batches: number; numbers: number }) =>
+    `parked batches: ${batches} ${batches === 1 ? 'kumpulan' : 'kumpulan'}, ${numbers} ${numbers === 1 ? 'nombor' : 'nombor'}, diketepikan untuk larian ini`,
+  runReasonUnknown: ({ count }: { count: number }) =>
+    `unknown answers: ${count} ${count === 1 ? 'nombor' : 'nombor'} kembali sebagai unknown`,
+  runReasonNotReached: 'not_reached: sesetengah nombor tidak disemak',
+  runResumeHint: 'Jalankan arahan yang sama sekali lagi untuk meneruskan (nombor yang selesai tidak diulang).',
+  runResumeAt: ({ time }: { time: string }) =>
+    `Sambungan semula seterusnya: ${time}. Jalankan arahan yang sama pada masa itu (nombor yang selesai tidak diulang).`,
 } satisfies Catalog;

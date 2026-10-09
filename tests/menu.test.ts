@@ -652,7 +652,7 @@ describe('menu through main()', () => {
     mkdirSync(join(appHome, 'data', 'sessions', 'telegram', 'a'), { recursive: true });
     const bad = join(work, 'bad.csv');
     writeFileSync(bad, 'name,phone\nAn,abc\n');
-    const terminal = scriptedTerminal(['1', CSV_PATH(), '', '', '1', bad, '', '', 'n', '0'], true);
+    const terminal = scriptedTerminal(['1', CSV_PATH(), '', '', '', '1', bad, '', '', 'n', '0'], true);
     const printed: string[] = [];
     const logged: string[] = [];
     const d = deps(terminal, printed, logged);

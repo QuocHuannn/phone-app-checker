@@ -220,4 +220,141 @@ export const zh = {
   qrGatePrompt: ({ alt }) =>
     `请放大窗口，然后按 Enter 重试${alt === '' ? '' : `，或输入 c 来${alt}`} (b = 返回): `,
   tgLoginTitle: '登录 Telegram',
+
+  // v0.2.0: live run dashboard, run log, summary, --plain flag.
+  dashTitle: ({ file, numbers }) => `正在检查 ${file} · ${numbers} 个号码`,
+  dashElapsed: ({ time }) => `已用时 ${time}`,
+  dashSpeed: ({ rate }) => `${rate}/分钟`,
+  dashEta: ({ left, clock }) => `约剩 ${left} · 预计 ${clock} 完成`,
+  dashColApp: '应用',
+  dashColAccount: '账号',
+  dashColState: '状态',
+  dashColDone: '已完成',
+  dashColStatus: '结果',
+  dashColLast: '最近',
+  dashWorking: '进行中',
+  dashWaiting: '等待中',
+  dashResting: ({ clock, left }) => `休息中 · ${clock} 恢复 (${left} 后)`,
+  dashDisabled: '已禁用',
+  dashDone: '完成',
+  dashStatusCounts: ({ yes, notFound, unknown }) =>
+    `${yes}y ${notFound}nf ${unknown}u`,
+  dashChecks: ({ done, total, numbers, apps }) =>
+    `${done}/${total} 项检查 (${numbers} 个号码 x ${apps} ${apps === 1 ? '个应用' : '个应用'})`,
+  dashCounts: ({ yes, notFound, unknown }) =>
+    `yes ${yes} · not_found ${notFound} · unknown ${unknown}`,
+  dashHintStop: 'Ctrl+C 会完成当前批次并保存报告。',
+  dashDetailsFile: ({ path }) => `日志: ${path}`,
+  progressPercent: ({ percent, done, total }) =>
+    `进度 ${percent}% ${done}/${total}`,
+  progressEta: ({ time }) => `预计完成 ${time}`,
+  progressPacing: ({ time }) => `节奏 ${time}`,
+  progressRestingUntil: ({ clock }) => `休息至 ${clock}`,
+  summaryDone: ({ time, numbers, unfinished }) =>
+    `用时 ${time} · ${numbers} 个号码 · ${unfinished} 个未完成`,
+  summaryNumbers: ({ total, valid, invalid }) =>
+    `号码: ${total} 个去重 (${valid} 个有效，${invalid} 个无效)`,
+  summaryAccountsUsed: ({ list }) => `使用的账号: ${list}`,
+  summaryColApp: '应用',
+  summaryColYes: 'yes',
+  summaryColNotFound: 'not_found',
+  summaryColUnknown: 'unknown',
+  summaryColSkipped: 'skipped',
+  summaryColInvalid: 'invalid',
+  summaryColCountry: '国家/地区',
+  summaryYesByCountry: '各国家/地区已注册 (yes):',
+  summaryStale: ({ apps, count }) =>
+    `STALE: ${apps} — ${count} 条 yes/not_found ${count === 1 ? '结果' : '结果'}已超过最大保留期或日期在未来 ` +
+    '(见报告中的 <app>_checked_at / <app>_stale): 已保留，未重新确认。',
+  summaryFootnote:
+    '`not_found` 也可能表示对方隐藏了号码、不允许被搜索；`unknown` = 尚未检查或被限流。',
+  cliNoValidNumbers: ({ invalid }) =>
+    `没有有效的电话号码 (${invalid} 个无效)；请检查 --column 以及文件中的号码列和国家代码`,
+  cliCsvColumn: ({ name }) => `列 "${name}"`,
+  cliCsvColumnIndex: ({ index }) => `第 ${index} 列 (无表头行)`,
+  cliCsvRead: ({ file, labelled, rows, unique, invalid, duplicates }) =>
+    `${file}: 使用 ${labelled}; ${rows} ${rows === 1 ? '行' : '行'}，${unique} 个去重` +
+    `${duplicates === 0 ? '' : `，合并了 ${duplicates} ${duplicates === 1 ? '条重复' : '条重复'}`}，${invalid} 个无效`,
+  cliReportWritten: ({ path }) => `报告已写入 ${path}`,
+  cliInterruptOnce: '收到中断信号: 正在完成当前批次，然后写入报告 (再按一次 Ctrl-C 强制退出)...',
+  cliInterruptOnceParallel:
+    '收到中断信号: 正在等待进行中的批次，然后写入报告 (再按一次 Ctrl-C 强制退出)...',
+  cliInterruptTwice: '第二次中断，立即退出。',
+  cliWarnNoValid: ({ reason }) => `警告: ${reason}。上面的报告只列出了无效行。`,
+  cliColApp: '应用',
+  cliColAccount: '账号',
+  cliColState: '状态',
+  cliColUsedToday: '今日已用',
+  cliColBatchTime: '批次耗时 (平均 / 最近)',
+  cliAccountReady: '就绪',
+  cliAccountDisabled: ({ reason }) => `已禁用: ${reason}`,
+  cliAccountCooling: ({ time }) => `冷却中，至 ${time}`,
+  cliNoAccounts: '还没有账号。请先登录 (菜单第 2 项，或运行: phone-app-checker login <app> --account <name>)。',
+  cliNoResetState: ({ app, account }) =>
+    `没有 ${app} 账号 "${account}" 的已记录状态；无需重置。`,
+  cliResetDone: ({ app, account }) =>
+    `已清除 ${app} 账号 "${account}" 的冷却和禁用标记。`,
+  revealPrompt: 'o = 在 Finder 中显示 · Enter = 菜单',
+  revealDone: '报告已在 Finder 中显示。',
+  revealFailed: '无法打开 Finder；路径见上方。',
+  schNoAccounts: ({ numbers, app }) =>
+    `没有账号，${numbers} ${numbers === 1 ? '个号码' : '个号码'}未检查。运行: login ${app} --account <name>`,
+  schToCheck: ({ numbers, accounts }) =>
+    `将用 ${accounts} ${accounts === 1 ? '个账号' : '个账号'}检查 ${numbers} ${numbers === 1 ? '个号码' : '个号码'}`,
+  schFailedBefore: ({ count }) =>
+    `${count} ${count === 1 ? '个号码' : '个号码'}在之前的运行中失败: 放到最后逐个检查`,
+  schRateLimited: ({ account, time }) => `${account}: 被限流，休息至 ${time}`,
+  schBanned: ({ account, reason, app }) =>
+    `警告 ${account}: 账号已禁用 (${reason})。修复后运行: login ${app} --account ${account}`,
+  schBatchError: ({ account, errors, max, reason }) =>
+    `${account}: 错误 (${errors}/${max}): ${reason}`,
+  schParked: ({ count, failures }) =>
+    `${count} ${count === 1 ? '个号码' : '个号码'}在一次正常的运行中失败了 ${failures} 次；` +
+    '本次运行将它们留为 unknown (不会因此让任何账号进入冷却)',
+  schDropped: ({ account }) => `${account}: 因反复出错，本次运行剩余时间不再使用`,
+  schBatchTimeout: ({ account, count }) =>
+    `${account}: 一批 ${count} ${count === 1 ? '个号码' : '个号码'}未及时返回；这些号码保持 unknown 且计入今日上限`,
+  schNoUsable: ({ count }) =>
+    `没有可用账号 (已禁用或出错)，${count} ${count === 1 ? '个号码' : '个号码'}未检查`,
+  schAllBlockedNowait: ({ count }) =>
+    `所有账号都在冷却或已达每日上限，${count} ${count === 1 ? '个号码' : '个号码'}未检查 (--no-wait)`,
+  schAllResting: ({ time, count }) =>
+    `所有账号都在休息；${time} 恢复 (剩 ${count} 个)`,
+  schChecked: ({ account, count, left }) =>
+    `${account}: 已检查 ${count} 个，剩 ${left} 个`,
+  schCloseError: ({ account, reason }) =>
+    `${account}: 关闭会话时出错: ${reason}`,
+  schStoppedByError: ({ reason }) => `因意外错误停止: ${reason}`,
+  runComplete: '全部有结论',
+  runNotConclusive: '已结束，但无结论',
+  runStopDone: '已完成',
+  runStopAborted: '已中断',
+  runStopNoAccounts: '无可用账号',
+  runStopBlocked: '被阻止',
+  runStopAdapterError: '适配器无法加载',
+  runKept: ({ count }) => `，${count} 个保留旧结果`,
+  runLine: ({ app, needed, attempted, conclusive, inconclusive, kept, remaining, label }) =>
+    `${app}: 需要 ${needed}，已尝试 ${attempted}，有结论 ${conclusive}，` +
+    `无结论 ${inconclusive}${kept}，无应答 ${remaining} (${label})`,
+  runIncomplete: ({ inconclusive, needed }) =>
+    `不完整: ${needed} 项检查中有 ${inconclusive} ${needed === 1 ? '项' : '项'}没有新的 yes/not_found 结果。`,
+  runNotFinal:
+    '报告并非最终结果: 标记为 unknown 的单元格尚未检查，旧的 yes/not_found 可能已过期。',
+  runAppLine: ({ app, inconclusive, attempted, conclusive }) =>
+    `${app}: ${inconclusive} 项无结论 (已尝试 ${attempted}，有结论 ${conclusive})`,
+  runReasonNoAccounts: ({ app }) =>
+    `no_accounts: 没有可用的 ${app} 账号 (请登录，或修复被禁用的账号: login ${app} --account <name>)`,
+  runReasonAdapterError: ({ app }) => `adapter_error: 无法加载 ${app} 适配器`,
+  runReasonAborted: 'aborted: 运行被中断',
+  runReasonCooldown: 'cooldown: 所有账号都在限流或出错后休息',
+  runReasonDailyCap: 'daily cap: 所有可用账号都已达到每日上限',
+  runReasonErrors: ({ count }) => `errors: ${count} ${count === 1 ? '个批次' : '个批次'}失败`,
+  runReasonParked: ({ batches, numbers }) =>
+    `parked batches: ${batches} ${batches === 1 ? '个批次' : '个批次'}，${numbers} ${numbers === 1 ? '个号码' : '个号码'}，本次运行已放弃`,
+  runReasonUnknown: ({ count }) =>
+    `unknown answers: ${count} ${count === 1 ? '个号码' : '个号码'}返回了 unknown`,
+  runReasonNotReached: 'not_reached: 部分号码未被检查',
+  runResumeHint: '再次运行相同命令即可继续 (已完成的号码不会重复检查)。',
+  runResumeAt: ({ time }) =>
+    `下次恢复: ${time}。届时再次运行相同命令 (已完成的号码不会重复检查)。`,
 } satisfies Catalog;

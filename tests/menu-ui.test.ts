@@ -625,6 +625,8 @@ describe('login method list and the closing box on a rich terminal', () => {
     expect(box).toContain('│ Next: open the file with Excel or Numbers (double-click it).');
     expect(box).toMatch(/│ To show it in Finder, type: open -R '[^ ]*report\.csv'/);
     expect(box).not.toContain('INCOMPLETE');
+    // The check ends in a pause: Enter returns to the menu.
+    await tty.send('\r');
     // Second run: the menu is back and the file just used is the first choice on the list; 7 numbers are still without an answer.
     at = await until(tty, 'Accounts ready:', at);
     at = await answer(tty, '↑↓ move · Enter select', '1', at);
@@ -641,6 +643,7 @@ describe('login method list and the closing box on a rich terminal', () => {
     expect(box).toContain('Run the same check again with the same file to continue; finished numbers are not repeated.');
     // The warning is bold red on a rich terminal.
     expect(tty.screen()).toMatch(/\u001b\[31m\u001b\[1m[^\n]*INCOMPLETE/);
+    await tty.send('\r'); // the pause after the box
     await quitFrom(tty, at);
     await done;
     expect(runs.map((run) => run[0])).toEqual(['check', 'check']);
@@ -665,6 +668,7 @@ describe('login method list and the closing box on a rich terminal', () => {
     expect(lines[0]).toMatch(/^╭─ Report saved to …/);
     expect(lines[0]).toContain('report.csv');
     for (const line of lines) expect([...line].length).toBeLessThanOrEqual(59);
+    await tty.send('\r'); // the pause after the box
     await answer(tty, 'q quit', '0', at);
     await done;
   });

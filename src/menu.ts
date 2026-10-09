@@ -73,6 +73,8 @@ export interface MenuHost {
   saveLanguage?: (lang: Lang) => void;
   /** Open an address in the default browser (macOS `open`); resolves false when it could not. Absent: the menu never offers it. */
   openUrl?: (url: string) => Promise<boolean>;
+  /** Reveal a file in Finder (macOS `open -R`); resolves false when it could not. Absent: the menu prints the path instead. */
+  revealPath?: (path: string) => Promise<boolean>;
 }
 
 interface Menu {
@@ -467,9 +469,25 @@ async function checkCsv(menu: Menu): Promise<void> {
   reportCommandResult(menu, result);
   if (result.code === 0) {
     showReportDone(menu, out, result, true);
+    if (result.report !== undefined) await pauseOrReveal(menu, result.report.path);
   } else if (result.code === 130) {
     printReportBox(menu, out, result);
     say(t(menu, 'checkInterrupted', { path: shown(out) }));
+    if (result.report !== undefined) await pauseOrReveal(menu, result.report.path);
+  }
+}
+
+/** After a check/summary: Enter returns to the menu, `o` reveals the report in Finder. */
+async function pauseOrReveal(menu: Menu, path: string): Promise<void> {
+  const { host, say } = menu;
+  if (host.revealPath === undefined) {
+    await pauseForMenu(menu);
+    return;
+  }
+  for (;;) {
+    const answer = (await askVisible(t(menu, 'revealPrompt'), host.io)).trim().toLowerCase();
+    if (answer !== 'o') return;
+    say(t(menu, (await host.revealPath(path)) ? 'revealDone' : 'revealFailed'));
   }
 }
 

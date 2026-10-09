@@ -223,4 +223,141 @@ export const ko = {
   qrGatePrompt: ({ alt }) =>
     `창을 키운 다음 Enter를 눌러 다시 시도하세요${alt === '' ? '' : `, 또는 c를 입력해 ${alt}`} (b = 돌아가기): `,
   tgLoginTitle: 'Telegram 로그인',
+
+  // v0.2.0: 실시간 실행 대시보드, 실행 로그, 요약, --plain 플래그.
+  dashTitle: ({ file, numbers }) => `${file} 확인 중 · 번호 ${numbers}개`,
+  dashElapsed: ({ time }) => `경과 ${time}`,
+  dashSpeed: ({ rate }) => `분당 ${rate}`,
+  dashEta: ({ left, clock }) => `약 ${left} 남음 · 약 ${clock}에 완료`,
+  dashColApp: '앱',
+  dashColAccount: '계정',
+  dashColState: '상태',
+  dashColDone: '완료',
+  dashColStatus: '결과',
+  dashColLast: '최근',
+  dashWorking: '작업 중',
+  dashWaiting: '대기 중',
+  dashResting: ({ clock, left }) => `휴식 중 · ${clock}에 재개 (${left} 후)`,
+  dashDisabled: '비활성화됨',
+  dashDone: '완료됨',
+  dashStatusCounts: ({ yes, notFound, unknown }) =>
+    `${yes}y ${notFound}nf ${unknown}u`,
+  dashChecks: ({ done, total, numbers, apps }) =>
+    `확인 ${total}개 중 ${done}개 완료 (번호 ${numbers}개 x ${apps === 1 ? '앱' : '앱'} ${apps}개)`,
+  dashCounts: ({ yes, notFound, unknown }) =>
+    `yes ${yes} · not_found ${notFound} · unknown ${unknown}`,
+  dashHintStop: 'Ctrl+C를 누르면 이 배치를 마무리하고 보고서를 저장합니다.',
+  dashDetailsFile: ({ path }) => `로그: ${path}`,
+  progressPercent: ({ percent, done, total }) =>
+    `진행 ${percent}% ${done}/${total}`,
+  progressEta: ({ time }) => `예상 완료 ${time}`,
+  progressPacing: ({ time }) => `간격 조절 ${time}`,
+  progressRestingUntil: ({ clock }) => `${clock}까지 휴식 중`,
+  summaryDone: ({ time, numbers, unfinished }) =>
+    `${time} 만에 완료 · 번호 ${numbers}개 · 미완료 ${unfinished}개`,
+  summaryNumbers: ({ total, valid, invalid }) =>
+    `번호: 고유 ${total}개 (유효 ${valid}개, 무효 ${invalid}개)`,
+  summaryAccountsUsed: ({ list }) => `사용된 계정: ${list}`,
+  summaryColApp: '앱',
+  summaryColYes: 'yes',
+  summaryColNotFound: 'not_found',
+  summaryColUnknown: 'unknown',
+  summaryColSkipped: 'skipped',
+  summaryColInvalid: 'invalid',
+  summaryColCountry: '국가',
+  summaryYesByCountry: '국가별 등록 (yes):',
+  summaryStale: ({ apps, count }) =>
+    `STALE: ${apps} — ${count === 1 ? '결과' : '결과'} ${count}개의 yes/not_found가 최대 기한보다 오래되었거나 미래 날짜입니다 ` +
+    '(보고서의 <app>_checked_at / <app>_stale 참조): 유지되며 다시 확인되지 않았습니다.',
+  summaryFootnote:
+    '`not_found`는 상대방이 검색에서 번호를 숨겼을 수도 있습니다. `unknown` = 아직 확인되지 않았거나 제한됨.',
+  cliNoValidNumbers: ({ invalid }) =>
+    `유효한 전화번호가 없습니다 (무효 ${invalid}개). --column과 파일의 전화번호 열 및 국가 코드를 확인하세요`,
+  cliCsvColumn: ({ name }) => `"${name}" 열`,
+  cliCsvColumnIndex: ({ index }) => `열 ${index} (헤더 행 없음)`,
+  cliCsvRead: ({ file, labelled, rows, unique, invalid, duplicates }) =>
+    `${file}: ${labelled} 사용 중. ${rows === 1 ? '행' : '행'} ${rows}개, 고유 ${unique}개` +
+    `${duplicates === 0 ? '' : `, ${duplicates === 1 ? '중복' : '중복'} ${duplicates}개 병합됨`}, 무효 ${invalid}개`,
+  cliReportWritten: ({ path }) => `보고서가 작성되었습니다: ${path}`,
+  cliInterruptOnce: '중단 요청을 받았습니다: 현재 배치를 마무리한 다음 보고서를 작성합니다 (강제 종료하려면 Ctrl-C를 다시 누르세요)...',
+  cliInterruptOnceParallel:
+    '중단 요청을 받았습니다: 진행 중인 배치를 기다린 다음 보고서를 작성합니다 (강제 종료하려면 Ctrl-C를 다시 누르세요)...',
+  cliInterruptTwice: '두 번째 중단 요청, 지금 종료합니다.',
+  cliWarnNoValid: ({ reason }) => `경고: ${reason}. 위 보고서에는 무효한 행만 나열되어 있습니다.`,
+  cliColApp: '앱',
+  cliColAccount: '계정',
+  cliColState: '상태',
+  cliColUsedToday: '오늘 사용량',
+  cliColBatchTime: '배치 시간 (평균 / 최근)',
+  cliAccountReady: '준비됨',
+  cliAccountDisabled: ({ reason }) => `비활성화됨: ${reason}`,
+  cliAccountCooling: ({ time }) => `${time}까지 쿨다운 중`,
+  cliNoAccounts: '아직 계정이 없습니다. 먼저 로그인하세요 (메뉴 항목 2 또는 실행: phone-app-checker login <app> --account <name>).',
+  cliNoResetState: ({ app, account }) =>
+    `${app} 계정 "${account}"에 기록된 상태가 없습니다. 초기화할 것이 없습니다.`,
+  cliResetDone: ({ app, account }) =>
+    `${app} 계정 "${account}"의 쿨다운 및 비활성화 플래그를 지웠습니다.`,
+  revealPrompt: 'o = Finder에서 보기 · Enter = 메뉴',
+  revealDone: '보고서가 Finder에 표시되었습니다.',
+  revealFailed: 'Finder를 열 수 없습니다. 경로는 위에 있습니다.',
+  schNoAccounts: ({ numbers, app }) =>
+    `계정이 없어 ${numbers === 1 ? '번호' : '번호'} ${numbers}개가 확인되지 않았습니다. 실행: login ${app} --account <name>`,
+  schToCheck: ({ numbers, accounts }) =>
+    `${accounts === 1 ? '계정' : '계정'} ${accounts}개로 ${numbers === 1 ? '번호' : '번호'} ${numbers}개를 확인합니다`,
+  schFailedBefore: ({ count }) =>
+    `이전 실행에서 ${count === 1 ? '번호' : '번호'} ${count}개가 실패했습니다: 마지막에 하나씩 확인합니다`,
+  schRateLimited: ({ account, time }) => `${account}: 속도 제한, ${time}까지 휴식`,
+  schBanned: ({ account, reason, app }) =>
+    `경고 ${account}: 계정이 비활성화되었습니다 (${reason}). 해결한 다음: login ${app} --account ${account}`,
+  schBatchError: ({ account, errors, max, reason }) =>
+    `${account}: 오류 (${errors}/${max}): ${reason}`,
+  schParked: ({ count, failures }) =>
+    `정상적으로 작동하는 실행에서 ${count === 1 ? '번호' : '번호'} ${count}개가 ${failures}번 실패했습니다. ` +
+    '이번 실행에서는 unknown으로 둡니다 (이로 인해 계정이 쿨다운되지 않습니다)',
+  schDropped: ({ account }) => `${account}: 반복된 오류로 이번 실행의 나머지에서 제외되었습니다`,
+  schBatchTimeout: ({ account, count }) =>
+    `${account}: ${count === 1 ? '번호' : '번호'} ${count}개 배치가 제시간에 응답하지 않았습니다. 해당 번호는 unknown으로 유지되며 오늘의 한도에 계산됩니다`,
+  schNoUsable: ({ count }) =>
+    `사용 가능한 계정이 없습니다 (비활성화되었거나 실패함). ${count === 1 ? '번호' : '번호'} ${count}개가 미확인 상태입니다`,
+  schAllBlockedNowait: ({ count }) =>
+    `모든 계정이 쿨다운 중이거나 일일 한도에 도달했습니다. ${count === 1 ? '번호' : '번호'} ${count}개가 미확인 상태입니다 (--no-wait)`,
+  schAllResting: ({ time, count }) =>
+    `모든 계정이 휴식 중입니다. ${time}에 재개합니다 (${count}개 남음)`,
+  schChecked: ({ account, count, left }) =>
+    `${account}: ${count}개 확인됨, ${left}개 남음`,
+  schCloseError: ({ account, reason }) =>
+    `${account}: 세션을 닫는 중 오류 발생: ${reason}`,
+  schStoppedByError: ({ reason }) => `예기치 않은 오류로 중단되었습니다: ${reason}`,
+  runComplete: '모두 확정됨',
+  runNotConclusive: '종료됨, 확정되지 않음',
+  runStopDone: '종료됨',
+  runStopAborted: '중단됨',
+  runStopNoAccounts: '사용 가능한 계정 없음',
+  runStopBlocked: '차단됨',
+  runStopAdapterError: '어댑터를 로드할 수 없음',
+  runKept: ({ count }) => `, ${count}개는 이전 결과 유지`,
+  runLine: ({ app, needed, attempted, conclusive, inconclusive, kept, remaining, label }) =>
+    `${app}: 필요 ${needed}, 시도 ${attempted}, 확정 ${conclusive}, ` +
+    `미확정 ${inconclusive}${kept}, 응답 없음 ${remaining} (${label})`,
+  runIncomplete: ({ inconclusive, needed }) =>
+    `미완료: ${needed === 1 ? '확인' : '확인'} ${needed}개 중 ${inconclusive}개에 새로운 yes/not_found 응답이 없습니다.`,
+  runNotFinal:
+    '보고서가 최종이 아닙니다: unknown으로 표시된 셀은 확인되지 않았으며, 이전 yes/not_found는 오래되었을 수 있습니다.',
+  runAppLine: ({ app, inconclusive, attempted, conclusive }) =>
+    `${app}: 미확정 ${inconclusive}개 (시도 ${attempted}개, 확정 ${conclusive}개)`,
+  runReasonNoAccounts: ({ app }) =>
+    `no_accounts: 사용 가능한 ${app} 계정이 없습니다 (로그인하거나 비활성화된 계정을 해결하세요: login ${app} --account <name>)`,
+  runReasonAdapterError: ({ app }) => `adapter_error: ${app} 어댑터를 로드할 수 없습니다`,
+  runReasonAborted: 'aborted: 실행이 중단되었습니다',
+  runReasonCooldown: 'cooldown: 모든 계정이 속도 제한 또는 오류 후 휴식 중입니다',
+  runReasonDailyCap: 'daily cap: 사용 가능한 모든 계정이 일일 한도에 도달했습니다',
+  runReasonErrors: ({ count }) => `errors: ${count === 1 ? '배치' : '배치'} ${count}개가 실패했습니다`,
+  runReasonParked: ({ batches, numbers }) =>
+    `parked batches: ${batches === 1 ? '배치' : '배치'} ${batches}개, ${numbers === 1 ? '번호' : '번호'} ${numbers}개, 이번 실행에서 포기됨`,
+  runReasonUnknown: ({ count }) =>
+    `unknown answers: ${count === 1 ? '번호' : '번호'} ${count}개가 unknown으로 돌아왔습니다`,
+  runReasonNotReached: 'not_reached: 일부 번호가 확인되지 않았습니다',
+  runResumeHint: '같은 명령을 다시 실행하면 계속됩니다 (완료된 번호는 반복되지 않습니다).',
+  runResumeAt: ({ time }) =>
+    `다음 재개: ${time}. 그때 같은 명령을 다시 실행하세요 (완료된 번호는 반복되지 않습니다).`,
 } satisfies Catalog;

@@ -1,8 +1,9 @@
-import { plural } from './plural.ts';
+import { translator, type Translator } from './i18n/index.ts';
 import { APP_SCOPE } from './adapters/index.ts';
 import type { Config } from './config.ts';
 import type { AccountProgress, ProgressEvent } from './progress.ts';
 import { localDay, nextLocalMidnight, type AccountState, type Store, type StoredResult } from './store.ts';
+import { formatLocalTime } from './ui.ts';
 import {
   AccountBanned,
   RateLimited,
@@ -97,6 +98,13 @@ export interface SchedulerOptions {
   onProgress?: (event: ProgressEvent) => void;
   /** Real milliseconds a session may take to close (default CLOSE_TIMEOUT_MS). */
   closeTimeoutMs?: number;
+  /**
+   * Where routine per-batch detail goes instead of `log` (the CLI routes it to the run log file while
+   * the dashboard is on screen). Defaults to `log`, so other tiers keep seeing it.
+   */
+  logDetail?: (message: string) => void;
+  /** Message lookup for run log lines and `describeRun` (default: English). */
+  tr?: Translator;
 }
 
 /**
@@ -213,7 +221,7 @@ export async function runChecks(options: SchedulerOptions): Promise<AppRunSummar
       try {
         return await runApp(shared, app);
       } catch (error) {
-        log(`${app}: stopped by an unexpected error: ${describeError(error)}`);
+        log(`${app}: ${(options.tr ?? translator())('schStoppedByError', { reason: describeError(error) })}`);
         stop.abort();
         throw error;
       }
@@ -233,6 +241,10 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
   const sleep = options.sleep ?? defaultSleep;
   const random = options.random ?? Math.random;
   const log = (message: string) => (options.log ?? (() => {}))(`${app}: ${message}`);
+  // Routine per-batch lines go to `logDetail` when the CLI shows the dashboard (it routes them to the
+  // run log file); on every other tier they are ordinary log lines.
+  const detail = (message: string) => (options.logDetail ?? options.log ?? (() => {}))(`${app}: ${message}`);
+  const tr = options.tr ?? translator();
   const pacing = config.apps[app];
 
   // The app's results table is read once and shared by the pending selection and the stale-result
@@ -266,7 +278,7 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
 
   const names = options.listAccounts(app);
   if (names.length === 0) {
-    log(`no accounts, ${plural(needed.length, 'number')} left unchecked. Run: login ${app} --account <name>`);
+    log(tr('schNoAccounts', { numbers: needed.length, app }));
     summary.stopped = 'no_accounts';
     return summary;
   }
@@ -294,7 +306,7 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
       },
     ]),
   );
-  log(`${plural(needed.length, 'number')} to check with ${plural(names.length, 'account')}`);
+  detail(tr('schToCheck', { numbers: needed.length, accounts: names.length }));
 
   // Batches that failed with an unexpected error wait here (behind all fresh numbers) for a retry.
   const retries: RetryBatch[] = [];
@@ -312,7 +324,7 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
       .filter((n) => failedBefore.has(n.e164))
       .sort((a, b) => (failedBefore.get(a.e164) ?? 0) - (failedBefore.get(b.e164) ?? 0));
     for (const n of suspects) retries.push({ numbers: [n], failures: MAX_BATCH_FAILURES - 1, cooldowns: [] });
-    log(`${plural(retries.length, 'number')} failed in an earlier run: checking them last, one by one`);
+    detail(tr('schFailedBefore', { count: retries.length }));
   }
   let successes = 0;
   let quarantined = 0;
@@ -387,7 +399,7 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
         }),
       ]);
     } catch (error) {
-      log(`${name}: error while closing session: ${describeError(error)}`);
+      log(tr('schCloseError', { account: name, reason: describeError(error) }));
     } finally {
       clearTimeout(timer);
     }
@@ -530,10 +542,10 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
             ? failure.retryAfterMs
             : pacing.rateLimitCooldownMs;
         next.cooldownUntil = finished + rest;
-        log(`${name}: rate limited, resting until ${new Date(next.cooldownUntil).toISOString()}`);
+        log(tr('schRateLimited', { account: name, time: formatLocalTime(next.cooldownUntil, finished) }));
       } else if (failure instanceof AccountBanned) {
         next.disabledReason = describeError(failure);
-        log(`WARNING ${name}: account disabled (${next.disabledReason}). Fix it, then: login ${app} --account ${name}`);
+        log(tr('schBanned', { account: name, reason: next.disabledReason ?? '', app }));
       } else {
         unexpected = true;
         // Only a failed lookup says something about these numbers (not a session that would not open).
@@ -549,7 +561,7 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
         // a few bad numbers in a row must not get an account that works dropped.
         if (!park) slot.consecutiveErrors += 1;
         summary.errors += 1;
-        log(`${name}: error (${slot.consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}): ${describeError(failure)}`);
+        log(tr('schBatchError', { account: name, errors: slot.consecutiveErrors, max: MAX_CONSECUTIVE_ERRORS, reason: describeError(failure) }));
         retries.push(entry);
         handedToRetries = true;
         if (park) {
@@ -565,17 +577,14 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
               if (state.cooldownUntil === cooled.set) lifted.push({ ...state, cooldownUntil: cooled.previous });
             }
           }
-          log(
-            `${plural(entry.numbers.length, 'number')} failed ${entry.failures} times in a run that otherwise works; ` +
-              'leaving them unknown for this run (no account is put on cooldown for it)',
-          );
+          log(tr('schParked', { count: entry.numbers.length, failures: entry.failures }));
         } else {
           entry.cooldowns.push({ account: name, set: finished + pacing.errorCooldownMs, previous: next.cooldownUntil });
           next.cooldownUntil = finished + pacing.errorCooldownMs;
         }
         if (slot.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
           slot.dropped = true;
-          log(`${name}: dropped for the rest of this run after repeated errors`);
+          log(tr('schDropped', { account: name }));
         }
       }
       await closeSession(name, slot);
@@ -607,7 +616,7 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
       if (status !== 'unknown') refreshed.add(e164);
       slot.counts[status] += 1;
     }
-    if (answers.size > 0) log(`${name}: ${answers.size} checked, ${queued()} left`);
+    if (answers.size > 0) detail(tr('schChecked', { account: name, count: answers.size, left: queued() }));
     progress();
   };
 
@@ -624,7 +633,7 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
     slot.state = next;
     if (retry !== undefined) retries.unshift(retry);
     else pending.unshift(...batch);
-    log(`${name}: a batch of ${plural(batch.length, 'number')} did not return in time; its numbers stay unknown and count against today's cap`);
+    log(tr('schBatchTimeout', { account: name, count: batch.length }));
   };
 
   /**
@@ -705,7 +714,7 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
       }
 
       if (usable === 0) {
-        log(`no usable account left (disabled or failing), ${plural(queued() + quarantined, 'number')} unchecked`);
+        log(tr('schNoUsable', { count: queued() + quarantined }));
         summary.stopped = 'no_accounts';
         summary.blockedBy = [];
         summary.resumeAt = undefined;
@@ -731,11 +740,11 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
         summary.blockedBy = blockedBy;
         summary.resumeAt = blockedWake;
         if (!options.wait) {
-          log(`all accounts are cooling down or at their daily cap, ${plural(queued(), 'number')} unchecked (--no-wait)`);
+          log(tr('schAllBlockedNowait', { count: queued() }));
           summary.stopped = 'blocked';
           break;
         }
-        log(`all accounts are resting; resuming at ${new Date(blockedWake).toISOString()} (${queued()} left)`);
+        log(tr('schAllResting', { time: formatLocalTime(blockedWake, t), count: queued() }));
         progress({ until: blockedWake, kind: 'cooldown' });
         await wait(blockedWake - t);
         progress();
@@ -765,13 +774,13 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
   return summary;
 }
 
-const STOP_LABELS: Record<StopReason, string> = {
-  done: 'finished',
-  aborted: 'interrupted',
-  no_accounts: 'no usable account',
-  blocked: 'blocked',
-  adapter_error: 'adapter could not load',
-};
+const STOP_LABEL_KEYS = {
+  done: 'runStopDone',
+  aborted: 'runStopAborted',
+  no_accounts: 'runStopNoAccounts',
+  blocked: 'runStopBlocked',
+  adapter_error: 'runStopAdapterError',
+} as const;
 
 export interface RunDescription {
   /** One line per app: attempted / conclusive / inconclusive counts. Never says `done` for inconclusive work. */
@@ -785,24 +794,24 @@ export interface RunDescription {
 }
 
 /** Why one app's run left work inconclusive (empty when it did not). */
-function incompleteReasons(s: AppRunSummary): string[] {
+function incompleteReasons(s: AppRunSummary, tr: Translator): string[] {
   if (s.inconclusive === 0) return [];
   const reasons: string[] = [];
-  if (s.stopped === 'no_accounts') reasons.push(`no_accounts: no usable ${s.app} account (log in, or fix a disabled one: login ${s.app} --account <name>)`);
-  if (s.stopped === 'adapter_error') reasons.push(`adapter_error: the ${s.app} adapter could not be loaded`);
-  if (s.stopped === 'aborted') reasons.push('aborted: the run was interrupted');
-  if (s.blockedBy.includes('cooldown')) reasons.push('cooldown: every account is resting after a rate limit or an error');
-  if (s.blockedBy.includes('daily_cap')) reasons.push('daily cap: every usable account reached its daily limit');
-  if (s.errors > 0) reasons.push(`errors: ${plural(s.errors, 'batch', 'batches')} failed`);
-  if (s.parkedBatches > 0) reasons.push(`parked batches: ${plural(s.parkedBatches, 'batch', 'batches')}, ${plural(s.parked, 'number')}, given up for this run`);
+  if (s.stopped === 'no_accounts') reasons.push(tr('runReasonNoAccounts', { app: s.app }));
+  if (s.stopped === 'adapter_error') reasons.push(tr('runReasonAdapterError', { app: s.app }));
+  if (s.stopped === 'aborted') reasons.push(tr('runReasonAborted'));
+  if (s.blockedBy.includes('cooldown')) reasons.push(tr('runReasonCooldown'));
+  if (s.blockedBy.includes('daily_cap')) reasons.push(tr('runReasonDailyCap'));
+  if (s.errors > 0) reasons.push(tr('runReasonErrors', { count: s.errors }));
+  if (s.parkedBatches > 0) reasons.push(tr('runReasonParked', { batches: s.parkedBatches, numbers: s.parked }));
   const unknown = s.answered - s.conclusive;
-  if (unknown > 0) reasons.push(`unknown answers: ${plural(unknown, 'number')} came back unknown`);
-  if (reasons.length === 0) reasons.push('not_reached: some numbers were not checked');
+  if (unknown > 0) reasons.push(tr('runReasonUnknown', { count: unknown }));
+  if (reasons.length === 0) reasons.push(tr('runReasonNotReached'));
   return reasons;
 }
 
 /** Per-app counts and, when anything stays inconclusive, an INCOMPLETE banner with the reasons and the next resume time. */
-export function describeRun(summaries: readonly AppRunSummary[]): RunDescription {
+export function describeRun(summaries: readonly AppRunSummary[], tr: Translator = translator(), now?: number): RunDescription {
   const lines: string[] = [];
   const banner: string[] = [];
   let inconclusive = 0;
@@ -812,11 +821,20 @@ export function describeRun(summaries: readonly AppRunSummary[]): RunDescription
     inconclusive += s.inconclusive;
     needed += s.needed;
     const complete = s.inconclusive === 0;
-    const label = s.stopped === 'done' ? (complete ? 'all conclusive' : 'finished, NOT conclusive') : STOP_LABELS[s.stopped];
-    const kept = s.retainedStale > 0 ? `, ${s.retainedStale} keep an older result` : '';
+    const label =
+      s.stopped === 'done' ? (complete ? tr('runComplete') : tr('runNotConclusive')) : tr(STOP_LABEL_KEYS[s.stopped]);
+    const kept = s.retainedStale > 0 ? tr('runKept', { count: s.retainedStale }) : '';
     lines.push(
-      `${s.app}: needed ${s.needed}, attempted ${s.attempted}, conclusive ${s.conclusive}, ` +
-        `inconclusive ${s.inconclusive}${kept}, no answer ${s.remaining} (${label})`,
+      tr('runLine', {
+        app: s.app,
+        needed: s.needed,
+        attempted: s.attempted,
+        conclusive: s.conclusive,
+        inconclusive: s.inconclusive,
+        kept,
+        remaining: s.remaining,
+        label,
+      }),
     );
     if (!complete && s.resumeAt !== undefined && Number.isFinite(s.resumeAt)) {
       resumeAt = resumeAt === undefined ? s.resumeAt : Math.min(resumeAt, s.resumeAt);
@@ -827,19 +845,17 @@ export function describeRun(summaries: readonly AppRunSummary[]): RunDescription
     const bar = '='.repeat(72);
     banner.push(
       bar,
-      `INCOMPLETE: ${inconclusive} of ${plural(needed, 'check')} ${inconclusive === 1 ? 'has' : 'have'} no fresh yes/not_found answer.`,
-      'The report is NOT final: cells marked unknown are unchecked, and an older yes/not_found may be outdated.',
+      tr('runIncomplete', { inconclusive, needed }),
+      tr('runNotFinal'),
     );
     for (const s of summaries) {
-      const reasons = incompleteReasons(s);
+      const reasons = incompleteReasons(s, tr);
       if (reasons.length === 0) continue;
-      banner.push(`  ${s.app}: ${s.inconclusive} inconclusive (${s.attempted} attempted, ${s.conclusive} conclusive)`);
+      banner.push(`  ${tr('runAppLine', { app: s.app, inconclusive: s.inconclusive, attempted: s.attempted, conclusive: s.conclusive })}`);
       for (const reason of reasons) banner.push(`    - ${reason}`);
     }
     banner.push(
-      resumeAt === undefined
-        ? 'Run the same command again to continue (finished numbers are not repeated).'
-        : `Next resume: ${new Date(resumeAt).toISOString()}. Run the same command again then (finished numbers are not repeated).`,
+      resumeAt === undefined ? tr('runResumeHint') : tr('runResumeAt', { time: formatLocalTime(resumeAt, now) }),
       bar,
     );
   }

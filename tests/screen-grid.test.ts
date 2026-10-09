@@ -276,11 +276,11 @@ describe('screenGrid with redrawn one-line indicators', () => {
     spinner.stop(); // idempotent
   });
 
-  it('the progress bar is redrawn in place and finish() removes it', () => {
+  it('the dashboard frame is redrawn in place and finish() removes it', () => {
     vi.useFakeTimers();
-    const tty = fakeTty({ columns: 60, rows: 8 });
+    const tty = fakeTty({ columns: 60, rows: 12 });
     const ui = createUi(tty.io.output as never, RICH_ENV);
-    const grid = screenGrid({ columns: 60, rows: 8 });
+    const grid = screenGrid({ columns: 60, rows: 12 });
     let seen = 0;
     const pump = () => {
       const screen = tty.screen();
@@ -297,32 +297,33 @@ describe('screenGrid with redrawn one-line indicators', () => {
     });
     const event = (remaining: number): ProgressEvent => ({ app: 'telegram', needed: 4, remaining });
 
-    renderer.update(event(4));
-    vi.advanceTimersByTime(150); // a tick draws the bar
+    renderer.update(event(4)); // the first update draws the frame at once
     pump();
-    expect(nonBlank(grid)).toHaveLength(1);
-    const firstBar = nonBlank(grid)[0] as string;
-    expect(displayWidth(firstBar)).toBeLessThanOrEqual(60);
-    expect(firstBar).toContain('0%');
+    const frame = grid.snapshot();
+    expect(frame).toContain('0 of 4 checks');
+    expect(frame).toContain('╭');
+    expect(frame).toContain('╰');
+    for (const row of grid.text()) expect(displayWidth(row)).toBeLessThanOrEqual(60);
 
     renderer.update(event(2));
-    vi.advanceTimersByTime(150);
+    vi.advanceTimersByTime(1000); // the 1 Hz tick redraws the recorded state
     pump();
-    expect(nonBlank(grid)).toHaveLength(1); // redrawn in place, still a single row
-    expect(nonBlank(grid)[0]).toContain('50%');
+    const second = grid.snapshot();
+    expect(second).toContain('2 of 4 checks');
+    expect(second).toContain('50%');
 
     renderer.update(event(0));
     renderer.finish();
     pump();
-    expect(nonBlank(grid)).toHaveLength(0); // erase() cleared the bar line
+    expect(nonBlank(grid)).toHaveLength(0); // erase() cleared the whole frame
     expect(grid.cursor().col).toBe(0);
   });
 
-  it('wrapLog leaves the log lines above the bar', () => {
+  it('wrapLog leaves the log lines above the redrawn frame', () => {
     vi.useFakeTimers();
-    const tty = fakeTty({ columns: 60, rows: 8 });
+    const tty = fakeTty({ columns: 60, rows: 14 });
     const ui = createUi(tty.io.output as never, RICH_ENV);
-    const grid = screenGrid({ columns: 60, rows: 8 });
+    const grid = screenGrid({ columns: 60, rows: 14 });
     let seen = 0;
     const pump = () => {
       const screen = tty.screen();
@@ -341,19 +342,19 @@ describe('screenGrid with redrawn one-line indicators', () => {
     });
 
     renderer.update({ app: 'telegram', needed: 4, remaining: 4 });
-    vi.advanceTimersByTime(150);
     log('note one');
     pump();
-    const visible = nonBlank(grid);
-    expect(visible).toHaveLength(2);
-    expect(visible[0]).toBe('note one');
-    expect(visible[1]).toContain('0%'); // the bar lives on the last row again
+    const first = grid.text();
+    expect(first[0]).toBe('note one');
+    expect(grid.snapshot()).toContain('0 of 4 checks');
+    expect(first.indexOf('note one')).toBeLessThan(first.findIndex((row) => row.includes('╭')));
 
     log('note two');
     pump();
-    expect(nonBlank(grid)).toHaveLength(3);
-    expect(nonBlank(grid)[0]).toBe('note one');
-    expect(nonBlank(grid)[1]).toBe('note two');
-    expect(nonBlank(grid)[2]).toContain('0%');
+    const second = grid.text();
+    expect(second[0]).toBe('note one');
+    expect(second[1]).toBe('note two');
+    // The frame sits below both log lines again: its totals row mentions the run.
+    expect(grid.snapshot()).toContain('0 of 4 checks');
   });
 });

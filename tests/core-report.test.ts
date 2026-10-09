@@ -166,8 +166,6 @@ describe('summary', () => {
     const summary = summarize(buildReport(store, entries, ['telegram', 'whatsapp', 'zalo'], { now: T4 + DAY, maxAgeMs: 2 * DAY }));
     // telegram yes (T1, 4 days) and not_found (T2, 3 days) are stale; whatsapp T3 (2 days, not < 2) is stale; zalo T4 is fresh.
     expect(summary.stale).toEqual({ telegram: 2, whatsapp: 1, zalo: 0, viber: 0, line: 0 });
-    expect(formatSummary(summary)).toContain(
-      'STALE: telegram 2, whatsapp 1 yes/not_found results are older than the max age or dated in the future',
-    );
+    expect(formatSummary(summary)).toContain('STALE: telegram 2, whatsapp 1 — 3 yes/not_found results are older than the max age or dated in the future');
   });
 });

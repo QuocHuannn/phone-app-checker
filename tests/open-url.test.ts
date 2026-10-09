@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { describe, expect, it } from 'vitest';
-import { openUrl, TELEGRAM_APPS_URL } from '../src/open-url.ts';
+import { openUrl, revealPath, TELEGRAM_APPS_URL } from '../src/open-url.ts';
 
 interface Call {
   command: string;
@@ -70,6 +70,37 @@ describe('openUrl', () => {
     for (const outcome of [{ exit: 1 }, { error: new Error('ENOENT') }, { throws: new Error('EACCES') }]) {
       const f = fakeSpawn(outcome);
       await expect(openUrl(TELEGRAM_APPS_URL, { platform: 'darwin', stdoutIsTTY: true, spawn: f.spawn })).resolves.toBe(false);
+    }
+  });
+});
+
+describe('revealPath', () => {
+  it('reveals the file in Finder with /usr/bin/open -R: one argument, no shell, detached, output ignored', async () => {
+    const f = fakeSpawn();
+    await expect(revealPath('/tmp/report.csv', { platform: 'darwin', stdoutIsTTY: true, spawn: f.spawn })).resolves.toBe(true);
+    expect(f.calls).toEqual([{ command: '/usr/bin/open', args: ['-R', '/tmp/report.csv'], options: { stdio: 'ignore', detached: true } }]);
+    expect(f.unrefs()).toBe(1);
+  });
+
+  it('never starts anything when stdout is not a terminal, on another platform, or for an empty path', async () => {
+    const f = fakeSpawn();
+    await expect(revealPath('/tmp/report.csv', { platform: 'darwin', stdoutIsTTY: false, spawn: f.spawn })).resolves.toBe(false);
+    await expect(revealPath('/tmp/report.csv', { platform: 'linux', stdoutIsTTY: true, spawn: f.spawn })).resolves.toBe(false);
+    await expect(revealPath('', { platform: 'darwin', stdoutIsTTY: true, spawn: f.spawn })).resolves.toBe(false);
+    expect(f.calls).toEqual([]);
+  });
+
+  it('passes the path as one argument, spaces and all (no shell to split or inject on)', async () => {
+    const f = fakeSpawn();
+    const tricky = "/tmp/weird name; rm -rf ~/'quoted'.csv";
+    await expect(revealPath(tricky, { platform: 'darwin', stdoutIsTTY: true, spawn: f.spawn })).resolves.toBe(true);
+    expect(f.calls[0]?.args).toEqual(['-R', tricky]);
+  });
+
+  it('says false when open fails, errors, or cannot even start', async () => {
+    for (const outcome of [{ exit: 1 }, { error: new Error('ENOENT') }, { throws: new Error('EACCES') }]) {
+      const f = fakeSpawn(outcome);
+      await expect(revealPath('/tmp/report.csv', { platform: 'darwin', stdoutIsTTY: true, spawn: f.spawn })).resolves.toBe(false);
     }
   });
 });

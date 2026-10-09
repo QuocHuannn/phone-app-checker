@@ -21,7 +21,8 @@ import type { InputEntry } from './csv.ts';
 import { isFresh } from './scheduler.ts';
 import type { Store, StoredResult } from './store.ts';
 import { APPS, type App, type Status } from './types.ts';
-import { PLAIN_UI, type Paint, type Ui } from './ui.ts';
+import { PLAIN_UI, formatDuration, type Paint, type Ui } from './ui.ts';
+import { translator, type Translator } from './i18n/index.ts';
 
 export const STATUSES: readonly Status[] = ['yes', 'not_found', 'unknown', 'skipped', 'invalid'];
 
@@ -440,42 +441,64 @@ function statusPaint(ui: Ui, status: Status | undefined): Paint {
   return ui.dim;
 }
 
-/** Human-readable summary: status counts per app, then `yes` counts per country. `ui` colours the status table (plain by default). */
-export function formatSummary(summary: ReportSummary, ui: Ui = PLAIN_UI): string {
+/** Extra run facts for `formatSummary` (the report command keeps the classic output). */
+export interface SummaryExtras {
+  /** Apps this run/report covered (default: all apps — the table then shows every column). */
+  apps?: readonly App[];
+  /** Wall time of the run; adds the `Done in …` header line. */
+  durationMs?: number;
+  /** Account names that answered at least one number, per app. */
+  accountsUsed?: Partial<Record<App, readonly string[]>>;
+  /** Message lookup (default: English). */
+  tr?: Translator;
+}
+
+/** Human-readable summary: status counts per requested app, then `yes` counts per country. `ui` colours the status table (plain by default). */
+export function formatSummary(summary: ReportSummary, ui: Ui = PLAIN_UI, options: SummaryExtras = {}): string {
+  const tr = options.tr ?? translator();
+  const shown = options.apps ?? APPS;
   const out: string[] = [];
-  out.push(`Numbers: ${summary.rows} unique (${summary.valid} valid, ${summary.invalid} invalid)`, '');
-  const perApp = APPS.map((app) => [app, ...STATUSES.map((status) => String(summary.perApp[app][status]))]);
+  if (options.durationMs !== undefined) {
+    const unfinished = shown.reduce((total, app) => total + summary.perApp[app].unknown, 0);
+    out.push(tr('summaryDone', { time: formatDuration(options.durationMs), numbers: summary.rows, unfinished }), '');
+  }
+  out.push(tr('summaryNumbers', { total: summary.rows, valid: summary.valid, invalid: summary.invalid }), '');
+  const perApp = shown.map((app) => [app, ...STATUSES.map((status) => String(summary.perApp[app][status]))]);
   out.push(
-    table(['app', ...STATUSES], perApp, (row, column, cell) => {
-      if (column === 0) return row < 0 ? ui.bold(cell) : cell;
-      const status = STATUSES[column - 1];
-      // Headers carry the colour of their column; a zero count is quiet (dim) whatever the column.
-      if (row < 0) return ui.bold(statusPaint(ui, status)(cell));
-      return (perApp[row]?.[column] ?? '0') === '0' ? ui.dim(cell) : statusPaint(ui, status)(cell);
-    }),
+    table(
+      [tr('summaryColApp'), tr('summaryColYes'), tr('summaryColNotFound'), tr('summaryColUnknown'), tr('summaryColSkipped'), tr('summaryColInvalid')],
+      perApp,
+      (row, column, cell) => {
+        if (column === 0) return row < 0 ? ui.bold(cell) : cell;
+        const status = STATUSES[column - 1];
+        // Headers carry the colour of their column; a zero count is quiet (dim) whatever the column.
+        if (row < 0) return ui.bold(statusPaint(ui, status)(cell));
+        return (perApp[row]?.[column] ?? '0') === '0' ? ui.dim(cell) : statusPaint(ui, status)(cell);
+      },
+    ),
   );
+  const accounts = shown
+    .flatMap((app) => (options.accountsUsed?.[app] ?? []).map((name) => ({ app, name })))
+    .map(({ app, name }) => `${app} ${name}`);
+  if (accounts.length > 0) out.push('', tr('summaryAccountsUsed', { list: accounts.join(' · ') }));
   if (summary.yesByCountry.size > 0) {
     const countries = [...summary.yesByCountry.entries()].sort((a, b) => {
-      const total = (counts: Record<App, number>) => APPS.reduce((sum, app) => sum + counts[app], 0);
+      const total = (counts: Record<App, number>) => shown.reduce((sum, app) => sum + counts[app], 0);
       return total(b[1]) - total(a[1]) || a[0].localeCompare(b[0]);
     });
-    out.push('', 'Registered (yes) by country:');
+    out.push('', tr('summaryYesByCountry'));
     out.push(
       table(
-        ['country', ...APPS],
-        countries.map(([country, counts]) => [country === '' ? '??' : country, ...APPS.map((app) => String(counts[app]))]),
+        [tr('summaryColCountry'), ...shown],
+        countries.map(([country, counts]) => [country === '' ? '??' : country, ...shown.map((app) => String(counts[app]))]),
       ),
     );
   }
-  const stale = APPS.filter((app) => summary.stale[app] > 0);
+  const stale = shown.filter((app) => summary.stale[app] > 0);
   if (stale.length > 0) {
     const staleTotal = stale.reduce((sum, app) => sum + summary.stale[app], 0);
-    out.push(
-      '',
-      `STALE: ${stale.map((app) => `${app} ${summary.stale[app]}`).join(', ')} yes/not_found ${staleTotal === 1 ? 'result is' : 'results are'} older than the max age or dated in the future ` +
-        '(see <app>_checked_at / <app>_stale in the report): they were kept, not re-confirmed.',
-    );
+    out.push('', tr('summaryStale', { apps: stale.map((app) => `${app} ${summary.stale[app]}`).join(', '), count: staleTotal }));
   }
-  out.push('', '`not_found` can also mean the person hides their number from search; `unknown` = not checked yet or throttled.');
+  out.push('', tr('summaryFootnote'));
   return out.join('\n');
 }

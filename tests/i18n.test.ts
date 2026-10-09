@@ -162,7 +162,17 @@ describe('catalogs', () => {
 
   it('translations are really translated: no other language repeats English text', () => {
     // Allowed to match English: only text that is the same in every language by nature.
-    const sameEverywhere = new Set<string>(['askCsvHintDefault']); // "Enter = <path>"
+    const sameEverywhere = new Set<string>([
+      'askCsvHintDefault', // "Enter = <path>"
+      // Report-status cell values (yes/not_found/unknown/skipped/invalid) are CSV vocabulary: untranslatable everywhere.
+      'dashStatusCounts',
+      'dashCounts',
+      'summaryColYes',
+      'summaryColNotFound',
+      'summaryColUnknown',
+      'summaryColSkipped',
+      'summaryColInvalid',
+    ]);
     for (const lang of LANGS.filter((code) => code !== 'en')) {
       for (const [key, message] of entries(lang)) {
         if (sameEverywhere.has(key)) continue;

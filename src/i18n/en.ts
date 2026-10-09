@@ -263,4 +263,141 @@ export const en = {
   qrGatePrompt: ({ alt }: { alt: string }) =>
     `Enlarge the window, then press Enter to try again${alt === '' ? '' : `, or type c to ${alt}`} (b = back): `,
   tgLoginTitle: 'Log in to Telegram',
+
+  // v0.2.0: live run dashboard, run log, summary, --plain flag.
+  dashTitle: ({ file, numbers }: { file: string; numbers: number }) => `Checking ${file} · ${numbers} numbers`,
+  dashElapsed: ({ time }: { time: string }) => `Elapsed ${time}`,
+  dashSpeed: ({ rate }: { rate: number }) => `${rate}/min`,
+  dashEta: ({ left, clock }: { left: string; clock: string }) => `about ${left} left · finish about ${clock}`,
+  dashColApp: 'APP',
+  dashColAccount: 'ACCOUNT',
+  dashColState: 'STATE',
+  dashColDone: 'DONE',
+  dashColStatus: 'RESULTS',
+  dashColLast: 'LAST',
+  dashWorking: 'working',
+  dashWaiting: 'waiting',
+  dashResting: ({ clock, left }: { clock: string; left: string }) => `resting · resumes ${clock} (in ${left})`,
+  dashDisabled: 'disabled',
+  dashDone: 'done',
+  dashStatusCounts: ({ yes, notFound, unknown }: { yes: number; notFound: number; unknown: number }) =>
+    `${yes}y ${notFound}nf ${unknown}u`,
+  dashChecks: ({ done, total, numbers, apps }: { done: number; total: number; numbers: number; apps: number }) =>
+    `${done} of ${total} checks (${numbers} numbers x ${apps} ${apps === 1 ? 'app' : 'apps'})`,
+  dashCounts: ({ yes, notFound, unknown }: { yes: number; notFound: number; unknown: number }) =>
+    `yes ${yes} · not_found ${notFound} · unknown ${unknown}`,
+  dashHintStop: 'Ctrl+C finishes this batch and saves the report.',
+  dashDetailsFile: ({ path }: { path: string }) => `Log: ${path}`,
+  progressPercent: ({ percent, done, total }: { percent: number; done: number; total: number }) =>
+    `progress ${percent}% ${done}/${total}`,
+  progressEta: ({ time }: { time: string }) => `ETA ${time}`,
+  progressPacing: ({ time }: { time: string }) => `pacing ${time}`,
+  progressRestingUntil: ({ clock }: { clock: string }) => `resting until ${clock}`,
+  summaryDone: ({ time, numbers, unfinished }: { time: string; numbers: number; unfinished: number }) =>
+    `Done in ${time} · ${numbers} numbers · ${unfinished} unfinished`,
+  summaryNumbers: ({ total, valid, invalid }: { total: number; valid: number; invalid: number }) =>
+    `Numbers: ${total} unique (${valid} valid, ${invalid} invalid)`,
+  summaryAccountsUsed: ({ list }: { list: string }) => `Accounts used: ${list}`,
+  summaryColApp: 'app',
+  summaryColYes: 'yes',
+  summaryColNotFound: 'not_found',
+  summaryColUnknown: 'unknown',
+  summaryColSkipped: 'skipped',
+  summaryColInvalid: 'invalid',
+  summaryColCountry: 'country',
+  summaryYesByCountry: 'Registered (yes) by country:',
+  summaryStale: ({ apps, count }: { apps: string; count: number }) =>
+    `STALE: ${apps} — ${count} yes/not_found ${count === 1 ? 'result is' : 'results are'} older than the max age or dated in the future ` +
+    '(see <app>_checked_at / <app>_stale in the report): kept, not re-confirmed.',
+  summaryFootnote:
+    '`not_found` can also mean the person hides their number from search; `unknown` = not checked yet or throttled.',
+  cliNoValidNumbers: ({ invalid }: { invalid: number }) =>
+    `no valid phone numbers (${invalid} invalid); check --column and the file's phone column and country codes`,
+  cliCsvColumn: ({ name }: { name: string }) => `column "${name}"`,
+  cliCsvColumnIndex: ({ index }: { index: string }) => `column ${index} (no header row)`,
+  cliCsvRead: ({ file, labelled, rows, unique, invalid, duplicates }: { file: string; labelled: string; rows: number; unique: number; invalid: number; duplicates: number }) =>
+    `${file}: using ${labelled}; ${rows} ${rows === 1 ? 'row' : 'rows'}, ${unique} unique` +
+    `${duplicates === 0 ? '' : `, ${duplicates} ${duplicates === 1 ? 'duplicate' : 'duplicates'} merged`}, ${invalid} invalid`,
+  cliReportWritten: ({ path }: { path: string }) => `Report written to ${path}`,
+  cliInterruptOnce: 'Interrupt received: finishing the current batch, then writing the report (Ctrl-C again to force quit)...',
+  cliInterruptOnceParallel:
+    'Interrupt received: waiting for the batches in flight, then writing the report (Ctrl-C again to force quit)...',
+  cliInterruptTwice: 'Second interrupt, exiting now.',
+  cliWarnNoValid: ({ reason }: { reason: string }) => `WARNING: ${reason}. The report above lists only invalid rows.`,
+  cliColApp: 'app',
+  cliColAccount: 'account',
+  cliColState: 'state',
+  cliColUsedToday: 'used today',
+  cliColBatchTime: 'batch time (avg / last)',
+  cliAccountReady: 'ready',
+  cliAccountDisabled: ({ reason }: { reason: string }) => `DISABLED: ${reason}`,
+  cliAccountCooling: ({ time }: { time: string }) => `cooling down until ${time}`,
+  cliNoAccounts: 'No accounts yet. Log in first (menu item 2, or run: phone-app-checker login <app> --account <name>).',
+  cliNoResetState: ({ app, account }: { app: string; account: string }) =>
+    `No recorded state for ${app} account "${account}"; nothing to reset.`,
+  cliResetDone: ({ app, account }: { app: string; account: string }) =>
+    `Cleared cooldown and disabled flag for ${app} account "${account}".`,
+  revealPrompt: 'o = show in Finder · Enter = menu',
+  revealDone: 'The report is shown in Finder.',
+  revealFailed: 'Could not open Finder; the path is above.',
+  schNoAccounts: ({ numbers, app }: { numbers: number; app: string }) =>
+    `no accounts, ${numbers} ${numbers === 1 ? 'number' : 'numbers'} left unchecked. Run: login ${app} --account <name>`,
+  schToCheck: ({ numbers, accounts }: { numbers: number; accounts: number }) =>
+    `${numbers} ${numbers === 1 ? 'number' : 'numbers'} to check with ${accounts} ${accounts === 1 ? 'account' : 'accounts'}`,
+  schFailedBefore: ({ count }: { count: number }) =>
+    `${count} ${count === 1 ? 'number' : 'numbers'} failed in an earlier run: checking them last, one by one`,
+  schRateLimited: ({ account, time }: { account: string; time: string }) => `${account}: rate limited, resting until ${time}`,
+  schBanned: ({ account, reason, app }: { account: string; reason: string; app: string }) =>
+    `WARNING ${account}: account disabled (${reason}). Fix it, then: login ${app} --account ${account}`,
+  schBatchError: ({ account, errors, max, reason }: { account: string; errors: number; max: number; reason: string }) =>
+    `${account}: error (${errors}/${max}): ${reason}`,
+  schParked: ({ count, failures }: { count: number; failures: number }) =>
+    `${count} ${count === 1 ? 'number' : 'numbers'} failed ${failures} times in a run that otherwise works; ` +
+    'leaving them unknown for this run (no account is put on cooldown for it)',
+  schDropped: ({ account }: { account: string }) => `${account}: dropped for the rest of this run after repeated errors`,
+  schBatchTimeout: ({ account, count }: { account: string; count: number }) =>
+    `${account}: a batch of ${count} ${count === 1 ? 'number' : 'numbers'} did not return in time; its numbers stay unknown and count against today's cap`,
+  schNoUsable: ({ count }: { count: number }) =>
+    `no usable account left (disabled or failing), ${count} ${count === 1 ? 'number' : 'numbers'} unchecked`,
+  schAllBlockedNowait: ({ count }: { count: number }) =>
+    `all accounts are cooling down or at their daily cap, ${count} ${count === 1 ? 'number' : 'numbers'} unchecked (--no-wait)`,
+  schAllResting: ({ time, count }: { time: string; count: number }) =>
+    `all accounts are resting; resuming at ${time} (${count} left)`,
+  schChecked: ({ account, count, left }: { account: string; count: number; left: number }) =>
+    `${account}: ${count} checked, ${left} left`,
+  schCloseError: ({ account, reason }: { account: string; reason: string }) =>
+    `${account}: error while closing session: ${reason}`,
+  schStoppedByError: ({ reason }: { reason: string }) => `stopped by an unexpected error: ${reason}`,
+  runComplete: 'all conclusive',
+  runNotConclusive: 'finished, NOT conclusive',
+  runStopDone: 'finished',
+  runStopAborted: 'interrupted',
+  runStopNoAccounts: 'no usable account',
+  runStopBlocked: 'blocked',
+  runStopAdapterError: 'adapter could not load',
+  runKept: ({ count }: { count: number }) => `, ${count} keep an older result`,
+  runLine: ({ app, needed, attempted, conclusive, inconclusive, kept, remaining, label }: { app: string; needed: number; attempted: number; conclusive: number; inconclusive: number; kept: string; remaining: number; label: string }) =>
+    `${app}: needed ${needed}, attempted ${attempted}, conclusive ${conclusive}, ` +
+    `inconclusive ${inconclusive}${kept}, no answer ${remaining} (${label})`,
+  runIncomplete: ({ inconclusive, needed }: { inconclusive: number; needed: number }) =>
+    `INCOMPLETE: ${inconclusive} of ${needed} ${needed === 1 ? 'check has' : 'checks have'} no fresh yes/not_found answer.`,
+  runNotFinal:
+    'The report is NOT final: cells marked unknown are unchecked, and an older yes/not_found may be outdated.',
+  runAppLine: ({ app, inconclusive, attempted, conclusive }: { app: string; inconclusive: number; attempted: number; conclusive: number }) =>
+    `${app}: ${inconclusive} inconclusive (${attempted} attempted, ${conclusive} conclusive)`,
+  runReasonNoAccounts: ({ app }: { app: string }) =>
+    `no_accounts: no usable ${app} account (log in, or fix a disabled one: login ${app} --account <name>)`,
+  runReasonAdapterError: ({ app }: { app: string }) => `adapter_error: the ${app} adapter could not be loaded`,
+  runReasonAborted: 'aborted: the run was interrupted',
+  runReasonCooldown: 'cooldown: every account is resting after a rate limit or an error',
+  runReasonDailyCap: 'daily cap: every usable account reached its daily limit',
+  runReasonErrors: ({ count }: { count: number }) => `errors: ${count} ${count === 1 ? 'batch' : 'batches'} failed`,
+  runReasonParked: ({ batches, numbers }: { batches: number; numbers: number }) =>
+    `parked batches: ${batches} ${batches === 1 ? 'batch' : 'batches'}, ${numbers} ${numbers === 1 ? 'number' : 'numbers'}, given up for this run`,
+  runReasonUnknown: ({ count }: { count: number }) =>
+    `unknown answers: ${count} ${count === 1 ? 'number' : 'numbers'} came back unknown`,
+  runReasonNotReached: 'not_reached: some numbers were not checked',
+  runResumeHint: 'Run the same command again to continue (finished numbers are not repeated).',
+  runResumeAt: ({ time }: { time: string }) =>
+    `Next resume: ${time}. Run the same command again then (finished numbers are not repeated).`,
 };

@@ -1,6 +1,6 @@
-import { existsSync, rmSync } from 'node:fs';
+import { closeSync, constants, existsSync, openSync, readdirSync, rmSync, unlinkSync, writeSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import { loadAdapter as defaultLoadAdapter } from './adapters/index.ts';
 import { listDevices } from './android/adb.ts';
@@ -17,16 +17,16 @@ import {
 import { saveTelegramCredentials } from './config-write.ts';
 import { formatDoctor, runDoctor } from './doctor.ts';
 import { bootstrapHome, ensureHomeDirectory, packageVersion } from './home.ts';
-import { LANG_ENV, resolveLang, translate, type Lang } from './i18n/index.ts';
+import { LANG_ENV, resolveLang, translate, translator, type Lang, type Translator } from './i18n/index.ts';
 import { LANG_FILE, readLanguageFile, writeLanguageFile } from './i18n/store.ts';
 import { readPhoneCsv, safeLabel, type ParsedInput } from './csv.ts';
 import { acquireLifecycleShared, acquireRunLock, lifecycleDir, type RunLock } from './lock.ts';
 import { isInteractive, runMenu, type CommandResult, type MenuHost } from './menu.ts';
-import { openUrl } from './open-url.ts';
-import { ProgressRenderer } from './progress.ts';
+import { openUrl, revealPath } from './open-url.ts';
+import { ProgressRenderer, type ProgressEvent } from './progress.ts';
 import type { PromptIo } from './prompt.ts';
 import { reportBox } from './screens.ts';
-import { createUi, PLAIN_UI, type DrawStream, type UiStream } from './ui.ts';
+import { createUi, PLAIN_ENV, PLAIN_UI, type DrawStream, type Ui, type UiStream } from './ui.ts';
 import {
   buildReport,
   checkReportTarget,
@@ -35,6 +35,7 @@ import {
   writeReport,
   type ReportFreshness,
   type ReportTarget,
+  type SummaryExtras,
 } from './report.ts';
 import { plural } from './plural.ts';
 import { describeRun, runChecks, type SchedulerOptions } from './scheduler.ts';
@@ -85,6 +86,7 @@ export interface CliDeps {
 
 interface GlobalOptions {
   config?: string;
+  plain?: boolean;
 }
 
 interface ReportOptions {
@@ -104,8 +106,8 @@ function validCount(input: ParsedInput): number {
   return input.entries.filter((entry) => entry.phone !== null).length;
 }
 
-function noValidNumbersMessage(input: ParsedInput): string {
-  return `no valid phone numbers (${input.entries.length - validCount(input)} invalid); check --column and the file's phone column and country codes`;
+function noValidNumbersMessage(input: ParsedInput, tr: Translator): string {
+  return tr('cliNoValidNumbers', { invalid: input.entries.length - validCount(input) });
 }
 
 function parseNonNegative(value: string): number {
@@ -160,6 +162,42 @@ function openLockedStore(dataDir: string): { store: Store; lock: RunLock } {
   }
 }
 
+/** Run logs kept in the data directory; older ones are pruned to this many files. */
+const RUN_LOG_KEEP = 5;
+
+interface RunLog {
+  path: string;
+  fd: number;
+  close(): void;
+}
+
+/**
+ * Open the run log for this `check`: `check-<stamp>.log` in the data directory (mode 700, ensured by
+ * `openLockedStore`), created mode 600. Batch lines are written here while the dashboard is on
+ * screen. Older `check-*.log` files are pruned so only the newest RUN_LOG_KEEP stay.
+ */
+function openRunLog(dataDir: string, csv: string, count: number): RunLog {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const path = join(dataDir, `check-${stamp}.log`);
+  const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600);
+  writeSync(fd, `# phone-app-checker check — ${new Date().toISOString()} — ${count} numbers — ${basename(csv)}\n`);
+  try {
+    const logs = readdirSync(dataDir)
+      .filter((name) => /^check-.+\.log$/.test(name))
+      .sort();
+    for (const stale of logs.slice(0, Math.max(0, logs.length - (RUN_LOG_KEEP - 1)))) {
+      try {
+        unlinkSync(join(dataDir, stale));
+      } catch {
+        /* pruning is best-effort */
+      }
+    }
+  } catch {
+    /* listing failed; the log still works */
+  }
+  return { path, fd, close: () => closeSync(fd) };
+}
+
 export function createProgram(deps: CliDeps = {}): Command {
   const loadAdapter = deps.loadAdapter ?? defaultLoadAdapter;
   const now = deps.now ?? Date.now;
@@ -168,10 +206,14 @@ export function createProgram(deps: CliDeps = {}): Command {
   const exit = deps.exit ?? ((code: number) => process.exit(code));
   const env = deps.env ?? process.env;
   const adbDevices = deps.listDevices ?? listDevices;
-  // Colour, the progress bar and the closing box exist only on a real terminal and only on the default sinks: an injected `log` / `print` stays plain.
+  // Colour, the dashboard and the closing box exist only on a real terminal and only on the default sinks: an injected `log` / `print` stays plain.
   const display = deps.display ?? (deps.log === undefined ? process.stderr : undefined);
-  const ui = display === undefined ? PLAIN_UI : createUi(display, env);
-  const printUi = deps.printDisplay !== undefined ? createUi(deps.printDisplay, env) : deps.print === undefined ? createUi(process.stdout, env) : PLAIN_UI;
+  // Built lazily: --plain is parsed inside the action and must be honoured before the first draw.
+  let uiCache: Ui | undefined;
+  const getUi = (): Ui => (uiCache ??= display === undefined ? PLAIN_UI : createUi(display, env));
+  let printUiCache: Ui | undefined;
+  const getPrintUi = (): Ui =>
+    (printUiCache ??= deps.printDisplay !== undefined ? createUi(deps.printDisplay, env) : deps.print === undefined ? createUi(process.stdout, env) : PLAIN_UI);
 
   const program = new Command();
   program
@@ -179,6 +221,7 @@ export function createProgram(deps: CliDeps = {}): Command {
     .description('Check which messaging apps a list of phone numbers is registered on.')
     .option('--config <path>', 'config file (default: ./checker.config.json, or $PHONE_APP_CHECKER_HOME/checker.config.json when set)')
     .version(packageVersion(), '-V, --version')
+    .option('--plain', 'plain output tier: no colour, no cursor movement (also NO_COLOR, TERM=dumb or PHONE_APP_CHECKER_PLAIN)')
     // One error style for everything the command line says: commander's "error: ..." becomes "Error: ...".
     .configureOutput({ outputError: (message, write) => write(message.replace(/^error: /, 'Error: ')) })
     .addHelpText('after', `\nRun with no arguments in a terminal to open an interactive menu: no commands to remember. English by default; press L in the menu to switch language (saved), or set ${LANG_ENV}=<en|vi|id|ms|ko|zh>.`);
@@ -195,6 +238,8 @@ export function createProgram(deps: CliDeps = {}): Command {
   const lifecycle = deps.lifecycleDir ?? lifecycleDir(env.HOME || undefined);
   function guarded<A extends unknown[]>(body: (...args: A) => Promise<void>): (...args: A) => Promise<void> {
     return async (...args: A) => {
+      // --plain is a global flag: force the plain tier before any output of this command.
+      if (program.opts<GlobalOptions>().plain === true) env[PLAIN_ENV] = '1';
       const hold = acquireLifecycleShared(lifecycle);
       try {
         await body(...args);
@@ -217,14 +262,19 @@ export function createProgram(deps: CliDeps = {}): Command {
   /** A path from the command line or the customer's file system can hold ESC/CR/LF/bidi: print a bounded, control-stripped copy; file operations keep the original. */
   const shownPath = (path: string): string => terminalSafe(path, DISPLAY_PATH_MAX);
 
-  function readInput(csv: string, options: ReportOptions, cfg: Config): ParsedInput {
+  function readInput(csv: string, options: ReportOptions, cfg: Config, tr: Translator): ParsedInput {
     const input = readPhoneCsv(csv, { column: options.column, defaultRegion: cfg.defaultRegion });
     // The title comes from the customer's file: print a bounded, control-stripped, digit-masked form only.
-    const labelled = input.hasHeader ? `column "${safeLabel(input.column)}"` : `column ${input.column} (no header row)`;
+    const labelled = input.hasHeader ? tr('cliCsvColumn', { name: safeLabel(input.column) }) : tr('cliCsvColumnIndex', { index: input.column });
     log(
-      `${shownPath(csv)}: using ${labelled}; ${plural(input.rows, 'row')}, ${input.entries.length} unique` +
-        (input.duplicates > 0 ? `, ${plural(input.duplicates, 'duplicate')} merged` : '') +
-        `, ${input.entries.filter((e) => e.phone === null).length} invalid`,
+      tr('cliCsvRead', {
+        file: shownPath(csv),
+        labelled,
+        rows: input.rows,
+        unique: input.entries.length,
+        invalid: input.entries.filter((e) => e.phone === null).length,
+        duplicates: input.duplicates,
+      }),
     );
     return input;
   }
@@ -238,16 +288,20 @@ export function createProgram(deps: CliDeps = {}): Command {
     freshness: ReportFreshness,
     /** Results the run already holds per app (the scheduler's mirror of the store); absent for `report`, which loads them itself. */
     stored?: Partial<Record<App, Map<string, StoredResult>>>,
+    /** Extra summary facts from the check run (duration, accounts used). */
+    extras?: SummaryExtras,
   ): void {
     const rows = buildReport(store, input.entries, apps, freshness, stored);
     writeReport(out, rows, target);
-    print(formatSummary(summarize(rows), printUi));
-    log(`Report written to ${shownPath(resolve(out))}`);
+    const tr = translator(loginLanguage(undefined));
+    print(formatSummary(summarize(rows), getPrintUi(), { apps, tr, ...extras }));
+    log(tr('cliReportWritten', { path: shownPath(resolve(out)) }));
   }
 
   /** Tell the caller a report was written and, on a terminal, close with the "Report saved to ..." box. */
   function announceReport(path: string, inconclusive: number): void {
     deps.onReport?.({ path, inconclusive });
+    const ui = getUi();
     if (ui.rich && !deps.embedded) for (const line of reportBox(ui, loginLanguage(undefined), { path, inconclusive })) log(line);
   }
 
@@ -348,37 +402,68 @@ export function createProgram(deps: CliDeps = {}): Command {
       const target = reportTarget(cfg, csv, options);
       checkReportTarget(options.out, target);
       const apps = resolveApps(cfg, options.apps);
-      const input = readInput(csv, options, cfg);
-      if (validCount(input) === 0) throw new Error(noValidNumbersMessage(input));
+      const tr = translator(loginLanguage(undefined));
+      const input = readInput(csv, options, cfg, tr);
+      if (validCount(input) === 0) throw new Error(noValidNumbersMessage(input, tr));
       const maxAgeDays = options.maxAge ?? cfg.maxAgeDays;
 
       const { store, lock } = openLockedStore(cfg.dataDir);
       const abort = new AbortController();
+      const numbers = input.entries.flatMap((entry) => (entry.phone ? [entry.phone] : []));
+      const ui = getUi();
+      const bar = options.progress === 'auto' && ui.rich && display !== undefined;
+      const runLog = bar ? openRunLog(cfg.dataDir, csv, numbers.length) : undefined;
+      const fileLine = (message: string): void => {
+        if (runLog !== undefined) writeSync(runLog.fd, `${message}\n`);
+      };
       const progress =
         options.progress === 'lines'
-          ? new ProgressRenderer({ mode: 'lines', ui, stream: { write: () => undefined }, line: log, now })
-          : options.progress === 'auto' && ui.rich && display !== undefined
-            ? new ProgressRenderer({ mode: 'bar', ui, stream: display, line: log, now })
-            : undefined;
-      // Log lines (and the interrupt notices) go around the bar, never through it.
-      const say = progress?.wrapLog(log) ?? log;
+          ? new ProgressRenderer({ mode: 'lines', ui, stream: { write: () => undefined }, line: log, now, tr })
+          : bar
+            ? new ProgressRenderer({
+                mode: 'bar',
+                ui,
+                stream: display as DrawStream,
+                line: log,
+                now,
+                tr,
+                title: tr('dashTitle', { file: basename(csv), numbers: numbers.length }),
+                ...(runLog === undefined ? {} : { logPath: runLog.path }),
+              })
+            : display !== undefined && display.isTTY === true
+              ? new ProgressRenderer({ mode: 'plain', ui, stream: { write: () => undefined }, line: log, now, tr })
+              : undefined;
+      // State changes and warnings go to the screen and the run log; routine per-batch lines go to the
+      // file alone while the dashboard is up (and to the screen as before on every other tier).
+      const say = progress?.wrapLog((message: string) => {
+        fileLine(message);
+        log(message);
+      }) ?? ((message: string) => {
+        fileLine(message);
+        log(message);
+      });
       const onInterrupt = () => {
         if (abort.signal.aborted) {
-          say('Second interrupt, exiting now.');
+          say(tr('cliInterruptTwice'));
           exit(130);
           return;
         }
         const parallel = apps.some((app) => cfg.apps[app].maxParallelAccounts > 1);
-        say(
-          parallel
-            ? 'Interrupt received: waiting for the batches in flight, then writing the report (Ctrl-C again to force quit)...'
-            : 'Interrupt received: finishing the current batch, then writing the report (Ctrl-C again to force quit)...',
-        );
+        say(parallel ? tr('cliInterruptOnceParallel') : tr('cliInterruptOnce'));
         abort.abort();
       };
       for (const signal of STOP_SIGNALS) process.on(signal, onInterrupt);
+      const startedAt = now();
+      const accountsUsed = new Map<App, Set<string>>();
+      const recordAccounts = (event: ProgressEvent): void => {
+        for (const row of event.accounts ?? []) {
+          if (row.done === 0 && row.state !== 'working') continue;
+          let names = accountsUsed.get(event.app);
+          if (names === undefined) accountsUsed.set(event.app, (names = new Set()));
+          names.add(row.account);
+        }
+      };
       try {
-        const numbers = input.entries.flatMap((entry) => (entry.phone ? [entry.phone] : []));
         const summaries = await runChecks({
           store,
           config: cfg,
@@ -394,18 +479,36 @@ export function createProgram(deps: CliDeps = {}): Command {
           sleep: deps.sleep,
           random: deps.random,
           log: say,
-          ...(progress === undefined ? {} : { onProgress: (event) => progress.update(event) }),
+          ...(runLog === undefined ? {} : { logDetail: fileLine }),
+          tr,
+          onProgress: (event) => {
+            recordAccounts(event);
+            progress?.update(event);
+          },
         });
         progress?.finish();
-        const run = describeRun(summaries);
-        for (const line of run.lines) log(line);
-        emitReport(store, input, apps, options.out, target, { now: now(), maxAgeMs: maxAgeDays * DAY_MS }, Object.fromEntries(summaries.map((s) => [s.app, s.results])));
+        const run = describeRun(summaries, tr, now());
+        for (const line of run.lines) say(line);
+        emitReport(
+          store,
+          input,
+          apps,
+          options.out,
+          target,
+          { now: now(), maxAgeMs: maxAgeDays * DAY_MS },
+          Object.fromEntries(summaries.map((s) => [s.app, s.results])),
+          {
+            durationMs: now() - startedAt,
+            accountsUsed: Object.fromEntries([...accountsUsed].map(([app, names]) => [app, [...names].sort()])),
+          },
+        );
         // Exit code is unchanged (0 = the command produced its report); the banner is the warning.
-        for (const line of run.banner) log(ui.bold(ui.red(line)));
+        for (const line of run.banner) say(ui.bold(ui.red(line)));
         announceReport(resolve(options.out), summaries.reduce((total, s) => total + s.inconclusive, 0));
         if (abort.signal.aborted) process.exitCode = 130;
       } finally {
         progress?.finish();
+        runLog?.close();
         for (const signal of STOP_SIGNALS) process.off(signal, onInterrupt);
         store.close();
         lock.release();
@@ -425,7 +528,7 @@ export function createProgram(deps: CliDeps = {}): Command {
       const target = reportTarget(cfg, csv, options);
       checkReportTarget(options.out, target);
       const apps = resolveApps(cfg, options.apps);
-      const input = readInput(csv, options, cfg);
+      const input = readInput(csv, options, cfg, translator(loginLanguage(undefined)));
       const maxAgeMs = (options.maxAge ?? cfg.maxAgeDays) * DAY_MS;
       const store = Store.open(cfg.dataDir);
       try {
@@ -434,7 +537,7 @@ export function createProgram(deps: CliDeps = {}): Command {
         // The report is still written (its invalid rows show what went wrong), but an input without a
         // single valid number must not look like a successful report: same failure as `check`.
         if (validCount(input) === 0) {
-          log(`WARNING: ${noValidNumbersMessage(input)}. The report above lists only invalid rows.`);
+          log(translator(loginLanguage(undefined))('cliWarnNoValid', { reason: noValidNumbersMessage(input, translator(loginLanguage(undefined))) }));
           process.exitCode = 1;
         }
       } finally {
@@ -450,7 +553,8 @@ export function createProgram(deps: CliDeps = {}): Command {
       const store = Store.open(cfg.dataDir);
       try {
         const today = localDay(now());
-        const header = ['app', 'account', 'state', 'used today', 'batch time (avg / last)'];
+        const tr = translator(loginLanguage(undefined));
+        const header = [tr('cliColApp'), tr('cliColAccount'), tr('cliColState'), tr('cliColUsedToday'), tr('cliColBatchTime')];
         const lines: string[][] = [];
         const recorded = store.listAccounts();
         for (const app of APPS) {
@@ -461,15 +565,15 @@ export function createProgram(deps: CliDeps = {}): Command {
           for (const name of [...names].sort()) {
             const state = store.getAccount(app, name);
             const used = state.day === today ? state.usedToday : 0;
-            let status = 'ready';
-            if (state.disabledReason !== null) status = `DISABLED: ${state.disabledReason}`;
-            else if (state.cooldownUntil > now()) status = `cooling down until ${new Date(state.cooldownUntil).toLocaleString('sv-SE')}`;
+            let status = tr('cliAccountReady');
+            if (state.disabledReason !== null) status = tr('cliAccountDisabled', { reason: state.disabledReason });
+            else if (state.cooldownUntil > now()) status = tr('cliAccountCooling', { time: new Date(state.cooldownUntil).toLocaleString('sv-SE') });
             const took = (ms: number | null) => (ms === null ? '-' : `${(ms / 1000).toFixed(1)}s`);
             lines.push([app, name, status, `${used}/${cfg.apps[app].dailyCap}`, `${took(state.avgBatchMs)} / ${took(state.lastBatchMs)}`]);
           }
         }
         if (lines.length === 0) {
-          print('No accounts yet. Log in first (menu item 2, or run: phone-app-checker login <app> --account <name>).');
+          print(tr('cliNoAccounts'));
           return;
         }
         lines.unshift(header);
@@ -491,14 +595,14 @@ export function createProgram(deps: CliDeps = {}): Command {
       const { store, lock } = openLockedStore(cfg.dataDir);
       try {
         if (!store.resetAccount(app, account)) {
-          log(`No recorded state for ${app} account "${account}"; nothing to reset.`);
+          log(translator(loginLanguage(undefined))('cliNoResetState', { app, account }));
           return;
         }
       } finally {
         store.close();
         lock.release();
       }
-      log(`Cleared cooldown and disabled flag for ${app} account "${account}".`);
+      log(translator(loginLanguage(undefined))('cliResetDone', { app, account }));
     }));
 
   program
@@ -612,6 +716,7 @@ function menuHost(io: PromptIo, deps: CliDeps, langFlag?: string): MenuHost {
           },
         }),
     openUrl: (url) => openUrl(url),
+    revealPath: (path) => revealPath(path),
     run: async (args) => {
       // A previous action's exit code must not leak into this one, nor into the menu's own exit code.
       process.exitCode = undefined;
@@ -633,24 +738,28 @@ function menuHost(io: PromptIo, deps: CliDeps, langFlag?: string): MenuHost {
 
 /**
  * Arguments that still mean "open the menu": none at all, or only the hidden `--lang <code>` /
- * `--lang=<code>` (the language the menu starts in). `undefined` for any other command line.
+ * `--lang=<code>` (the language the menu starts in), possibly with `--plain`. `undefined` for any other command line.
  */
 function menuArguments(args: string[]): { langFlag?: string } | undefined {
-  if (args.length === 0) return {};
-  if (args.length === 2 && args[0] === '--lang' && args[1] !== undefined) return { langFlag: args[1] };
-  if (args.length === 1 && args[0]?.startsWith('--lang=')) return { langFlag: args[0].slice('--lang='.length) };
+  const rest = args.filter((arg) => arg !== '--plain');
+  if (rest.length === 0) return {};
+  if (rest.length === 2 && rest[0] === '--lang' && rest[1] !== undefined) return { langFlag: rest[1] };
+  if (rest.length === 1 && rest[0]?.startsWith('--lang=')) return { langFlag: rest[0].slice('--lang='.length) };
   return undefined;
 }
 
 /** Run the CLI; resolves with the process exit code. No arguments (or only `--lang <code>`) on a terminal opens the menu. */
 export async function main(argv: string[], deps: CliDeps = {}): Promise<number> {
   const terminal = deps.terminal ?? { input: process.stdin, output: process.stdout };
+  const env = deps.env ?? process.env;
+  if (argv.slice(2).includes('--plain')) env[PLAIN_ENV] = '1';
   const menuArgs = menuArguments(argv.slice(2));
   if (menuArgs !== undefined && isInteractive(terminal)) return runMenu(menuHost(terminal, deps, menuArgs.langFlag));
   const result = await execute(argv, deps);
   if (result.error !== undefined) console.error(`Error: ${result.error}`);
   return result.code;
 }
+
 
 /**
  * End the process once everything written is out. Baileys leaves query timers (60 s) behind when a WhatsApp

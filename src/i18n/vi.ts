@@ -220,4 +220,141 @@ export const vi = {
   qrGateAltTelegram: 'dùng mã đăng nhập theo số điện thoại thay thế',
   qrGatePrompt: ({ alt }) => `Phóng to cửa sổ rồi nhấn Enter để thử lại${alt === '' ? '' : `, hoặc gõ c để ${alt}`} (b = quay lại): `,
   tgLoginTitle: 'Đăng nhập Telegram',
+
+  // v0.2.0: live run dashboard, run log, summary, --plain flag.
+  dashTitle: ({ file, numbers }) => `Đang kiểm tra ${file} · ${numbers} số`,
+  dashElapsed: ({ time }) => `Đã chạy ${time}`,
+  dashSpeed: ({ rate }) => `${rate}/phút`,
+  dashEta: ({ left, clock }) => `còn khoảng ${left} · xong khoảng ${clock}`,
+  dashColApp: 'ỨNG DỤNG',
+  dashColAccount: 'TÀI KHOẢN',
+  dashColState: 'TRẠNG THÁI',
+  dashColDone: 'XONG',
+  dashColStatus: 'KẾT QUẢ',
+  dashColLast: 'GẦN NHẤT',
+  dashWorking: 'đang chạy',
+  dashWaiting: 'đang chờ',
+  dashResting: ({ clock, left }) => `nghỉ · tiếp tục ${clock} (sau ${left})`,
+  dashDisabled: 'vô hiệu',
+  dashDone: 'xong',
+  dashStatusCounts: ({ yes, notFound, unknown }) =>
+    `${yes}y ${notFound}nf ${unknown}u`,
+  dashChecks: ({ done, total, numbers, apps }) =>
+    `${done} trên ${total} lượt kiểm (${numbers} số x ${apps} ${apps === 1 ? 'app' : 'app'})`,
+  dashCounts: ({ yes, notFound, unknown }) =>
+    `yes ${yes} · not_found ${notFound} · unknown ${unknown}`,
+  dashHintStop: 'Ctrl+C để kết thúc đợt này và lưu báo cáo.',
+  dashDetailsFile: ({ path }) => `Nhật ký: ${path}`,
+  progressPercent: ({ percent, done, total }) =>
+    `tiến độ ${percent}% ${done}/${total}`,
+  progressEta: ({ time }) => `dự kiến ${time}`,
+  progressPacing: ({ time }) => `giãn nhịp ${time}`,
+  progressRestingUntil: ({ clock }) => `nghỉ đến ${clock}`,
+  summaryDone: ({ time, numbers, unfinished }) =>
+    `Xong trong ${time} · ${numbers} số · ${unfinished} chưa xong`,
+  summaryNumbers: ({ total, valid, invalid }) =>
+    `Số điện thoại: ${total} duy nhất (${valid} hợp lệ, ${invalid} không hợp lệ)`,
+  summaryAccountsUsed: ({ list }) => `Tài khoản đã dùng: ${list}`,
+  summaryColApp: 'ứng dụng',
+  summaryColYes: 'yes',
+  summaryColNotFound: 'not_found',
+  summaryColUnknown: 'unknown',
+  summaryColSkipped: 'skipped',
+  summaryColInvalid: 'invalid',
+  summaryColCountry: 'quốc gia',
+  summaryYesByCountry: 'Đã đăng ký (yes) theo quốc gia:',
+  summaryStale: ({ apps, count }) =>
+    `STALE: ${apps} — ${count} ${count === 1 ? 'kết quả' : 'kết quả'} yes/not_found cũ hơn tuổi tối đa hoặc có ngày ở tương lai ` +
+    '(xem <app>_checked_at / <app>_stale trong báo cáo): được giữ lại, không xác nhận lại.',
+  summaryFootnote:
+    '`not_found` cũng có thể nghĩa là người đó ẩn số điện thoại khỏi tìm kiếm; `unknown` = chưa kiểm tra hoặc bị giới hạn tần suất.',
+  cliNoValidNumbers: ({ invalid }) =>
+    `không có số điện thoại hợp lệ (${invalid} không hợp lệ); hãy kiểm tra --column, cột số điện thoại trong tệp và mã quốc gia`,
+  cliCsvColumn: ({ name }) => `cột "${name}"`,
+  cliCsvColumnIndex: ({ index }) => `cột ${index} (không có hàng tiêu đề)`,
+  cliCsvRead: ({ file, labelled, rows, unique, invalid, duplicates }) =>
+    `${file}: dùng ${labelled}; ${rows} ${rows === 1 ? 'hàng' : 'hàng'}, ${unique} duy nhất` +
+    `${duplicates === 0 ? '' : `, gộp ${duplicates} ${duplicates === 1 ? 'bản trùng' : 'bản trùng'}`}, ${invalid} không hợp lệ`,
+  cliReportWritten: ({ path }) => `Đã ghi báo cáo vào ${path}`,
+  cliInterruptOnce: 'Đã nhận lệnh ngắt: đang hoàn tất đợt hiện tại rồi ghi báo cáo (nhấn Ctrl-C lần nữa để buộc thoát)...',
+  cliInterruptOnceParallel:
+    'Đã nhận lệnh ngắt: đang chờ các đợt đang chạy rồi ghi báo cáo (nhấn Ctrl-C lần nữa để buộc thoát)...',
+  cliInterruptTwice: 'Ngắt lần thứ hai, thoát ngay.',
+  cliWarnNoValid: ({ reason }) => `CẢNH BÁO: ${reason}. Báo cáo trên chỉ liệt kê các hàng không hợp lệ.`,
+  cliColApp: 'ứng dụng',
+  cliColAccount: 'tài khoản',
+  cliColState: 'trạng thái',
+  cliColUsedToday: 'đã dùng hôm nay',
+  cliColBatchTime: 'thời gian đợt (TB / gần nhất)',
+  cliAccountReady: 'sẵn sàng',
+  cliAccountDisabled: ({ reason }) => `VÔ HIỆU: ${reason}`,
+  cliAccountCooling: ({ time }) => `đang nghỉ đến ${time}`,
+  cliNoAccounts: 'Chưa có tài khoản nào. Hãy đăng nhập trước (mục menu 2, hoặc chạy: phone-app-checker login <app> --account <name>).',
+  cliNoResetState: ({ app, account }) =>
+    `Không có trạng thái đã ghi cho tài khoản "${account}" của ${app}; không có gì để đặt lại.`,
+  cliResetDone: ({ app, account }) =>
+    `Đã xóa cooldown và cờ disabled cho tài khoản "${account}" của ${app}.`,
+  revealPrompt: 'o = hiện trong Finder · Enter = menu',
+  revealDone: 'Báo cáo đã được hiển thị trong Finder.',
+  revealFailed: 'Không mở được Finder; đường dẫn ở phía trên.',
+  schNoAccounts: ({ numbers, app }) =>
+    `không có tài khoản, ${numbers} ${numbers === 1 ? 'số' : 'số'} chưa được kiểm tra. Chạy: login ${app} --account <name>`,
+  schToCheck: ({ numbers, accounts }) =>
+    `${numbers} ${numbers === 1 ? 'số' : 'số'} cần kiểm tra với ${accounts} ${accounts === 1 ? 'tài khoản' : 'tài khoản'}`,
+  schFailedBefore: ({ count }) =>
+    `${count} ${count === 1 ? 'số' : 'số'} thất bại ở lần chạy trước: kiểm tra chúng sau cùng, từng số một`,
+  schRateLimited: ({ account, time }) => `${account}: bị giới hạn tần suất, nghỉ đến ${time}`,
+  schBanned: ({ account, reason, app }) =>
+    `CẢNH BÁO ${account}: tài khoản disabled (${reason}). Khắc phục rồi chạy: login ${app} --account ${account}`,
+  schBatchError: ({ account, errors, max, reason }) =>
+    `${account}: lỗi (${errors}/${max}): ${reason}`,
+  schParked: ({ count, failures }) =>
+    `${count} ${count === 1 ? 'số' : 'số'} thất bại ${failures} lần trong một lần chạy vốn bình thường; ` +
+    'để chúng ở trạng thái unknown trong lần chạy này (không tài khoản nào bị cooldown vì việc này)',
+  schDropped: ({ account }) => `${account}: bị loại khỏi phần còn lại của lần chạy này sau nhiều lỗi lặp lại`,
+  schBatchTimeout: ({ account, count }) =>
+    `${account}: một đợt ${count} ${count === 1 ? 'số' : 'số'} không phản hồi kịp thời; các số đó vẫn ở trạng thái unknown và tính vào hạn mức hôm nay`,
+  schNoUsable: ({ count }) =>
+    `không còn tài khoản dùng được (bị disabled hoặc lỗi), ${count} ${count === 1 ? 'số' : 'số'} chưa kiểm tra`,
+  schAllBlockedNowait: ({ count }) =>
+    `tất cả tài khoản đang cooldown hoặc đã đạt hạn mức ngày, ${count} ${count === 1 ? 'số' : 'số'} chưa kiểm tra (--no-wait)`,
+  schAllResting: ({ time, count }) =>
+    `tất cả tài khoản đang nghỉ; tiếp tục lúc ${time} (còn ${count} số)`,
+  schChecked: ({ account, count, left }) =>
+    `${account}: đã kiểm ${count}, còn ${left}`,
+  schCloseError: ({ account, reason }) =>
+    `${account}: lỗi khi đóng phiên: ${reason}`,
+  schStoppedByError: ({ reason }) => `dừng do lỗi không mong đợi: ${reason}`,
+  runComplete: 'tất cả đều kết luận',
+  runNotConclusive: 'đã xong, CHƯA kết luận',
+  runStopDone: 'đã xong',
+  runStopAborted: 'bị ngắt',
+  runStopNoAccounts: 'không có tài khoản dùng được',
+  runStopBlocked: 'bị chặn',
+  runStopAdapterError: 'không tải được adapter',
+  runKept: ({ count }) => `, ${count} giữ kết quả cũ`,
+  runLine: ({ app, needed, attempted, conclusive, inconclusive, kept, remaining, label }) =>
+    `${app}: cần ${needed}, đã thử ${attempted}, kết luận ${conclusive}, ` +
+    `chưa kết luận ${inconclusive}${kept}, không trả lời ${remaining} (${label})`,
+  runIncomplete: ({ inconclusive, needed }) =>
+    `INCOMPLETE: ${inconclusive} trong ${needed} ${needed === 1 ? 'lượt kiểm' : 'lượt kiểm'} chưa có câu trả lời yes/not_found mới.`,
+  runNotFinal:
+    'Báo cáo CHƯA phải bản cuối: các ô ghi unknown là chưa kiểm tra, và kết quả yes/not_found cũ có thể đã lỗi thời.',
+  runAppLine: ({ app, inconclusive, attempted, conclusive }) =>
+    `${app}: ${inconclusive} chưa kết luận (${attempted} đã thử, ${conclusive} kết luận)`,
+  runReasonNoAccounts: ({ app }) =>
+    `no_accounts: không có tài khoản ${app} nào dùng được (đăng nhập, hoặc sửa một tài khoản disabled: login ${app} --account <name>)`,
+  runReasonAdapterError: ({ app }) => `adapter_error: không tải được adapter ${app}`,
+  runReasonAborted: 'aborted: lần chạy đã bị ngắt',
+  runReasonCooldown: 'cooldown: mọi tài khoản đang nghỉ sau khi bị giới hạn tần suất hoặc gặp lỗi',
+  runReasonDailyCap: 'daily cap: mọi tài khoản dùng được đã đạt giới hạn ngày',
+  runReasonErrors: ({ count }) => `errors: ${count} ${count === 1 ? 'đợt' : 'đợt'} thất bại`,
+  runReasonParked: ({ batches, numbers }) =>
+    `parked batches: ${batches} ${batches === 1 ? 'đợt' : 'đợt'}, ${numbers} ${numbers === 1 ? 'số' : 'số'}, đã bỏ qua cho lần chạy này`,
+  runReasonUnknown: ({ count }) =>
+    `unknown answers: ${count} ${count === 1 ? 'số' : 'số'} trả về unknown`,
+  runReasonNotReached: 'not_reached: một số số chưa được kiểm tra',
+  runResumeHint: 'Chạy lại đúng lệnh đó để tiếp tục (các số đã xong sẽ không bị lặp lại).',
+  runResumeAt: ({ time }) =>
+    `Lần tiếp tục tiếp theo: ${time}. Chạy lại đúng lệnh đó vào lúc đó (các số đã xong sẽ không bị lặp lại).`,
 } satisfies Catalog;

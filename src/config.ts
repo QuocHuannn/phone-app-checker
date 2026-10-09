@@ -1,9 +1,10 @@
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { chmodSync, closeSync, constants, existsSync, fchmodSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, unlinkSync, writeSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import type { isSupportedCountry } from 'libphonenumber-js/max';
 import { join, resolve } from 'node:path';
+import { writePrivateFileAtomic } from './private-file.ts';
 import type { App, PacingSettings } from './types.ts';
-import { APPS } from './types.ts';
+import { APPS, terminalSafe } from './types.ts';
 
 export interface AppConfig extends PacingSettings {
   /** App-specific options (e.g. Telegram apiId/apiHash, Viber adb serial). */
@@ -107,7 +108,86 @@ const WHOLE_NUMBER_KEYS: readonly string[] = ['batchSize', 'dailyCap'];
 /** A wait longer than a year is a typo (an extra zero, microseconds for milliseconds) and would hang a run. */
 const MAX_DURATION_MS = 365 * 24 * 60 * MINUTE;
 
-const TOP_LEVEL_KEYS = ['defaultRegion', 'dataDir', 'maxAgeDays', 'apps'];
+const TOP_LEVEL_KEYS = ['configVersion', 'defaultRegion', 'dataDir', 'maxAgeDays', 'apps'];
+
+/** `configVersion` the binary writes and loads: a file without one predates versioning, so it is 1. */
+export const CURRENT_CONFIG_VERSION = 2;
+
+/** Open flag that refuses to follow a symlink in the last path component (POSIX only). */
+const NOFOLLOW = constants.O_NOFOLLOW ?? 0;
+
+/**
+ * Ordered, pure migrations: `CONFIG_STEPS[v - 1]` upgrades a version-`v` document to `v + 1`.
+ * To add a migration: bump `CURRENT_CONFIG_VERSION`, append a step returning a new object
+ * (rename/remove keys here; new optional keys need no step), and extend `TOP_LEVEL_KEYS` with
+ * any new top-level name. Side effects stay in `loadConfig`, which backs up, writes and reports.
+ */
+const CONFIG_STEPS: readonly ((config: Record<string, unknown>) => Record<string, unknown>)[] = [
+  // v1 (0.1.0) -> v2: declare the format version; every key keeps its meaning.
+  (config) => ({ configVersion: 2, ...config }),
+];
+
+function configVersionOf(config: Record<string, unknown>): number {
+  const version = config.configVersion;
+  if (version === undefined) return 1;
+  if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+    throw new Error('configVersion must be a whole number (1, 2, ...)');
+  }
+  return version;
+}
+
+/**
+ * Pure config upgrade shared by `loadConfig` and the config writers: applies the steps the
+ * document needs and stamps `configVersion`. Throws (plain, no prefix) when the file is newer
+ * than this binary: the unknown keys could be credentials, so they are never silently dropped.
+ */
+export function migrateConfigObject(config: Record<string, unknown>): Record<string, unknown> {
+  const version = configVersionOf(config);
+  if (version > CURRENT_CONFIG_VERSION) {
+    throw new Error(
+      `the config file needs a newer version of this program (configVersion ${version}, supported ${CURRENT_CONFIG_VERSION}); upgrade instead of editing it`,
+    );
+  }
+  let migrated = config;
+  for (const step of CONFIG_STEPS.slice(version - 1)) migrated = step(migrated);
+  return migrated;
+}
+
+/** Older backups a single file can accumulate; past that, the names belong to something else. */
+const MAX_CONFIG_BACKUPS = 99;
+
+/**
+ * First-free `file.v<version>.bak` copy of `text`, mode 0600, created exclusively: an existing
+ * backup is never overwritten (later runs get `-2`, `-3`, ... up to `MAX_CONFIG_BACKUPS`), and a
+ * symlink is never followed.
+ */
+function writeConfigBackup(file: string, version: number, text: string): string {
+  for (let suffix = 1; suffix <= MAX_CONFIG_BACKUPS; suffix += 1) {
+    const backup = suffix === 1 ? `${file}.v${version}.bak` : `${file}.v${version}-${suffix}.bak`;
+    try {
+      const fd = openSync(backup, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NOFOLLOW, 0o600);
+      try {
+        const data = Buffer.from(text);
+        let written = 0;
+        while (written < data.length) written += writeSync(fd, data, written);
+        fchmodSync(fd, 0o600);
+        fsyncSync(fd);
+      } finally {
+        closeSync(fd);
+      }
+      return backup;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') continue;
+      try {
+        unlinkSync(backup);
+      } catch {
+        // Nothing or only part of it was created; the real error is the one to report.
+      }
+      throw error;
+    }
+  }
+  throw new Error(`${MAX_CONFIG_BACKUPS} backups of this config already exist; remove some before it can be upgraded`);
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -189,13 +269,17 @@ export function configFilePath(path?: string, home?: string): string {
  * `home` undefined = source mode: the default file and a relative `dataDir` resolve against cwd.
  * `home` set = release mode: the default file is `<home>/checker.config.json` and a relative
  * `dataDir` is anchored at `<home>`. An explicit `path` is always cwd-relative.
+ *
+ * A file with an older `configVersion` (absent = 1) is upgraded in place: the original is kept
+ * as `checker.config.json.v<old>.bak` (mode 0600, never overwritten) and one stderr line names
+ * the backup, so menu users see it too. A newer `configVersion` fails instead of downgrading.
  */
 export function loadConfig(path?: string, home?: string): Config {
   const base = home === undefined ? process.cwd() : resolve(home);
   const file = configFilePath(path, home);
   let raw: Record<string, unknown> = {};
+  let text: string | undefined;
   if (existsSync(file)) {
-    let text: string;
     try {
       text = readFileSync(file, 'utf8');
     } catch (error) {
@@ -212,6 +296,18 @@ export function loadConfig(path?: string, home?: string): Config {
   }
 
   if (!isPlainObject(raw)) fail(`${file} must contain a JSON object`);
+  // An older file upgrades in memory first; it is only replaced once the result validates below,
+  // so a bad setting never turns a readable file into a rewritten broken one.
+  let upgrade: { version: number; text: string } | undefined;
+  if (text !== undefined) {
+    try {
+      const version = configVersionOf(raw);
+      if (version < CURRENT_CONFIG_VERSION) upgrade = { version, text };
+      raw = migrateConfigObject(raw);
+    } catch (error) {
+      fail(`${file}: ${(error as Error).message}`);
+    }
+  }
   for (const key of Object.keys(raw)) {
     if (!TOP_LEVEL_KEYS.includes(key)) fail(`unknown setting "${key}"`);
   }
@@ -236,6 +332,20 @@ export function loadConfig(path?: string, home?: string): Config {
   }
   const apps = {} as Record<App, AppConfig>;
   for (const app of APPS) apps[app] = mergeApp(app, DEFAULT_APPS[app], rawApps[app]);
+
+  if (upgrade !== undefined) {
+    let backup: string;
+    try {
+      backup = writeConfigBackup(file, upgrade.version, upgrade.text);
+      writePrivateFileAtomic(file, `${JSON.stringify(raw, null, 2)}\n`);
+    } catch (error) {
+      fail(`${file}: cannot save the upgraded config (${(error as NodeJS.ErrnoException).code ?? 'write error'})`);
+    }
+    // A path from the user's disk can carry ESC/CR/LF/bidi: print a bounded, stripped copy.
+    process.stderr.write(
+      `Config migrated to format version ${CURRENT_CONFIG_VERSION}. The previous file was kept at ${terminalSafe(backup, 512)}\n`,
+    );
+  }
 
   return { defaultRegion, dataDir: resolve(base, dataDir), maxAgeDays, apps };
 }

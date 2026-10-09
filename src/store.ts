@@ -212,35 +212,53 @@ export class Store {
     }
   }
 
+  /**
+   * Version ladder: bumping `SCHEMA_VERSION` means adding one `version < N` block here — one
+   * transaction each, never an ad-hoc ALTER elsewhere — and each block stamps its own number.
+   * Step 1 creates the tables the first release shipped; step 2 adds `failed_checks`, the table
+   * a v1 database (which already has results + accounts) gained.
+   */
   private migrate(): void {
-    if (this.schemaVersion() === SCHEMA_VERSION) return;
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS results (
-        e164 TEXT NOT NULL,
-        app TEXT NOT NULL,
-        status TEXT NOT NULL,
-        checked_at INTEGER NOT NULL,
-        PRIMARY KEY (e164, app)
-      );
-      CREATE TABLE IF NOT EXISTS accounts (
-        app TEXT NOT NULL,
-        name TEXT NOT NULL,
-        cooldown_until INTEGER NOT NULL DEFAULT 0,
-        disabled_reason TEXT,
-        day TEXT NOT NULL DEFAULT '',
-        used_today INTEGER NOT NULL DEFAULT 0,
-        next_allowed_at INTEGER NOT NULL DEFAULT 0,
-        PRIMARY KEY (app, name)
-      );
-      CREATE TABLE IF NOT EXISTS failed_checks (
-        e164 TEXT NOT NULL,
-        app TEXT NOT NULL,
-        failures INTEGER NOT NULL,
-        last_failed_at INTEGER NOT NULL,
-        PRIMARY KEY (e164, app)
-      );
-      PRAGMA user_version = ${SCHEMA_VERSION};
-    `);
+    const version = this.schemaVersion();
+    if (version === SCHEMA_VERSION) return;
+    if (version < 1) {
+      this.transaction(() => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS results (
+            e164 TEXT NOT NULL,
+            app TEXT NOT NULL,
+            status TEXT NOT NULL,
+            checked_at INTEGER NOT NULL,
+            PRIMARY KEY (e164, app)
+          );
+          CREATE TABLE IF NOT EXISTS accounts (
+            app TEXT NOT NULL,
+            name TEXT NOT NULL,
+            cooldown_until INTEGER NOT NULL DEFAULT 0,
+            disabled_reason TEXT,
+            day TEXT NOT NULL DEFAULT '',
+            used_today INTEGER NOT NULL DEFAULT 0,
+            next_allowed_at INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (app, name)
+          );
+          PRAGMA user_version = 1;
+        `);
+      });
+    }
+    if (version < 2) {
+      this.transaction(() => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS failed_checks (
+            e164 TEXT NOT NULL,
+            app TEXT NOT NULL,
+            failures INTEGER NOT NULL,
+            last_failed_at INTEGER NOT NULL,
+            PRIMARY KEY (e164, app)
+          );
+          PRAGMA user_version = 2;
+        `);
+      });
+    }
   }
 
   /** Run `fn` atomically. Re-entrant: nested calls join the outer transaction. */

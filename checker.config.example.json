@@ -1,4 +1,5 @@
 {
+  "configVersion": 2,
   "defaultRegion": "VN",
   "dataDir": "./data",
   "maxAgeDays": 30,

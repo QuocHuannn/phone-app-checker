@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createProgram, main, type CliDeps } from '../src/cli.ts';
+import { CURRENT_CONFIG_VERSION } from '../src/config.ts';
 import { DOCTOR_FOOTER } from '../src/doctor.ts';
 import { Store } from '../src/store.ts';
 import { APPS, AccountBanned, type Adapter, type App, type CheckStatus } from '../src/types.ts';
@@ -779,7 +780,9 @@ describe('version, doctor and app home', () => {
     const home = join(env.dir, 'home');
     expect(await runDoctorCommand({ env: { [HOME_ENV]: home } }, [])).toBeUndefined();
     expect(existsSync(join(home, 'checker.config.json'))).toBe(true);
-    expect(env.printed.join('\n')).toMatch(/^OK\s+config\s+.*\(exists\)/m);
+    const text = env.printed.join('\n');
+    expect(text).toMatch(/^OK\s+config\s+/m); // the path wraps under formatDoctor's columns
+    expect(text).toContain('(exists)');
   });
 
   it('doctor reports an unusable home as a failing config check', async () => {
@@ -788,14 +791,16 @@ describe('version, doctor and app home', () => {
     const home = join(env.dir, 'link');
     symlinkSync(target, home);
     expect(await runDoctorCommand({ env: { [HOME_ENV]: home } }, [])).toBe(1);
-    expect(env.printed.join('\n')).toMatch(/^FAIL\s+config\s+.*symlink/m);
+    const text = env.printed.join('\n');
+    expect(text).toMatch(/^FAIL\s+config\s+/m); // the detail wraps; 'symlink' lands on a continuation line
+    expect(text).toContain('symlink');
   });
 
   describe('hidden data-dir command (used by install.sh / uninstall.sh)', () => {
     it('prints the configured dataDir resolved against the app home, without creating anything', async () => {
       const home = join(env.dir, 'home');
       mkdirSync(home);
-      writeFileSync(join(home, 'checker.config.json'), JSON.stringify({ dataDir: './store' }));
+      writeFileSync(join(home, 'checker.config.json'), JSON.stringify({ configVersion: CURRENT_CONFIG_VERSION, dataDir: './store' }));
       await program({ env: { [HOME_ENV]: home } }).parseAsync(['data-dir'], { from: 'user' });
       expect(env.printed).toEqual([join(home, 'store')]);
       expect(readdirSync(home)).toEqual(['checker.config.json']);

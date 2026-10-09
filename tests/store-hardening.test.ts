@@ -1,6 +1,8 @@
+import { execFileSync } from 'node:child_process';
 import { chmodSync, closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, truncateSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Store } from '../src/store.ts';
@@ -109,6 +111,25 @@ describe('migration', () => {
     writeFileSync(join(dir, 'checker.db'), '', { mode: 0o600 });
     expect(userVersion(openIn(dir).db)).toBe(2);
   });
+  it.each([[1], [2]])('opens the committed 0.1.0 fixture database at schema %s and keeps its rows', (schema) => {
+    const dir = tempDir();
+    const path = join(dir, 'checker.db');
+    const seed = fileURLToPath(new URL('./fixtures/v0.1.0/seed-checker-db.mjs', import.meta.url));
+    execFileSync(process.execPath, [seed, path, String(schema)]);
+    chmodSync(path, 0o600);
+
+    const store = openIn(dir);
+    expect(userVersion(store.db)).toBe(2);
+    expect(store.getResult('+84901000001', 'telegram')).toEqual({ status: 'yes', checkedAt: 1700000000000 });
+    expect(store.getResult('+84902000002', 'whatsapp')).toEqual({ status: 'not_found', checkedAt: 1700000001000 });
+    expect(store.getResult('+84903000003', 'zalo')).toEqual({ status: 'unknown', checkedAt: 1700000002000 });
+    expect(store.getAccount('telegram', 'main')).toMatchObject({ usedToday: 3, day: '2026-10-01' });
+    expect(store.failedChecks('telegram').get('+84904000004')).toBe(schema === 1 ? undefined : 2);
+    store.close();
+    // Reopening the migrated database is a no-op.
+    expect(userVersion(openIn(dir).db)).toBe(2);
+  });
+
 });
 
 describe('damaged databases', () => {

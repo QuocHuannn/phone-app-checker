@@ -1,6 +1,6 @@
 import type { Lang } from './i18n/index.ts';
 
-export const APPS = ['telegram', 'whatsapp', 'zalo', 'viber', 'line', 'threema'] as const;
+export const APPS = ['telegram', 'whatsapp', 'zalo', 'viber', 'line', 'threema', 'matrix'] as const;
 export type App = (typeof APPS)[number];
 
 /** Final value written in a report cell. */

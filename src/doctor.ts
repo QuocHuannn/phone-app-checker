@@ -47,6 +47,7 @@ const ADAPTER_PACKAGE: Record<App, string | undefined> = {
   viber: undefined,
   line: '@evex/linejs',
   threema: undefined,
+  matrix: undefined,
 };
 
 const requireForPackages = createRequire(import.meta.url);
@@ -140,15 +141,15 @@ async function adbProblem(config: Config, input: DoctorInput): Promise<{ level: 
 }
 
 /**
- * Threema keeps `{gatewayId, secret}` in `credentials.json` inside each account directory. A missing
- * file means that account never finished login; a group/world-readable one exposes the Gateway secret.
+ * Threema and Matrix keep their login in `credentials.json` inside each account directory. A missing
+ * file means that account never finished login; a group/world-readable one exposes the secret.
  */
-function threemaCredentialProblems(config: Config): string[] {
+function credentialFileProblems(config: Config, app: 'threema' | 'matrix'): string[] {
   const problems: string[] = [];
-  for (const name of listAccountNames(config, 'threema')) {
-    const file = join(accountDirPath(config, 'threema', name), 'credentials.json');
+  for (const name of listAccountNames(config, app)) {
+    const file = join(accountDirPath(config, app, name), 'credentials.json');
     const stat = statSync(file, { throwIfNoEntry: false });
-    if (stat === undefined) problems.push(`account "${name}" has no credentials.json: run login threema --account ${name}`);
+    if (stat === undefined) problems.push(`account "${name}" has no credentials.json: run login ${app} --account ${name}`);
     else if ((stat.mode & 0o077) !== 0) problems.push(`account "${name}" credentials.json is readable by others (mode ${(stat.mode & 0o777).toString(8)}): run chmod 600 on it`);
   }
   return problems;
@@ -184,7 +185,7 @@ async function appCheck(app: App, config: Config, input: DoctorInput): Promise<D
     if (problem?.level === 'fail') failure = problem.detail;
     else if (problem !== undefined) warnings.push(problem.detail);
   }
-  if (app === 'threema') warnings.push(...threemaCredentialProblems(config));
+  if (app === 'threema' || app === 'matrix') warnings.push(...credentialFileProblems(config, app));
   if (failure !== undefined) return { name: app, level: 'fail', detail: [failure, ...warnings].join('; ') };
   if (warnings.length > 0) return { name: app, level: 'warn', detail: warnings.join('; ') };
   return { name: app, level: 'ok', detail: `${available}; ${plural(accounts, 'account')}` };

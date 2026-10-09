@@ -87,6 +87,7 @@ export const en = {
   hintViber: 'Viber needs an Android phone connected by USB cable (see docs/viber-setup.md).',
   hintLine: 'LINE will guide you on the screen (see docs/line-setup.md).',
   hintThreema: 'Threema will ask for: your Gateway ID (starts with *, 8 characters) and its secret (not shown while you type). See docs/threema-setup.md.',
+  hintMatrix: 'Matrix will ask for: your homeserver (Enter = matrix.org), your username and your password (not shown while you type). The password is used once and never saved. See docs/matrix-setup.md.',
 
   // 2 - choosing how to log in.
   loginMethodPrompt: ({ max }: { max: number }) => `Choose 1-${max} (Enter = 1): `,
@@ -202,6 +203,13 @@ export const en = {
   threemaIdPrompt: 'Threema Gateway ID (8 characters, starts with *, for example *ABCDEFG): ',
   threemaSecretPrompt: 'Threema Gateway API secret (not shown while you type): ',
   threemaIdInvalid: 'A Gateway ID is "*" followed by 7 capital letters or digits, for example *ABCDEFG. Try again.',
+  matrixHomeserverPrompt: ({ url }: { url: string }) => `Matrix homeserver address (Enter = ${url}): `,
+  matrixHomeserverInvalid: 'Type an address that starts with https://, for example https://matrix.org. Try again.',
+  matrixUserPrompt: 'Matrix username (for example alice, or @alice:matrix.org): ',
+  matrixPasswordPrompt: 'Matrix password (not shown while you type; used once, never saved): ',
+  matrixTermsIntro: ({ server }: { server: string }) => `The identity server ${server} asks you to accept its terms before it answers lookups. Read them here:`,
+  matrixTermsPrompt: 'Do you accept these terms? (y/n): ',
+  matrixTermsDeclined: 'The terms were not accepted; nothing was saved.',
   telegramPhonePrompt: 'Telegram phone number (international format, for example +84901234567): ',
   telegramCodePrompt: 'Login code sent by Telegram (not shown while you type): ',
   telegramPasswordPrompt: 'Two-step verification password (not shown while you type): ',

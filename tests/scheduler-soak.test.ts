@@ -42,6 +42,7 @@ const PACING: Record<App, Partial<PacingSettings>> = {
   viber: { batchSize: 50, dailyCap: 1500, minIntervalMs: 30 * 60_000, jitterMs: 10 * 60_000, rateLimitCooldownMs: 12 * HOUR },
   line: { batchSize: 10, dailyCap: 700, minIntervalMs: 120_000, jitterMs: 60_000, rateLimitCooldownMs: 24 * HOUR },
   threema: { batchSize: 10, dailyCap: 700, minIntervalMs: 120_000, jitterMs: 60_000, rateLimitCooldownMs: 24 * HOUR },
+  matrix: { batchSize: 10, dailyCap: 700, minIntervalMs: 120_000, jitterMs: 60_000, rateLimitCooldownMs: 24 * HOUR },
 };
 
 function makeConfig(): Config {

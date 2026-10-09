@@ -471,6 +471,16 @@ describe('2 - login', () => {
     expect(f.screen()).toContain('Next step');
   });
 
+  it('Matrix: explains that the password is used once and never saved, then runs login with the default account', async () => {
+    const f = fixture(['2', String(APPS.indexOf('matrix') + 1), '', '0']);
+    await runMenu(f.host);
+    expect(f.flat()).toContain('Matrix will ask for: your homeserver');
+    expect(f.flat()).toContain('never saved');
+    expect(f.flat()).toContain('docs/matrix-setup.md');
+    expect(f.runs).toEqual([['login', 'matrix', '--account', 'default', ...EN]]);
+    expect(f.screen()).toContain('Next step');
+  });
+
   describe('WhatsApp', () => {
     it('offers the pairing code first (recommended, the default) and the QR second, and re-asks on anything else', async () => {
       const f = fixture(['2', '2', '', 'x', '3', '2', '0']);

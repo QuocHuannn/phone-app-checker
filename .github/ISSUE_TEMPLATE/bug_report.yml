@@ -41,6 +41,7 @@ body:
         - Viber
         - LINE
         - Threema
+        - Matrix
         - None / general
   - type: input
     id: version

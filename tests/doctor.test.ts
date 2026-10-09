@@ -151,6 +151,52 @@ describe('runDoctor', () => {
     });
   });
 
+  describe('matrix credentials', () => {
+    function matrixFile(content: string | undefined, mode = 0o600): void {
+      const dir = join(home, 'data', 'sessions', 'matrix', 'default');
+      mkdirSync(dir, { recursive: true });
+      if (content === undefined) return;
+      const file = join(dir, 'credentials.json');
+      writeFileSync(file, content);
+      chmodSync(file, mode);
+    }
+
+    it('is disabled by default and needs no package (first-party adapter)', async () => {
+      writeConfig({});
+      expect(byName(await runDoctor(input())).matrix).toMatchObject({ level: 'ok', detail: 'disabled (adapter available)' });
+    });
+
+    it('loads in --deep mode', async () => {
+      writeConfig({});
+      const loaded: App[] = [];
+      await runDoctor(input({ deep: true, loadAdapter: async (app) => (loaded.push(app), fakeAdapter(app)) }));
+      expect(loaded).toContain('matrix');
+    });
+
+    it('is ok when the account has a private credentials file', async () => {
+      writeConfig({ apps: { matrix: { enabled: true } } });
+      matrixFile('{}');
+      expect(byName(await runDoctor(input())).matrix).toMatchObject({ level: 'ok' });
+    });
+
+    it('warns when the account directory has no credentials file', async () => {
+      writeConfig({ apps: { matrix: { enabled: true } } });
+      matrixFile(undefined);
+      const check = byName(await runDoctor(input())).matrix;
+      expect(check).toMatchObject({ level: 'warn' });
+      expect(check?.detail).toContain('login matrix --account default');
+    });
+
+    it('warns when the credentials file can be read by other users', async () => {
+      writeConfig({ apps: { matrix: { enabled: true } } });
+      matrixFile('{}', 0o644);
+      const check = byName(await runDoctor(input())).matrix;
+      expect(check).toMatchObject({ level: 'warn' });
+      expect(check?.detail).toContain('readable by others');
+      expect(check?.detail).toContain('chmod 600');
+    });
+  });
+
   it('fails when Viber is enabled and adb is missing', async () => {
     writeConfig({ apps: { viber: { enabled: true } } });
     addAccount('viber');

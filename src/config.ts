@@ -100,6 +100,18 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     options: {},
     maxParallelAccounts: 1,
   },
+  // The Matrix identity-server lookup publishes no rate limit: these are conservative guesses (docs/matrix-setup.md).
+  matrix: {
+    enabled: false,
+    batchSize: 1,
+    dailyCap: 100,
+    minIntervalMs: 5_000,
+    jitterMs: 5_000,
+    rateLimitCooldownMs: 6 * HOUR,
+    errorCooldownMs: 10 * MINUTE,
+    options: { homeserver: 'https://matrix.org', identityServer: 'https://vector.im' },
+    maxParallelAccounts: 1,
+  },
 };
 
 export const DEFAULT_CONFIG_FILE = 'checker.config.json';

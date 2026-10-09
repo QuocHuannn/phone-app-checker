@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import qrcodeTerminal from 'qrcode-terminal';
 import { describe, expect, it } from 'vitest';
-import { detectMode, frameSize, qrMatrix, QrScreen, renderQr, visualRows, type QrMode, type QrStream } from '../src/qr.ts';
+import { detectMode, frameSize, qrMatrix, qrWindowNeed, QrScreen, renderQr, visualRows, type QrMode, type QrStream } from '../src/qr.ts';
 import { DARK, decode, LIGHT, rasterize } from './helpers/ansi-raster.ts';
 
 const b64 = (seed: string, bytes: number): string => createHash('sha512').update(seed).digest().subarray(0, bytes).toString('base64');
@@ -272,5 +272,60 @@ describe('QrScreen', () => {
       const visible = (line: string): number => line.replace(/\u001b\[[0-9;]*m/g, '').length;
       expect(Math.max(...lines.map(visible))).toBe(size.columns);
     }
+  });
+});
+
+describe('qrWindowNeed: the window a login must have before a QR is started', () => {
+  const modules = qrMatrix(WHATSAPP).length;
+  const colour = { isTTY: true, getColorDepth: () => 8 };
+
+  it('says a default 80x24 window is too small and names a bigger size', () => {
+    const need = qrWindowNeed(modules, { ...colour, columns: 80, rows: 24 }, {});
+    expect(need.fits).toBe(false);
+    expect(need.rows).toBeGreaterThan(24);
+  });
+
+  it('fits exactly at the size it reports, and not one row or column below', () => {
+    const need = qrWindowNeed(modules, { ...colour, columns: 80, rows: 24 }, {});
+    expect(qrWindowNeed(modules, { ...colour, columns: need.columns, rows: need.rows }, {}).fits).toBe(true);
+    expect(qrWindowNeed(modules, { ...colour, columns: need.columns - 1, rows: need.rows }, {}).fits).toBe(false);
+    expect(qrWindowNeed(modules, { ...colour, columns: need.columns, rows: need.rows - 1 }, {}).fits).toBe(false);
+  });
+
+  it('plain output needs a bigger window than colour output', () => {
+    const big = { ...colour, columns: 500, rows: 500 };
+    const withColour = qrWindowNeed(modules, big, {});
+    const plain = qrWindowNeed(modules, big, { NO_COLOR: '1' });
+    expect(plain.columns).toBeGreaterThan(withColour.columns);
+    expect(plain.rows).toBeGreaterThan(withColour.rows);
+  });
+
+  it('a stream that is not a terminal always fits: there is nothing to resize', () => {
+    expect(qrWindowNeed(modules, { isTTY: false }, {}).fits).toBe(true);
+    expect(qrWindowNeed(modules, {}, {}).fits).toBe(true);
+  });
+
+  it('a terminal that reports no size is treated as 80x24, not as unlimited', () => {
+    expect(qrWindowNeed(modules, colour, {}).fits).toBe(false);
+  });
+});
+
+describe('PHONE_APP_CHECKER_PLAIN', () => {
+  it('forces the plain QR mode on a colour terminal; an empty value does not', () => {
+    const tty = { isTTY: true, getColorDepth: () => 8 };
+    expect(detectMode(tty, {})).toBe('color256');
+    expect(detectMode(tty, { PHONE_APP_CHECKER_PLAIN: '1' })).toBe('plain');
+    expect(detectMode(tty, { PHONE_APP_CHECKER_PLAIN: '' })).toBe('color256');
+  });
+
+  it('never moves the cursor on a terminal: a new code is printed below the old one', () => {
+    const stream = fakeStream({ isTTY: true, columns: 400, rows: 200 });
+    const { screen, logs } = screenOn(stream, { PHONE_APP_CHECKER_PLAIN: '1' });
+    screen.show(TELEGRAM);
+    screen.show(TELEGRAM, 'New QR code (#2).');
+    screen.clear();
+    expect(stream.written).toEqual([]);
+    expect(logs).toHaveLength(2);
+    expect(logs.join('')).not.toContain('\u001b');
   });
 });

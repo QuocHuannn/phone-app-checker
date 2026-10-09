@@ -7,6 +7,7 @@ import { packageVersion, readBuildInfo } from './home.ts';
 import { plural } from './plural.ts';
 import { Store } from './store.ts';
 import { APPS, redactPhones, type Adapter, type App } from './types.ts';
+import { wrap } from './ui.ts';
 
 export type DoctorLevel = 'ok' | 'warn' | 'fail';
 
@@ -194,11 +195,18 @@ export const DOCTOR_FOOTER = [
   'then a small trial on numbers whose answers you already know, before trusting any result.',
 ].join('\n');
 
-/** One aligned `LEVEL  name  detail` line per check, a blank line, then {@link DOCTOR_FOOTER}. */
-export function formatDoctor(checks: DoctorCheck[]): string {
+/**
+ * One aligned `LEVEL  name  detail` line per check, a blank line, then {@link DOCTOR_FOOTER} as its
+ * own paragraph. Details wrap to `columns` with a hanging indent under the detail column, so a fix
+ * instruction is never cut mid-token at a narrow window.
+ */
+export function formatDoctor(checks: DoctorCheck[], columns = 80): string {
   const nameWidth = Math.max(0, ...checks.map((check) => check.name.length));
-  const rows = checks.map((check) =>
-    `${LEVEL_LABEL[check.level].padEnd(4)}  ${check.name.padEnd(nameWidth)}  ${check.detail}`.trimEnd(),
-  );
+  const rows: string[] = [];
+  for (const check of checks) {
+    const prefix = `${LEVEL_LABEL[check.level].padEnd(4)}  ${check.name.padEnd(nameWidth)}  `;
+    const parts = wrap(check.detail, Math.max(12, columns - prefix.length));
+    for (const [index, part] of parts.entries()) rows.push(index === 0 ? `${prefix}${part}`.trimEnd() : `${' '.repeat(prefix.length)}${part}`.trimEnd());
+  }
   return `${rows.join('\n')}\n\n${DOCTOR_FOOTER}`;
 }

@@ -33,6 +33,8 @@ interface Fixture {
   host: MenuHost;
   runs: string[][];
   screen: () => string;
+  /** Screen with every run of whitespace folded to one space, so wrapped sentences still match. */
+  flat: () => string;
   remaining: () => string[];
 }
 
@@ -74,7 +76,7 @@ function fixture(
     },
     ...options.host,
   };
-  return { host, runs, screen: terminal.screen, remaining: terminal.remaining };
+  return { host, runs, screen: terminal.screen, flat: () => terminal.screen().replace(/\s+/g, ' '), remaining: terminal.remaining };
 }
 
 const CSV_PATH = () => join(work, 'customers.csv');
@@ -126,14 +128,14 @@ describe('isInteractive', () => {
 
 describe('menu navigation', () => {
   it('shows the menu, the guide and quits with 0', async () => {
-    const f = fixture(['6', '0']);
+    const f = fixture(['6', '', '0']);
     expect(await runMenu(f.host)).toBe(0);
     const screen = f.screen();
     for (const entry of ['1. Check a CSV file', '2. Log in an app account', '3. View logged-in accounts', '4. Rebuild the latest report', '5. Check this Mac is ready', '6. Guide / warnings', 'L. Language / Ngôn ngữ / Bahasa / 언어 / 语言: English', '0. Quit', 'v9.9.9']) {
       expect(screen).toContain(entry);
     }
     for (const warning of ['agreed to be contacted', 'not_found', '(privacy)', 'HK / JP / KR / TW / TH', 'Zalo only checks Vietnamese numbers (+84)', 'restricted or banned']) {
-      expect(screen).toContain(warning);
+      expect(f.flat()).toContain(warning);
     }
     expect(screen).toContain('Goodbye.');
     expect(f.runs).toEqual([]);
@@ -141,7 +143,7 @@ describe('menu navigation', () => {
   });
 
   it('shows the menu again after each action', async () => {
-    const f = fixture(['6', '6', '0']);
+    const f = fixture(['6', '', '6', '', '0']);
     await runMenu(f.host);
     expect(f.screen().split('=== Phone App Checker').length - 1).toBe(3);
   });
@@ -179,14 +181,21 @@ describe('menu navigation', () => {
 });
 
 describe('simple actions', () => {
-  it('3 runs `accounts`', async () => {
-    const f = fixture(['3', '0']);
+  it('3 runs `accounts` when accounts exist', async () => {
+    const f = fixture(['3', '', '0'], { accounts: { telegram: ['a'] } });
     await runMenu(f.host);
     expect(f.runs).toEqual([['accounts']]);
   });
 
+  it('3 shows the no-accounts hint without running `accounts` when nobody is logged in', async () => {
+    const f = fixture(['3', '0']);
+    await runMenu(f.host);
+    expect(f.flat()).toContain('No account is logged in yet');
+    expect(f.runs).toEqual([]);
+  });
+
   it('5 runs `doctor` once and adds only the menu\'s own hint (the offline-readiness note is part of the doctor output)', async () => {
-    const f = fixture(['5', '0']);
+    const f = fixture(['5', '', '0']);
     await runMenu(f.host);
     expect(f.runs).toEqual([['doctor']]);
     // The note is printed by `doctor` itself; the menu must not say it a second time.
@@ -195,14 +204,15 @@ describe('simple actions', () => {
   });
 
   it('a failing command shows its message and the menu keeps going', async () => {
-    const f = fixture(['3', '5', '6', '0'], {
+    const f = fixture(['3', '', '5', '', '6', '', '0'], {
       results: [
         { code: 1, error: 'database is locked' },
         { code: 1 },
       ],
+      accounts: { telegram: ['a'] },
     });
     expect(await runMenu(f.host)).toBe(0);
-    const screen = f.screen();
+    const screen = f.flat();
     expect(screen).toContain('Error: database is locked');
     expect(screen).toContain('The command did not succeed (code 1)');
     expect(screen).toContain('A line says FAIL');
@@ -218,7 +228,7 @@ describe('simple actions', () => {
       },
     });
     expect(await runMenu(f.host)).toBe(0);
-    expect(f.screen().match(/Cannot read the configuration: bad +json/g)).toHaveLength(3);
+    expect(f.flat().match(/Cannot read the configuration: bad +json/g)).toHaveLength(3);
     expect(f.screen()).not.toContain('\u001b');
     expect(f.runs).toEqual([]);
   });
@@ -226,30 +236,30 @@ describe('simple actions', () => {
 
 describe('1 - check a CSV', () => {
   it('checks every logged-in app by default and reports where the report is', async () => {
-    const f = fixture(['1', CSV_PATH(), '', '', '0'], { accounts: { telegram: ['a'], zalo: ['z'] } });
+    const f = fixture(['1', CSV_PATH(), '', '', '', '0'], { accounts: { telegram: ['a'], zalo: ['z'] } });
     await runMenu(f.host);
     expect(f.runs).toEqual([['check', '--out', join(work, 'report.csv'), '--apps', 'telegram,zalo', '--', CSV_PATH()]]);
-    expect(f.screen()).toContain(`Done. Report: ${join(work, 'report.csv')}`);
+    expect(f.flat().replaceAll(' ', '')).toContain(`Done. Report: ${join(work, 'report.csv')}`.replaceAll(' ', ''));
     expect(f.screen()).toContain('Goodbye.');
   });
 
   it('lets the user pick apps by number or name and re-asks on nonsense', async () => {
-    const f = fixture(['1', CSV_PATH(), 'x9', '3', '', '0'], { accounts: { telegram: ['a'], whatsapp: ['w'], zalo: ['z'] } });
+    const f = fixture(['1', CSV_PATH(), '', 'x9', '3', '', '0'], { accounts: { telegram: ['a'], whatsapp: ['w'], zalo: ['z'] } });
     await runMenu(f.host);
-    expect(f.screen()).toContain('Did not understand "x9"');
+    expect(f.flat()).toContain('Did not understand "x9"');
     // "3" is Zalo here (telegram, whatsapp, zalo are the three logged-in apps).
-    expect(f.screen()).toContain('Logged-in apps:');
+    expect(f.flat()).toContain('Logged-in apps:');
     expect(f.runs[0]?.[4]).toBe('zalo');
 
-    const byName = fixture(['1', CSV_PATH(), 'whatsapp, telegram', '', '0'], { accounts: { telegram: ['a'], whatsapp: ['w'] } });
+    const byName = fixture(['1', CSV_PATH(), '', 'whatsapp, telegram', '', '0'], { accounts: { telegram: ['a'], whatsapp: ['w'] } });
     await runMenu(byName.host);
     expect(byName.runs[0]?.[4]).toBe('telegram,whatsapp');
   });
 
   it('shows what the user typed when it names no app, in the case it was typed (not folded to lower case)', async () => {
-    const f = fixture(['1', CSV_PATH(), 'WhatsApp, Signal-X', '', '0'], { accounts: { telegram: ['a'], whatsapp: ['w'] } });
+    const f = fixture(['1', CSV_PATH(), '', 'WhatsApp, Signal-X', '', '0'], { accounts: { telegram: ['a'], whatsapp: ['w'] } });
     await runMenu(f.host);
-    expect(f.screen()).toContain('Did not understand "Signal-X"');
+    expect(f.flat()).toContain('Did not understand "Signal-X"');
   });
 
   it('re-asks for an empty file at once instead of failing after the other questions', async () => {
@@ -257,12 +267,12 @@ describe('1 - check a CSV', () => {
     writeFileSync(empty, '');
     const f = fixture(['1', empty, '', '0'], { accounts: { telegram: ['a'] } });
     await runMenu(f.host);
-    expect(f.screen()).toContain(`This file is empty: ${empty}`);
+    expect(f.flat()).toContain(`This file is empty: ${empty}`);
     expect(f.runs).toEqual([]);
   });
 
   it('does not ask which app when only one is logged in', async () => {
-    const f = fixture(['1', CSV_PATH(), '', '0'], { accounts: { line: ['l'] } });
+    const f = fixture(['1', CSV_PATH(), '', '', '0'], { accounts: { line: ['l'] } });
     await runMenu(f.host);
     expect(f.screen()).not.toContain('Check which apps?');
     expect(f.runs[0]?.[4]).toBe('line');
@@ -274,42 +284,42 @@ describe('1 - check a CSV', () => {
     const escaped = spaced.replace(/[ ()]/g, (c) => `\\${c}`);
     const fileUrl = `file://${encodeURI(spaced)}`;
     for (const typed of [`${escaped} `, `'${spaced}' `, `"${spaced}"`, fileUrl]) {
-      const f = fixture(['1', typed, '', '0'], { accounts: { telegram: ['a'] } });
+      const f = fixture(['1', typed, '', '', '0'], { accounts: { telegram: ['a'] } });
       await runMenu(f.host);
       expect(f.runs[0]?.at(-1)).toBe(spaced);
     }
 
-    const f = fixture(['1', '~/in-home.csv', '', '0'], { accounts: { telegram: ['a'] } });
+    const f = fixture(['1', '~/in-home.csv', '', '', '0'], { accounts: { telegram: ['a'] } });
     const home = join(dir, 'fakehome');
     mkdirSync(home);
     writeFileSync(join(home, 'in-home.csv'), CSV);
     await runMenu({ ...f.host, homeDir: home });
     expect(f.runs[0]?.at(-1)).toBe(join(home, 'in-home.csv'));
 
-    const relative = fixture(['1', 'customers.csv', '', '0'], { accounts: { telegram: ['a'] } });
+    const relative = fixture(['1', 'customers.csv', '', '', '0'], { accounts: { telegram: ['a'] } });
     await runMenu(relative.host);
     expect(relative.runs[0]?.at(-1)).toBe(CSV_PATH());
   });
 
-  it('re-asks for a missing file, a folder and an unreadable file, and Enter goes back', async () => {
+  it('re-asks for a missing file, a folder and an unreadable file, and b goes back', async () => {
     const locked = join(work, 'locked.csv');
     writeFileSync(locked, CSV);
     chmodSync(locked, 0o000);
     const readable = process.getuid?.() === 0 || (() => { try { readFileSync(locked); return true; } catch { return false; } })();
-    const f = fixture(['1', join(work, 'nope.csv'), work, ...(readable ? [] : [locked]), '', '0'], { accounts: { telegram: ['a'] } });
+    const f = fixture(['1', join(work, 'nope.csv'), work, ...(readable ? [] : [locked]), 'b', '0'], { accounts: { telegram: ['a'] } });
     await runMenu(f.host);
     chmodSync(locked, 0o600);
-    const screen = f.screen();
-    expect(screen).toContain(`File not found: ${join(work, 'nope.csv')}`);
-    expect(screen).toContain(`This is not a file: ${work}`);
-    if (!readable) expect(screen).toContain('Cannot read the file (no permission)');
+    const screen = f.flat();
+    expect(screen.replaceAll(' ', '')).toContain(`File not found: ${join(work, 'nope.csv')}`.replaceAll(' ', ''));
+    expect(screen.replaceAll(' ', '')).toContain(`This is not a file: ${work}`.replaceAll(' ', ''));
+    if (!readable) expect(screen.replaceAll(' ', '')).toContain('Cannot read the file (no permission):'.replaceAll(' ', ''));
     expect(f.runs).toEqual([]);
     expect(screen).toContain('Goodbye.');
   });
 
   it('shows a hostile path without escape, bidi or line-break characters', async () => {
     const hostile = join(work, '\u001b[31m\u202Egnp.csv\u001b]0;pwned\u0007\u2028forged.csv');
-    const f = fixture(['1', hostile, '', '0'], { accounts: { telegram: ['a'] } });
+    const f = fixture(['1', hostile, '', '', '0'], { accounts: { telegram: ['a'] } });
     await runMenu(f.host);
     const screen = f.screen();
     expect(screen).toContain('File not found:');
@@ -320,32 +330,32 @@ describe('1 - check a CSV', () => {
 
   it('asks before overwriting an existing report, and only overwrites on yes', async () => {
     writeFileSync(join(work, 'report.csv'), 'old');
-    const declined = fixture(['1', CSV_PATH(), '', 'x', 'n', '0'], { accounts: { telegram: ['a'] } });
+    const declined = fixture(['1', CSV_PATH(), '', '', 'x', 'n', '0'], { accounts: { telegram: ['a'] } });
     await runMenu(declined.host);
-    expect(declined.screen()).toContain(`File ${join(work, 'report.csv')} already exists. Overwrite`);
+    expect(declined.flat()).toContain(`File ${join(work, 'report.csv')} already exists. Overwrite`);
     expect(declined.screen()).toContain('Please type y (yes) or n (no).');
-    expect(declined.screen()).toContain('Cancelled, no file was overwritten.');
+    expect(declined.flat()).toContain('Cancelled, no file was overwritten.');
     expect(declined.runs).toEqual([]);
 
-    const byDefault = fixture(['1', CSV_PATH(), '', '', '0'], { accounts: { telegram: ['a'] } });
+    const byDefault = fixture(['1', CSV_PATH(), '', '', '', '0'], { accounts: { telegram: ['a'] } });
     await runMenu(byDefault.host);
     expect(byDefault.runs).toEqual([]);
 
     for (const yes of ['y', 'Y', 'yes', ' YES ']) {
-      const accepted = fixture(['1', CSV_PATH(), '', yes, '0'], { accounts: { telegram: ['a'] } });
+      const accepted = fixture(['1', CSV_PATH(), '', '', yes, '0'], { accounts: { telegram: ['a'] } });
       await runMenu(accepted.host);
       expect(accepted.runs).toHaveLength(1);
     }
   });
 
   it('uses a custom report file and a folder as the report location', async () => {
-    const custom = fixture(['1', CSV_PATH(), join(work, 'out file.csv'), '0'], { accounts: { telegram: ['a'] } });
+    const custom = fixture(['1', CSV_PATH(), '', join(work, 'out file.csv'), '0'], { accounts: { telegram: ['a'] } });
     await runMenu(custom.host);
     expect(custom.runs[0]?.[2]).toBe(join(work, 'out file.csv'));
 
     const folder = join(dir, 'reports');
     mkdirSync(folder);
-    const intoFolder = fixture(['1', CSV_PATH(), folder, '0'], { accounts: { telegram: ['a'] } });
+    const intoFolder = fixture(['1', CSV_PATH(), '', folder, '0'], { accounts: { telegram: ['a'] } });
     await runMenu(intoFolder.host);
     expect(intoFolder.runs[0]?.[2]).toBe(join(folder, 'report.csv'));
   });
@@ -357,7 +367,7 @@ describe('1 - check a CSV', () => {
     chmodSync(readOnly, 0o500);
     try {
       const writable = (() => { try { writeFileSync(join(readOnly, 'probe'), ''); return true; } catch { return false; } })();
-      const f = fixture(['1', join(readOnly, 'in.csv'), '', '0'], { accounts: { telegram: ['a'] } });
+      const f = fixture(['1', join(readOnly, 'in.csv'), '', '', '0'], { accounts: { telegram: ['a'] } });
       await runMenu(f.host);
       expect(f.runs[0]?.[2]).toBe(join(writable ? readOnly : work, 'report.csv'));
     } finally {
@@ -368,28 +378,28 @@ describe('1 - check a CSV', () => {
   it('says so when nobody is logged in and offers to log in', async () => {
     const f = fixture(['1', 'y', '', '0']);
     await runMenu(f.host);
-    expect(f.screen()).toContain('No account is logged in yet');
-    expect(f.screen()).toContain('Log in to which app?');
+    expect(f.flat()).toContain('No account is logged in yet');
+    expect(f.flat()).toContain('Log in to which app?');
     expect(f.runs).toEqual([]);
 
     const declined = fixture(['1', 'n', '0']);
     await runMenu(declined.host);
-    expect(declined.screen()).not.toContain('Log in to which app?');
+    expect(declined.flat()).not.toContain('Log in to which app?');
   });
 
   it('a failed check shows its message and stays in the menu; an interrupted one says it can resume', async () => {
-    const failed = fixture(['1', CSV_PATH(), '', '0'], {
+    const failed = fixture(['1', CSV_PATH(), '', '', '0'], {
       accounts: { telegram: ['a'] },
       results: [{ code: 1, error: 'no valid phone numbers (2 invalid)' }],
     });
     expect(await runMenu(failed.host)).toBe(0);
-    expect(failed.screen()).toContain('Error: no valid phone numbers (2 invalid)');
-    expect(failed.screen()).not.toContain('Done. Report');
+    expect(failed.flat()).toContain('Error: no valid phone numbers (2 invalid)');
+    expect(failed.flat()).not.toContain('Done. Report');
     expect(failed.screen()).toContain('Goodbye.');
 
-    const stopped = fixture(['1', CSV_PATH(), '', '0'], { accounts: { telegram: ['a'] }, results: [{ code: 130 }] });
+    const stopped = fixture(['1', CSV_PATH(), '', '', '0'], { accounts: { telegram: ['a'] }, results: [{ code: 130 }] });
     await runMenu(stopped.host);
-    expect(stopped.screen()).toContain('Stopped midway');
+    expect(stopped.flat()).toContain('Stopped midway');
   });
 });
 
@@ -424,7 +434,7 @@ describe('2 - login', () => {
   });
 
   it('re-asks for an unknown app and Enter goes back without running anything', async () => {
-    const f = fixture(['2', '9', 'signal', '', '0']);
+    const f = fixture(['2', '9', 'signal', 'b', '0']);
     await runMenu(f.host);
     expect(f.screen()).toContain('Did not understand "9"');
     expect(f.screen()).toContain('Did not understand "signal"');
@@ -434,7 +444,7 @@ describe('2 - login', () => {
   it('asks before re-logging in an existing account', async () => {
     const declined = fixture(['2', '3', 'z', 'n', '0'], { accounts: { zalo: ['z'] } });
     await runMenu(declined.host);
-    expect(declined.screen()).toContain('Logging in again replaces the old login session');
+    expect(declined.flat()).toContain('Logging in again replaces the old login session');
     expect(declined.runs).toEqual([]);
 
     const accepted = fixture(['2', '3', 'z', 'y', '0'], { accounts: { zalo: ['z'] } });
@@ -458,8 +468,8 @@ describe('2 - login', () => {
       await runMenu(f.host);
       const screen = f.screen();
       expect(screen).toContain('How do you want to link WhatsApp?');
-      expect(screen).toContain('1) Link with your phone number: type an 8-character code on your phone (recommended)');
-      expect(screen).toContain('2) Scan a QR code with your phone');
+      expect(f.flat()).toContain('1. Link with your phone number: type an 8-character code on your phone (recommended)');
+      expect(f.flat()).toContain('2. Scan a QR code with your phone');
       expect(screen.match(/Please type a number from 1 to 2\./g)).toHaveLength(2);
       expect(f.runs).toEqual([['login', 'whatsapp', '--account', 'default', '--method', 'qr', ...EN]]);
     });
@@ -467,7 +477,7 @@ describe('2 - login', () => {
     it('Enter at the method question means the pairing code, which asks for the phone number', async () => {
       const f = fixture(['2', '2', '', '', '0901234567', '0']);
       await runMenu(f.host);
-      expect(f.screen()).toContain('Phone number of the WhatsApp account you are linking');
+      expect(f.flat()).toContain('Phone number of the WhatsApp account you are linking');
       expect(f.runs).toEqual([['login', 'whatsapp', '--account', 'default', '--method', 'code', '--phone', '+84901234567', ...EN]]);
     });
 
@@ -489,8 +499,8 @@ describe('2 - login', () => {
       expect(screen).not.toContain('Logged in');
     });
 
-    it('Enter at the phone question goes back without running anything', async () => {
-      const f = fixture(['2', '2', '', '1', '', '0']);
+    it('b at the phone question goes back without running anything', async () => {
+      const f = fixture(['2', '2', '', '1', 'b', '0']);
       await runMenu(f.host);
       expect(f.runs).toEqual([]);
       expect(f.screen()).toContain('Goodbye.');
@@ -505,12 +515,10 @@ describe('2 - login', () => {
       await runMenu(f.host);
       const screen = f.screen();
       expect(screen).toContain('https://my.telegram.org/apps');
-      expect(screen).toContain('api_id');
-      expect(screen).toContain('api_hash');
-      expect(screen).toContain('The api_id is a number made of digits only');
-      expect(screen).toContain('The api_hash is exactly 32 characters');
-      expect(screen).toContain(`api_id and api_hash saved in ${join(dir, 'config.json')}`);
-      expect(screen).toContain('Telegram will show a QR code');
+      expect(f.flat()).toContain('The api_id is a number made of digits only');
+      expect(f.flat()).toContain('The api_hash is exactly 32 characters');
+      expect(f.flat()).toContain(`api_id and api_hash saved in ${join(dir, 'config.json')}`);
+      expect(f.flat()).toContain('Telegram will show a QR code');
       // Saved in the existing config (other settings kept), owner-only, and never printed back.
       const file = join(dir, 'config.json');
       expect(saved(file).apps.telegram.options).toEqual({ apiId: 1234567, apiHash: SECRET });
@@ -522,13 +530,13 @@ describe('2 - login', () => {
       expect(screen).toContain('Next step: choose 1');
     });
 
-    it('Enter at the api_id or the api_hash question goes back and saves nothing', async () => {
-      const atId = fixture(['2', '1', '', '', '0']);
+    it('b at the api_id or the api_hash question goes back and saves nothing', async () => {
+      const atId = fixture(['2', '1', '', 'b', '0']);
       await runMenu(atId.host);
       expect(atId.runs).toEqual([]);
       expect(saved(join(dir, 'config.json')).apps.telegram.options).toEqual({});
 
-      const atHash = fixture(['2', '1', '', '1234567', '', '0']);
+      const atHash = fixture(['2', '1', '', '1234567', 'b', '0']);
       await runMenu(atHash.host);
       expect(atHash.runs).toEqual([]);
       expect(saved(join(dir, 'config.json')).apps.telegram.options).toEqual({});
@@ -543,7 +551,7 @@ describe('2 - login', () => {
         },
       });
       await runMenu(f.host);
-      expect(f.screen()).toContain('Could not save the api_id / api_hash: the config file is not valid JSON');
+    expect(f.flat()).toContain('Could not save the api_id / api_hash: the config file is not valid JSON');
       expect(f.screen()).not.toContain(SECRET);
       expect(f.runs).toEqual([]);
     });
@@ -554,7 +562,7 @@ describe('2 - login', () => {
       expect(f.runs).toEqual([['login', 'telegram', '--account', 'default', '--method', 'code', ...EN]]);
       expect(f.screen()).not.toContain('my.telegram.org');
       expect(f.screen()).not.toContain(SECRET);
-      expect(f.screen()).toContain('two-step password');
+    expect(f.flat()).toContain('two-step password');
     });
 
     it('takes credentials from the environment too', async () => {
@@ -568,7 +576,7 @@ describe('2 - login', () => {
 
 describe('4 - view the latest report', () => {
   it('rebuilds the report for the CSV used last, with the logged-in apps', async () => {
-    const f = fixture(['1', CSV_PATH(), '', '', '4', '', '', '0'], { accounts: { telegram: ['a'], zalo: ['z'] } });
+    const f = fixture(['1', CSV_PATH(), '', '', '', '4', '', '', '', '0'], { accounts: { telegram: ['a'], zalo: ['z'] } });
     await runMenu(f.host);
     expect(f.runs).toEqual([
       ['check', '--out', join(work, 'report.csv'), '--apps', 'telegram,zalo', '--', CSV_PATH()],
@@ -577,14 +585,14 @@ describe('4 - view the latest report', () => {
   });
 
   it('asks for the CSV when none was used yet, and falls back to the config apps when nobody is logged in', async () => {
-    const f = fixture(['4', CSV_PATH(), '', '0']);
+    const f = fixture(['4', CSV_PATH(), '', '', '0']);
     await runMenu(f.host);
-    expect(f.screen()).toContain('CSV file (Enter to go back)');
+    expect(f.screen()).toContain('CSV file (b = back)');
     expect(f.runs).toEqual([['report', '--out', join(work, 'report.csv'), '--', CSV_PATH()]]);
   });
 
-  it('Enter without a CSV goes back', async () => {
-    const f = fixture(['4', '', '0']);
+  it('b without a CSV goes back', async () => {
+    const f = fixture(['4', 'b', '0']);
     await runMenu(f.host);
     expect(f.runs).toEqual([]);
   });
@@ -624,14 +632,14 @@ describe('menu through main()', () => {
   }
 
   it('opens on a terminal with no arguments and runs real commands: accounts, then a failing check, then quit', async () => {
-    const terminal = scriptedTerminal(['3', '1', 'n', '0'], true);
+    const terminal = scriptedTerminal(['3', '', '1', 'n', '0'], true);
     const printed: string[] = [];
     const logged: string[] = [];
     const d = deps(terminal, printed, logged);
     expect(await main(['node', 'phone-app-checker'], d)).toBe(0);
     expect(terminal.screen()).toContain('=== Phone App Checker');
-    expect(printed).toContain('No accounts yet. Log in first (menu item 2, or run: phone-app-checker login <app> --account <name>).');
-    expect(terminal.screen()).toContain('No account is logged in yet');
+    expect(printed).toEqual([]);
+    expect(terminal.screen().replace(/\s+/g, ' ')).toContain('No account is logged in yet');
     // The menu opens quietly: the first-run notice (which points at the doctor command) is for the command line.
     expect(logged.some((line) => line.startsWith('First run'))).toBe(false);
     expect(existsSync(join(d.appHome, 'checker.config.json'))).toBe(true);
@@ -644,7 +652,7 @@ describe('menu through main()', () => {
     mkdirSync(join(appHome, 'data', 'sessions', 'telegram', 'a'), { recursive: true });
     const bad = join(work, 'bad.csv');
     writeFileSync(bad, 'name,phone\nAn,abc\n');
-    const terminal = scriptedTerminal(['1', CSV_PATH(), '', '1', bad, '', 'n', '0'], true);
+    const terminal = scriptedTerminal(['1', CSV_PATH(), '', '', '1', bad, '', '', 'n', '0'], true);
     const printed: string[] = [];
     const logged: string[] = [];
     const d = deps(terminal, printed, logged);
@@ -652,10 +660,11 @@ describe('menu through main()', () => {
     const report = readFileSync(join(work, 'report.csv'), 'utf8');
     expect(report).toContain('0901234567,+84901234567,VN,yes');
     expect(report).toContain('+65 9123 4567,+6591234567,SG,not_found');
-    expect(terminal.screen()).toContain(`Done. Report: ${join(work, 'report.csv')}`);
+    // The path may wrap mid-token at the window edge: compare without blanks.
+    expect(terminal.screen().replaceAll(/\s+/g, '')).toContain(`Done. Report: ${join(work, 'report.csv')}`.replaceAll(/\s+/g, ''));
     expect(printed.join('\n')).toContain('telegram');
     // The second run overwrote nothing: the existing report asked for confirmation first (answered '' = no).
-    expect(terminal.screen()).toContain('Overwrite');
+    expect(terminal.screen().replace(/\s+/g, ' ')).toContain('Overwrite');
     expect(terminal.screen()).toContain('Goodbye.');
     expect(process.exitCode).toBeUndefined();
   });
@@ -665,10 +674,10 @@ describe('menu through main()', () => {
     mkdirSync(join(appHome, 'data', 'sessions', 'telegram', 'a'), { recursive: true });
     const bad = join(work, 'bad.csv');
     writeFileSync(bad, 'name,phone\nAn,abc\n');
-    const terminal = scriptedTerminal(['1', bad, '', '0'], true);
+    const terminal = scriptedTerminal(['1', bad, '', '', '0'], true);
     const d = deps(terminal, [], []);
     expect(await main(['node', 'phone-app-checker'], d)).toBe(0);
-    expect(terminal.screen()).toContain('Error: no valid phone numbers');
+    expect(terminal.screen().replace(/\s+/g, ' ')).toContain('Error: no valid phone numbers');
     expect(terminal.screen()).toContain('Goodbye.');
   });
 
@@ -753,7 +762,7 @@ describe('language', () => {
     await runMenu(f.host);
     const screen = f.screen();
     expect(screen).toContain('1. Check a CSV file');
-    expect(screen).toContain('Choose (0-6 or L) and press Enter:');
+    expect(screen).toContain('Choose 0-6 or L, then Enter:');
     expect(screen).toContain('L. Language / Ngôn ngữ / Bahasa / 언어 / 语言: English');
     expect(screen).toContain('Goodbye.');
     expect(screen).not.toMatch(/Kiểm tra|Thoát/);
@@ -819,7 +828,7 @@ describe('language', () => {
   });
 
   it('keeps the switch for the session and says so when it cannot be saved; the menu goes on', async () => {
-    const failing = fixture(['L', '2', '6', '0'], {
+    const failing = fixture(['L', '2', '6', '', '0'], {
       host: {
         saveLanguage: () => {
           throw new Error('EACCES: permission denied, open /secret/path');
@@ -853,16 +862,16 @@ describe('language', () => {
     it('renders the main menu and every screen without throwing', async () => {
       const secret = 'deadbeefcafe0123deadbeefcafe0123';
       const f = fixture(
-        ['', 'x', '6', '3', '5', '1', 'nope.csv', '', 'L', 'zz', '', '2', '9', '1', 'a b', 'tg1', '', '', '4', '', '0'],
+        ['', 'x', '6', '', '3', '', '5', '', '1', 'nope.csv', 'b', 'L', 'zz', '', '2', '9', '1', 'a b', 'tg1', 'b', '4', 'b', '0'],
         { accounts: { telegram: ['a'], zalo: ['z'] }, results: [{ code: 1, error: 'boom' }, { code: 1 }], host: { langFlag: lang } },
       );
       expect(await runMenu(f.host)).toBe(0);
-      const screen = f.screen();
+      const screen = f.flat();
       expect(screen).toContain(`=== Phone App Checker v9.9.9 ===`);
       for (const [number, key] of [[1, 'menuCheck'], [2, 'menuLogin'], [3, 'menuAccounts'], [4, 'menuReport'], [5, 'menuDoctor'], [6, 'menuGuide'], [0, 'menuQuit']] as const) {
-        expect(screen).toContain(`  ${number}. ${msg(key)}`);
+        expect(screen).toContain(`${number}. ${msg(key)}`);
       }
-      expect(screen).toContain(`  L. ${LANGUAGE_LABEL}: ${LANGUAGE_NAMES[lang]}`);
+      expect(screen).toContain(`L. ${LANGUAGE_LABEL}: ${LANGUAGE_NAMES[lang]}`);
       expect(screen).toContain(msg('menuPrompt'));
       expect(screen).toContain(msg('menuInvalid', { choice: 'x' }));
       for (const key of ['guideTitle', 'guideConsent', 'guideNotFound', 'guideLine', 'guideZalo', 'guideBan', 'guideEvidence', 'guideDetails'] as const) {
@@ -892,7 +901,7 @@ describe('language', () => {
     it('guides Telegram credentials with the URL and field names intact, and asks for them', async () => {
       const f = fixture(['2', '1', '', '', '0'], { host: { langFlag: lang } });
       await runMenu(f.host);
-      const screen = f.screen();
+      const screen = f.flat();
       for (const key of ['telegramIntro', 'telegramStep1', 'telegramStep2', 'telegramStep3', 'telegramSecretNote', 'telegramApiIdPrompt'] as const) {
         expect(screen).toContain(msg(key));
       }
@@ -904,32 +913,33 @@ describe('language', () => {
       const wa = fixture(['2', '2', '', '1', '', '0'], { host: { langFlag: lang } });
       await runMenu(wa.host);
       for (const key of ['whatsappMethodIntro', 'whatsappMethodQr', 'whatsappMethodCode', 'whatsappPhonePrompt'] as const) {
-        expect(wa.screen()).toContain(msg(key));
+        expect(wa.flat()).toContain(msg(key));
       }
-      expect(wa.screen()).toContain(msg('loginMethodPrompt', { max: 2 }));
+      expect(wa.flat()).toContain(msg('loginMethodPrompt', { max: 2 }));
 
       const tg = fixture(['2', '1', '', '', '0'], { telegram: { apiId: 1234567, apiHash: SECRET }, results: [{ code: 1 }], host: { langFlag: lang } });
       await runMenu(tg.host);
       for (const key of ['telegramMethodIntro', 'telegramMethodQr', 'telegramMethodCode', 'hintTelegramQr'] as const) {
-        expect(tg.screen()).toContain(msg(key));
+        expect(tg.flat()).toContain(msg(key));
       }
-      expect(tg.screen()).toContain(msg('loginFailed', { app: 'telegram', account: 'default' }));
+      expect(tg.flat()).toContain(msg('loginFailed', { app: 'telegram', account: 'default' }));
       expect(tg.runs).toEqual([['login', 'telegram', '--account', 'default', '--method', 'qr', '--lang', lang]]);
     });
 
     it('runs a check and confirms an overwrite with this language\'s words', async () => {
       writeFileSync(join(work, 'report.csv'), 'old');
       const yes = msg('answerYes').split(',')[1]?.trim() ?? 'y';
-      const f = fixture(['1', CSV_PATH(), '', yes, '0'], { accounts: { telegram: ['a'] }, host: { langFlag: lang } });
+      const f = fixture(['1', CSV_PATH(), '', '', yes, '0'], { accounts: { telegram: ['a'] }, host: { langFlag: lang } });
       await runMenu(f.host);
-      expect(f.screen()).toContain(msg('reportExists', { path: join(work, 'report.csv') }));
-      expect(f.screen()).toContain(msg('reportDone', { path: join(work, 'report.csv') }));
+      const folded = f.flat().replaceAll(' ', '');
+      expect(folded).toContain(msg('reportExists', { path: join(work, 'report.csv') }).replaceAll(' ', ''));
+      expect(folded).toContain(msg('reportDone', { path: join(work, 'report.csv') }).replaceAll(' ', ''));
       expect(f.runs).toHaveLength(1);
 
-      const declined = fixture(['1', CSV_PATH(), '', 'maybe', msg('answerNo').split(',')[1]?.trim() ?? 'n', '0'], { accounts: { telegram: ['a'] }, host: { langFlag: lang } });
+      const declined = fixture(['1', CSV_PATH(), '', '', 'maybe', msg('answerNo').split(',')[1]?.trim() ?? 'n', '0'], { accounts: { telegram: ['a'] }, host: { langFlag: lang } });
       await runMenu(declined.host);
-      expect(declined.screen()).toContain(msg('confirmRetry'));
-      expect(declined.screen()).toContain(msg('cancelledNoOverwrite'));
+      expect(declined.flat()).toContain(msg('confirmRetry'));
+      expect(declined.flat()).toContain(msg('cancelledNoOverwrite'));
       expect(declined.runs).toEqual([]);
     });
 
@@ -983,7 +993,7 @@ describe('language through main()', () => {
     chmodSync(langFile(), mode);
   }
 
-  it('starts in English with no flag, variable or file, and writes nothing just by opening', async () => {
+  it('starts in English with no flag, variable or file, and saves no language just by opening', async () => {
     const screen = await start(['0']);
     expect(screen).toContain('1. Check a CSV file');
     expect(screen).toContain('Goodbye.');
@@ -998,7 +1008,7 @@ describe('language through main()', () => {
     expect(statSync(langFile()).mode & 0o777).toBe(0o600);
     expect(statSync(appHome()).mode & 0o777).toBe(0o700);
     // Only the language file was written: no stray temporary file, no config.
-    expect(readdirSync(appHome())).toEqual(['menu-language']);
+    expect(readdirSync(appHome()).sort()).toEqual(['checker.config.json', 'menu-language']);
 
     const second = await start(['0']);
     expect(second).toContain('1. Kiểm tra file CSV');
@@ -1015,7 +1025,7 @@ describe('language through main()', () => {
     await start(['L', '6', '0']);
     expect(readFileSync(langFile(), 'utf8')).toBe('zh\n');
     expect(statSync(langFile()).mode & 0o777).toBe(0o600);
-    expect(readdirSync(appHome())).toEqual(['menu-language']);
+    expect(readdirSync(appHome()).sort()).toEqual(['checker.config.json', 'menu-language']);
   });
 
   it('the environment variable beats the saved file, and --lang beats both', async () => {
@@ -1088,12 +1098,12 @@ describe('language through main()', () => {
   it('a failed save is not fatal: the switch lasts for the session and no temporary file is left', async () => {
     // A non-empty directory where the file should go: rename cannot replace it.
     mkdirSync(join(langFile(), 'inner'), { recursive: true });
-    const screen = await start(['L', '3', '6', '0']);
+    const screen = await start(['L', '3', '6', '', '0']);
     expect(screen).toContain('Bahasa: Bahasa Indonesia.');
     expect(screen).toContain('Pilihan bahasa tidak dapat disimpan');
     expect(screen).toContain('PANDUAN DAN PERINGATAN');
     expect(screen).toContain('Sampai jumpa.');
-    expect(readdirSync(appHome())).toEqual(['menu-language']);
+    expect(readdirSync(appHome()).sort()).toEqual(['checker.config.json', 'menu-language']);
     // Nothing valid saved, so the next start is English again.
     expect(await start(['0'])).toContain('0. Quit');
   });

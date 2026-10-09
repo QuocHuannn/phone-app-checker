@@ -266,6 +266,26 @@ describe('formatDoctor', () => {
       expect(text.endsWith(`\n\n${DOCTOR_FOOTER}`)).toBe(true);
     }
   });
+
+  it('wraps a long fix instruction to the window with a hanging indent and loses no word', () => {
+    const detail = 'no account yet: log in (menu item 2, or: phone-app-checker login telegram --account <name>); api_id/api_hash: the menu asks for them when you log in';
+    const prefix = 'WARN  telegram  ';
+    for (const columns of [40, 60, 80]) {
+      const rows = formatDoctor([{ name: 'telegram', level: 'warn', detail }], columns).split('\n\n')[0]?.split('\n') ?? [];
+      expect(rows.length).toBeGreaterThan(1);
+      for (const row of rows) expect(row.length).toBeLessThanOrEqual(columns);
+      expect(rows[0]?.startsWith(prefix)).toBe(true);
+      for (const row of rows.slice(1)) expect(row.startsWith(' '.repeat(prefix.length))).toBe(true);
+      const words = (text: string): string[] => text.split(/\s+/).filter((word) => word !== '');
+      expect(words(rows.join(' ').replace(prefix.trim(), ''))).toEqual(words(detail));
+    }
+  });
+
+  it('puts the footer in its own paragraph after a blank line', () => {
+    const text = formatDoctor([{ name: 'data', level: 'ok', detail: 'fine' }], 40);
+    expect(text.split('\n\n')).toHaveLength(2);
+    expect(text.endsWith(DOCTOR_FOOTER)).toBe(true);
+  });
 });
 
 describe('wording shared with the install guide and install.sh', () => {

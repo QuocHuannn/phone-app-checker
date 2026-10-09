@@ -1,7 +1,7 @@
 import QRCode from 'qrcode-terminal/vendor/QRCode/index.js';
 import QRErrorCorrectLevel from 'qrcode-terminal/vendor/QRCode/QRErrorCorrectLevel.js';
 import { DEFAULT_LANG, translate, type Lang } from './i18n/index.ts';
-import { createUi, truncate } from './ui.ts';
+import { createUi, plainForced, truncate } from './ui.ts';
 
 /**
  * Terminal QR codes that scan on any theme.
@@ -49,11 +49,31 @@ export function qrMatrix(payload: string): boolean[][] {
 /** How to draw on `stream`: with explicit colours when it is a colour terminal, else plain text. */
 export function detectMode(stream: Pick<QrStream, 'isTTY' | 'getColorDepth'>, env: NodeJS.ProcessEnv): QrMode {
   if (stream.isTTY !== true) return 'plain';
-  if ((env.NO_COLOR ?? '') !== '' || env.TERM === 'dumb') return 'plain';
+  if (plainForced(env) || (env.NO_COLOR ?? '') !== '' || env.TERM === 'dumb') return 'plain';
   const depth = stream.getColorDepth?.(env) ?? 1;
   if (depth >= 8) return 'color256';
   if (depth >= 4) return 'color16';
   return 'plain';
+}
+
+/**
+ * The terminal size a code of `modules` modules needs on `stream` (a heading above it and the
+ * prompt rows below it included), so a caller can check the fit before a QR login starts.
+ * Not a terminal: `fits` is true and the need is the code's minimum size.
+ */
+export function qrWindowNeed(
+  modules: number,
+  stream: Pick<QrStream, 'isTTY' | 'columns' | 'rows' | 'getColorDepth'>,
+  env: NodeJS.ProcessEnv,
+): { columns: number; rows: number; fits: boolean } {
+  const mode = detectMode(stream, env);
+  const size = frameSize(modules, mode, QUIET_MINIMUM);
+  const needColumns = size.columns + 1;
+  const needRows = size.rows + RESERVED_ROWS + 2;
+  const terminal = stream.isTTY === true;
+  const columns = terminal ? (stream.columns ?? DEFAULT_COLUMNS) : Number.POSITIVE_INFINITY;
+  const rows = terminal ? (stream.rows ?? DEFAULT_ROWS) : Number.POSITIVE_INFINITY;
+  return { columns: needColumns, rows: needRows, fits: needColumns <= columns && needRows <= rows };
 }
 
 /** Width and height in terminal cells of the code drawn in `mode` with `quiet` blank modules around it. */
@@ -162,6 +182,8 @@ export class QrScreen {
   private readonly write: (text: string) => void;
   private readonly stream: QrStream;
   private readonly env: NodeJS.ProcessEnv;
+  /** Plain tier forced (PHONE_APP_CHECKER_PLAIN): never write cursor movement, however terminal-like the stream looks. */
+  private readonly plain: boolean;
   /** Terminal rows of the block printed last (the code or the "enlarge the window" hint), while it is still the last thing on screen. */
   private shownRows: number | undefined;
   private pending: { source: string | boolean[][]; heading: string | undefined } | undefined;
@@ -176,6 +198,7 @@ export class QrScreen {
     this.write = options.write;
     this.stream = options.stream ?? process.stderr;
     this.env = options.env ?? process.env;
+    this.plain = plainForced(this.env);
     this.waiting = options.waiting;
   }
 
@@ -254,7 +277,7 @@ export class QrScreen {
     this.waitTimer = undefined;
     const rows = this.shownRows;
     this.shownRows = undefined;
-    if (rows === undefined || this.stream.isTTY !== true) return;
+    if (rows === undefined || this.stream.isTTY !== true || this.plain) return;
     this.stream.write(`\u001b[${rows}A\u001b[0J`);
   }
 

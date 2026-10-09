@@ -16,7 +16,7 @@ export const en = {
   menuDoctor: 'Check this Mac is ready (doctor)',
   menuGuide: 'Guide / warnings',
   menuQuit: 'Quit',
-  menuPrompt: 'Choose (0-6 or L) and press Enter: ',
+  menuPrompt: 'Choose 0-6 or L, then Enter: ',
   menuInvalid: ({ choice }: { choice: string }) => `Invalid choice: "${choice}". Type a number from 0 to 6, or L, then press Enter.`,
   goodbye: 'Goodbye.',
 
@@ -42,8 +42,8 @@ export const en = {
   // Asking for the CSV and the report.
   askCsvIntro: 'Drag the CSV file from Finder into this window (or type its path), then press Enter.',
   askCsvPrompt: ({ hint }: { hint: string }) => `CSV file (${hint}): `,
-  askCsvHintBack: 'Enter to go back',
-  askCsvHintDefault: ({ path }: { path: string }) => `Enter = ${path}`,
+  askCsvHintBack: 'b = back',
+  askCsvHintDefault: ({ path }: { path: string }) => `b = back · Enter = ${path}`,
   askReportPrompt: ({ path }: { path: string }) => `Report file (Enter = ${path}): `,
   reportExists: ({ path }: { path: string }) => `File ${path} already exists. Overwrite`,
 
@@ -74,9 +74,9 @@ export const en = {
   appLoggedIn: ({ count, names }: { count: number; names: string }) =>
     `logged in: ${count} ${count === 1 ? 'account' : 'accounts'} (${names})`,
   loginAppsHeader: 'Apps:',
-  loginAppPrompt: ({ max }: { max: number }) => `Log in to which app? (number 1-${max}, Enter to go back): `,
+  loginAppPrompt: ({ max }: { max: number }) => `Log in to which app? (number 1-${max}, b = back): `,
   loginUnknown: ({ input, max }: { input: string; max: number }) => `Did not understand "${input}". Type a number from 1 to ${max}.`,
-  askAccountPrompt: ({ name }: { name: string }) => `Account name (Enter = ${name}): `,
+  askAccountPrompt: ({ name }: { name: string }) => `Account name (Enter = ${name}, b = back): `,
   accountNameInvalid: 'Use only letters without accents, digits, "-" or "_" (up to 32 characters, starting with a letter or digit).',
   accountExists: ({ account, app }: { account: string; app: string }) =>
     `Account "${account}" of ${app} already exists. Logging in again replaces the old login session.`,
@@ -93,13 +93,15 @@ export const en = {
   loginFailed: ({ app, account }: { app: string; account: string }) =>
     `Login of ${app} (account ${account}) did not finish and nothing was saved. You are back in the menu: choose 2 to try again.`,
   whatsappMethodIntro: 'How do you want to link WhatsApp?',
-  whatsappMethodCode: '1) Link with your phone number: type an 8-character code on your phone (recommended)',
-  whatsappMethodQr: '2) Scan a QR code with your phone',
-  whatsappPhonePrompt: 'Phone number of the WhatsApp account you are linking, with country code (for example +84901234567; Enter to go back): ',
+  whatsappMethodCode: 'Link with your phone number: type an 8-character code on your phone (recommended)',
+  whatsappMethodQr: 'Scan a QR code with your phone',
+  whatsappMethodCodeDetail: 'On the phone: WhatsApp > Settings > Linked devices > Link with phone number',
+  whatsappMethodQrDetail: ({ need }: { need: string }) => `Needs a window of at least ${need}`,
+  whatsappPhonePrompt: 'Phone number of the WhatsApp account you are linking, with country code (for example +84901234567; b = back): ',
   whatsappPhoneInvalid: 'This does not look like a valid phone number. Include the country code, for example +84901234567.',
   telegramMethodIntro: 'How do you want to log in to Telegram?',
-  telegramMethodQr: '1) Scan a QR code with the Telegram app on your phone (default)',
-  telegramMethodCode: '2) Type the login code Telegram sends, using your phone number',
+  telegramMethodQr: 'Scan a QR code with the Telegram app on your phone (default)',
+  telegramMethodCode: 'Type the login code Telegram sends, using your phone number',
   hintTelegramQr:
     'Telegram will show a QR code: on your phone open Telegram > Settings > Devices > Link Desktop Device, then scan it. A two-step password, if you have one, is asked after scanning (not shown while you type).',
 
@@ -160,11 +162,10 @@ export const en = {
 
   // Rich terminal screens: hints, empty states, final box.
   hintMenu: '↑↓ move · Enter select · q quit',
-  hintBack: '↑↓ move · Enter select · Esc or q back',
+  hintBack: '↑↓ move · Enter select · Esc, q or b back',
   bannerAccounts: 'Accounts ready:',
   emptyAccounts: 'No account is logged in yet. Choose "Log in an app account" first, then come back here.',
   loginPickApp: 'Log in to which app?',
-  loginPickMethod: 'How do you want to log in?',
   reportSavedTo: ({ path }: { path: string }) => `Report saved to ${path}`,
   finalNextOpen: 'Next: open the file with Excel or Numbers (double-click it).',
   finalNextFinder: ({ command }: { command: string }) => `To show it in Finder, type: ${command}`,
@@ -224,4 +225,42 @@ export const en = {
   guideBan: '- Use the company\'s own disposable SIM / accounts: accounts can be restricted or banned.',
   guideEvidence: '- A result is only an observation at the time of checking, not evidence.',
   guideDetails: '- Details: README.md and docs/install-macos.md.',
+
+  // v0.2.0: recent files, CSV preview, checklist, QR gate, accounts actions, guide pages.
+  accountsWord: ({ count }: { count: number }) => (count === 1 ? '1 account' : `${count} accounts`),
+  accountsNone: 'none',
+  pickCsvTitle: 'Choose the phone list (CSV)',
+  pickCsvDrag: 'Drag a CSV file from Finder into this window, or pick one you used before.',
+  pickCsvType: 'Type or paste a path',
+  pickCsvRecentHint: 'a number from the list, or b = back',
+  recentClear: 'clear the list and stop remembering files',
+  recentConfirm: 'Clear the recent files and stop remembering them?',
+  recentCleared: 'Recent files cleared; remembering is now off.',
+  recentMissing: 'missing',
+  recentWhenJustNow: 'just now',
+  recentWhenMinutes: ({ count }: { count: number }) => `${count} min ago`,
+  recentWhenHours: ({ count }: { count: number }) => `${count} h ago`,
+  recentWhenYesterday: 'yesterday',
+  previewTitle: ({ name, column }: { name: string; column: string }) => `${name} · phone column "${column}"`,
+  previewCounts: ({ rows, usable, unusable }: { rows: number; usable: number; unusable: number }) =>
+    `${rows} rows · ${usable} usable numbers · ${unusable} unusable`,
+  previewUnusable: ({ examples }: { examples: string }) => `Unusable, for example: ${examples} (kept in the report)`,
+  previewCountries: ({ list }: { list: string }) => `Countries: ${list}`,
+  previewPrompt: 'Use this file? (Enter = continue, b = pick another): ',
+  appsTitle: 'Which apps?',
+  appsHint: '↑↓ move · space ticks · Enter start · b back',
+  appsPickNone: 'Tick at least one app with the space bar.',
+  accountsTitle: 'Accounts',
+  accountsActionHint: '↑↓ move · r reset cooldown · l log in again · b back',
+  pressEnterForMenu: 'Press Enter for the menu.',
+  guidePage: ({ n, m }: { n: number; m: number }) => `Guide and warnings · page ${n} of ${m}`,
+  guideNext: 'Enter = next page · b back',
+  qrGateTooSmall: ({ cols, rows, needCols, needRows }: { cols: number; rows: number; needCols: number; needRows: number }) =>
+    `This window is ${cols} x ${rows}; the code needs ${needCols} x ${needRows}.`,
+  qrGateEnlarge: 'Enlarge the window (drag a corner), or press Cmd+minus once to shrink the text.',
+  qrGateAltWhatsapp: 'use the pairing code instead',
+  qrGateAltTelegram: 'use the phone-number code instead',
+  qrGatePrompt: ({ alt }: { alt: string }) =>
+    `Enlarge the window, then press Enter to try again${alt === '' ? '' : `, or type c to ${alt}`} (b = back): `,
+  tgLoginTitle: 'Log in to Telegram',
 };

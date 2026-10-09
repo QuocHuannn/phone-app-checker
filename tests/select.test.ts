@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PromptCancelled } from '../src/prompt.ts';
-import { canSelect, guardTerminal, parseKeys, selectMenu, type SelectItem } from '../src/select.ts';
+import { canSelect, guardTerminal, parseKeys, selectMany, selectMenu, type SelectItem } from '../src/select.ts';
 import { createUi, stripAnsi } from '../src/ui.ts';
 import { fakeProcess, fakeTty } from './helpers/fake-tty.ts';
 
@@ -294,5 +294,152 @@ describe('guardTerminal', () => {
     dispose();
     expect(['SIGINT', 'SIGTERM', 'SIGHUP', 'exit'].map((event) => proc.listenerCount(event))).toEqual([0, 0, 0, 0]);
     expect(restored).toBe(0);
+  });
+});
+
+describe('selectMenu: back key, action keys, disabled rows, wrapped rows', () => {
+  it('b backs out like q and Esc: nothing picked', async () => {
+    const { tty, start } = open();
+    const pending = start();
+    await tty.send('b');
+    expect(await pending).toEqual({ picked: false });
+  });
+
+  it('an action key reports the highlighted row without picking it', async () => {
+    const tty = fakeTty();
+    const ui = createUi(tty.io.output as never, RICH_ENV);
+    const pending = selectMenu(tty.io, ui, { items: ITEMS, hint: HINT, actions: [{ key: 'r' }] }, fakeProcess());
+    await tty.send(`${ESC}[B`);
+    await tty.send('R');
+    expect(await pending).toEqual({ picked: false, action: { key: 'r', index: 1 } });
+  });
+
+  it('a disabled row can be focused but never picked: Enter and its own key do nothing', async () => {
+    const tty = fakeTty();
+    const ui = createUi(tty.io.output as never, RICH_ENV);
+    const items: SelectItem<string>[] = [
+      { value: 'gone', label: 'missing.csv', key: '1', enabled: false },
+      { value: 'ok', label: 'present.csv', key: '2' },
+    ];
+    const pending = selectMenu(tty.io, ui, { items, hint: HINT }, fakeProcess());
+    await tty.send('\r');
+    await tty.send('1');
+    await tty.send('2');
+    expect(await pending).toMatchObject({ picked: true, value: 'ok' });
+  });
+
+  it('wraps a long label and its detail inside the window instead of cutting them, and indents the continuation', async () => {
+    const tty = fakeTty({ columns: 30, rows: 24 });
+    const ui = createUi(tty.io.output as never, RICH_ENV);
+    const items: SelectItem<string>[] = [
+      { value: 'code', label: 'Link with your phone number: type an 8-character code', detail: 'On the phone: Settings > Linked devices', key: '1' },
+    ];
+    const pending = selectMenu(tty.io, ui, { items, hint: HINT }, fakeProcess());
+    await tty.send('q');
+    await pending;
+    const text = stripAnsi(tty.screen()).replace(/\r|\n/g, ' ').replace(/\s+/g, ' ');
+    // Every word of the label and of the detail is still on screen: nothing was truncated away.
+    for (const word of ['Link', 'phone', 'number:', '8-character', 'code', 'Linked', 'devices']) expect(text).toContain(word);
+    for (const line of stripAnsi(tty.screen()).split(/\r|\n/)) expect([...line].length).toBeLessThanOrEqual(29);
+  });
+
+  it('echoes a long choice wrapped, never cut mid-word', async () => {
+    const tty = fakeTty({ columns: 24, rows: 24 });
+    const ui = createUi(tty.io.output as never, RICH_ENV);
+    const items: SelectItem<string>[] = [{ value: 'v', label: 'Scan a QR code with your phone', key: '1' }];
+    const pending = selectMenu(tty.io, ui, { items, hint: HINT }, fakeProcess());
+    await tty.send('\r');
+    await pending;
+    const echo = lastFrame(tty.screen()).split('\n').filter((line) => line.trim() !== '');
+    expect(echo.join(' ')).toContain('Scan a QR code with your phone'.split(' ').join(' '));
+    for (const line of echo) expect([...line].length).toBeLessThanOrEqual(23);
+  });
+});
+
+describe('selectMany: a checklist', () => {
+  const APPS_LIST: SelectItem<string>[] = [
+    { value: 'telegram', label: 'telegram', detail: 'a, b' },
+    { value: 'whatsapp', label: 'whatsapp' },
+    { value: 'zalo', label: 'zalo' },
+  ];
+  function openMany(options: { checked?: string[]; columns?: number; rows?: number } = {}) {
+    const tty = fakeTty({ columns: options.columns ?? 80, rows: options.rows ?? 24 });
+    const ui = createUi(tty.io.output as never, RICH_ENV);
+    const pending = selectMany(
+      tty.io,
+      ui,
+      { title: 'Which apps?', items: APPS_LIST, hint: '↑↓ move · space ticks · Enter start · b back', ...(options.checked === undefined ? {} : { checked: options.checked }) },
+      fakeProcess(),
+    );
+    pending.catch(() => undefined);
+    return { tty, pending };
+  }
+
+  it('starts with the given rows ticked and Enter returns them in list order', async () => {
+    const { tty, pending } = openMany({ checked: ['zalo', 'telegram'] });
+    await tty.send('\r');
+    expect(await pending).toEqual({ picked: true, values: ['telegram', 'zalo'] });
+  });
+
+  it('Space ticks and unticks the highlighted row', async () => {
+    const { tty, pending } = openMany({ checked: ['telegram', 'whatsapp', 'zalo'] });
+    await tty.send(' '); // untick telegram
+    await tty.send(`${ESC}[B`);
+    await tty.send(' '); // untick whatsapp
+    await tty.send(' '); // tick it again
+    await tty.send('\r');
+    expect(await pending).toEqual({ picked: true, values: ['whatsapp', 'zalo'] });
+  });
+
+  it('shows [x] and [ ] so the state is readable without colour', async () => {
+    const { tty, pending } = openMany({ checked: ['whatsapp'] });
+    await tty.send('q');
+    await pending;
+    const frame = stripAnsi(tty.screen());
+    expect(frame).toMatch(/\[ \] telegram/);
+    expect(frame).toMatch(/\[x\] whatsapp/);
+  });
+
+  it.each(['b', 'q', ESC])('%j cancels without choosing anything', async (key) => {
+    const { tty, pending } = openMany({ checked: ['zalo'] });
+    await tty.send(key);
+    expect(await pending).toEqual({ picked: false });
+  });
+
+  it('Enter with nothing ticked returns an empty list (the caller decides what that means)', async () => {
+    const { tty, pending } = openMany();
+    await tty.send('\r');
+    expect(await pending).toEqual({ picked: true, values: [] });
+  });
+
+  it('restores the terminal after picking: raw mode off, listeners removed', async () => {
+    const { tty, pending } = openMany();
+    await tty.send('\r');
+    await pending;
+    expect(tty.rawModes).toEqual([true, false]);
+    expect(tty.dataListeners()).toBe(0);
+    expect(tty.screen()).toContain(`${ESC}[?25h`);
+  });
+
+  it('Ctrl+C rejects with PromptCancelled and still restores the terminal', async () => {
+    const { tty, pending } = openMany();
+    await tty.send('\u0003');
+    await expect(pending).rejects.toBeInstanceOf(PromptCancelled);
+    expect(tty.rawModes.at(-1)).toBe(false);
+  });
+});
+
+describe('selectMenu: a long list scrolls inside a short window', () => {
+  it.each([{ columns: 40, rows: 8 }, { columns: 80, rows: 10 }])('never draws more rows than the window has ($columns x $rows) and keeps the highlighted row visible', async ({ columns, rows }) => {
+    const tty = fakeTty({ columns, rows });
+    const ui = createUi(tty.io.output as never, RICH_ENV);
+    const items: SelectItem<number>[] = Array.from({ length: 30 }, (_, i) => ({ value: i, label: `entry ${i}` }));
+    const pending = selectMenu(tty.io, ui, { title: 'Pick', items, hint: HINT }, fakeProcess());
+    for (let step = 0; step < 17; step += 1) await tty.send(`${ESC}[B`);
+    const frame = lastFrame(tty.screen());
+    expect(frame).toContain('entry 17');
+    expect(frame.split('\n').filter((line) => line !== '').length).toBeLessThanOrEqual(rows);
+    await tty.send('\r');
+    expect(await pending).toMatchObject({ picked: true, value: 17 });
   });
 });

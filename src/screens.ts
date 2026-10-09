@@ -7,14 +7,15 @@ export const APP_TITLE = 'Phone App Checker';
 /** Widest a box is; kept in step with `box` in ui.ts (rules are at most 72 columns, 2 of them the bar). */
 const BOX_INNER_MAX = 70;
 
-/** `✅ whatsapp 1 · ⬜ telegram –`: one entry per app, ready (with the number of accounts) or not set up. */
-export function statusStrip(ui: Ui, logged: ReadonlyMap<App, readonly string[]>): string[] {
-  const none = ui.rich ? '–' : '-';
+/** `✔ whatsapp 1 account · ○ telegram none`: one entry per app, icon + word, ready (with the count) or not set up. */
+export function statusStrip(ui: Ui, lang: Lang, logged: ReadonlyMap<App, readonly string[]>): string[] {
   return strip(
     ui,
     APPS.map((app) => {
       const count = logged.get(app)?.length ?? 0;
-      return count > 0 ? `${ui.icons.ready} ${app} ${count}` : `${ui.icons.empty} ${app} ${none}`;
+      return count > 0
+        ? `${ui.icons.ready} ${app} ${translate(lang, 'accountsWord', { count })}`
+        : `${ui.icons.empty} ${app} ${translate(lang, 'accountsNone')}`;
     }),
   );
 }
@@ -23,7 +24,7 @@ export function statusStrip(ui: Ui, logged: ReadonlyMap<App, readonly string[]>)
 export function banner(ui: Ui, lang: Lang, version: string, logged: ReadonlyMap<App, readonly string[]> | undefined): string[] {
   const body: (string | BoxLine)[] = [];
   if (logged !== undefined) {
-    body.push({ text: translate(lang, 'bannerAccounts'), paint: ui.dim }, ...statusStrip(ui, logged));
+    body.push({ text: translate(lang, 'bannerAccounts'), paint: ui.dim }, ...statusStrip(ui, lang, logged));
   }
   return box(ui, `${APP_TITLE} ${terminalSafe(version, 40)}`, body, 'info');
 }

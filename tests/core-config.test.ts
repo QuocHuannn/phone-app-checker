@@ -80,9 +80,21 @@ describe('loadConfig', () => {
     [{ apps: { telegram: { batchSize: 'big' } } }, /batchSize must be a non-negative number/],
     [{ apps: { telegram: { rateLimitCooldownMs: 0 } } }, /rateLimitCooldownMs must be >= 1/],
     [{ apps: { telegram: { enabled: 'yes' } } }, /enabled must be true\/false/],
+    [{ apps: { telegram: { maxParallelAccounts: 0 } } }, /maxParallelAccounts must be a whole number >= 1/],
+    [{ apps: { telegram: { maxParallelAccounts: 1.5 } } }, /maxParallelAccounts must be a whole number >= 1/],
+    [{ apps: { telegram: { maxParallelAccounts: '2' } } }, /maxParallelAccounts must be a whole number >= 1/],
+    [{ apps: { viber: { maxParallelAccounts: 2 } } }, /apps\.viber\.maxParallelAccounts must be 1.*one Android device|apps\.viber\.maxParallelAccounts must be 1/],
     [[], /JSON object/],
   ])('rejects invalid config %j', (content, message) => {
     expect(() => loadConfig(write(content))).toThrow(message);
+  });
+
+  it('runs one account at a time unless maxParallelAccounts is raised, and accepts it for every app but Viber', () => {
+    const config = loadConfig(write({ apps: { telegram: { maxParallelAccounts: 3 }, viber: { maxParallelAccounts: 1 } } }));
+    expect(config.apps.telegram.maxParallelAccounts).toBe(3);
+    expect(config.apps.whatsapp.maxParallelAccounts).toBe(1);
+    expect(config.apps.viber.maxParallelAccounts).toBe(1);
+    expect(DEFAULT_APPS.telegram.maxParallelAccounts).toBe(1);
   });
 
   it('fails clearly when an explicitly named file is missing', () => {

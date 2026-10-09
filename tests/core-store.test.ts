@@ -33,6 +33,9 @@ const account = (overrides: Partial<AccountState> = {}): AccountState => ({
   day: '2026-10-08',
   usedToday: 0,
   nextAllowedAt: 0,
+  lastBatchMs: null,
+  avgBatchMs: null,
+  batchesDone: 0,
   ...overrides,
 });
 

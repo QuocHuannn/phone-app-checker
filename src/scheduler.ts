@@ -1,7 +1,7 @@
 import { plural } from './plural.ts';
 import { APP_SCOPE } from './adapters/index.ts';
 import type { Config } from './config.ts';
-import type { ProgressEvent } from './progress.ts';
+import type { AccountProgress, ProgressEvent } from './progress.ts';
 import { localDay, nextLocalMidnight, type AccountState, type Store, type StoredResult } from './store.ts';
 import {
   AccountBanned,
@@ -65,6 +65,8 @@ export interface AppRunSummary {
   /** Earliest time (epoch ms) an account is usable again, when the run ended blocked. */
   resumeAt: number | undefined;
   stopped: StopReason;
+  /** Every stored result of the app, updated as batches commit: the report reads this once. */
+  results: Map<string, StoredResult>;
 }
 
 export interface SchedulerOptions {
@@ -126,6 +128,36 @@ interface Slot {
   session: Session | undefined;
   consecutiveErrors: number;
   dropped: boolean;
+  /** Last account state as committed (or reserved for an in-flight batch); the dispatcher keeps it current. */
+  state: AccountState | undefined;
+  /** Numbers of in-flight batches already reserved against the daily cap. */
+  reserved: number;
+  /** Wall time of the last batch that finished this run. */
+  lastBatchMs: number | undefined;
+  /** Numbers this account answered in this run, per status (for the per-account progress rows). */
+  counts: Record<CheckStatus, number>;
+}
+
+/** A batch sent to an account's session, awaiting its outcome in `completions`. */
+interface InFlight {
+  slot: Slot;
+  name: string;
+  /** Numbers actually sent to the adapter. */
+  batch: PhoneNumber[];
+  /** The retry-queue entry this batch belongs to (its numbers may exceed `batch`: the tail was not sent yet). */
+  retry: RetryBatch | undefined;
+  /** When the dispatcher handed the batch out (the day its daily usage is charged to). */
+  dispatchedAt: number;
+  /** True once Session.check was actually invoked (a session that would not open measures no latency). */
+  checked: boolean;
+  /** When Session.check was called: batch latency is measured from here, not from session opening. */
+  checkStartedAt: number | undefined;
+  finishedAt: number;
+  failed: boolean;
+  failure: unknown;
+  answers: Map<string, CheckStatus>;
+  /** Set when the grace window ran out: a late return is ignored, the numbers were already charged. */
+  abandoned: boolean;
 }
 
 /** A batch that failed with an unexpected error, waiting behind the fresh numbers for a retry. */
@@ -163,9 +195,10 @@ export function selectPending(
 
 /**
  * Check every needed number for the selected apps. Apps run concurrently (they never share
- * accounts); within an app, one batch runs at a time on the least-used account that is
- * allowed to work. Results and account state are committed after every batch, so killing the
- * process loses at most the batch in flight.
+ * accounts); within an app a dispatcher hands batches to accounts that are ready now, at most one
+ * batch in flight per account and at most `maxParallelAccounts` in flight per app (default 1, the
+ * historical serial behaviour). Daily caps are reserved at dispatch and settled at commit, so
+ * parallel accounts cannot overshoot a cap.
  */
 export async function runChecks(options: SchedulerOptions): Promise<AppRunSummary[]> {
   const log = options.log ?? (() => {});
@@ -225,6 +258,7 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
     blockedBy: [],
     resumeAt: undefined,
     stopped: 'done',
+    results: storedBefore,
   };
   if (needed.length === 0) return summary;
   const attempted = new Set<string>();
@@ -246,7 +280,20 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
     return summary;
   }
 
-  const slots = new Map<string, Slot>(names.map((name) => [name, { session: undefined, consecutiveErrors: 0, dropped: false }]));
+  const slots = new Map<string, Slot>(
+    names.map((name) => [
+      name,
+      {
+        session: undefined,
+        consecutiveErrors: 0,
+        dropped: false,
+        state: undefined,
+        reserved: 0,
+        lastBatchMs: undefined,
+        counts: { yes: 0, not_found: 0, unknown: 0 },
+      },
+    ]),
+  );
   log(`${plural(needed.length, 'number')} to check with ${plural(names.length, 'account')}`);
 
   // Batches that failed with an unexpected error wait here (behind all fresh numbers) for a retry.
@@ -269,9 +316,61 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
   }
   let successes = 0;
   let quarantined = 0;
-  const queued = () => pending.length + retries.reduce((total, entry) => total + entry.numbers.length, 0);
-  const progress = (waiting?: ProgressEvent['waiting']): void =>
-    options.onProgress?.({ app, needed: summary.needed, remaining: queued() + quarantined, ...(waiting === undefined ? {} : { waiting }) });
+  /** Batches handed to a session and not yet committed: their numbers are off the queues but still unanswered. */
+  const jobs = new Set<InFlight>();
+  /** Batches whose session call returned (or failed), waiting to be committed by the dispatcher. */
+  const completions: InFlight[] = [];
+  const queued = () => {
+    let total = pending.length;
+    for (const entry of retries) total += entry.numbers.length;
+    for (const job of jobs) total += job.retry === undefined ? job.batch.length : job.retry.numbers.length;
+    return total;
+  };
+  const accountRows = (): AccountProgress[] => {
+    const t = now();
+    const idle = queued() === 0;
+    const rows: AccountProgress[] = [];
+    for (const [name, slot] of slots) {
+      const state = slot.state;
+      const row: AccountProgress = {
+        account: name,
+        state: 'waiting',
+        counts: { ...slot.counts },
+        done: slot.counts.yes + slot.counts.not_found + slot.counts.unknown,
+      };
+      if (slot.lastBatchMs !== undefined) row.lastBatchMs = slot.lastBatchMs;
+      if (slot.dropped || (state !== undefined && state.disabledReason !== null)) {
+        row.state = 'disabled';
+      } else if (slot.reserved > 0) {
+        row.state = 'working';
+      } else if (idle) {
+        row.state = 'done';
+      } else if (state !== undefined) {
+        const used = state.day === localDay(t) ? state.usedToday : 0;
+        if (used >= pacing.dailyCap) {
+          row.state = 'cooldown';
+          row.waitingUntil = Math.max(state.cooldownUntil, nextLocalMidnight(t));
+        } else if (state.cooldownUntil > t) {
+          row.state = 'cooldown';
+          row.waitingUntil = state.cooldownUntil;
+        } else if (state.nextAllowedAt > t) {
+          row.waitingUntil = state.nextAllowedAt;
+        }
+      }
+      rows.push(row);
+    }
+    return rows;
+  };
+  const progress = (waiting?: ProgressEvent['waiting']): void => {
+    if (options.onProgress === undefined) return;
+    options.onProgress({
+      app,
+      needed: summary.needed,
+      remaining: queued() + quarantined,
+      ...(waiting === undefined ? {} : { waiting }),
+      accounts: accountRows(),
+    });
+  };
   progress();
 
   const closeSession = async (name: string, slot: Slot) => {
@@ -294,11 +393,285 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
     }
   };
 
+  // Dispatcher: at most one batch in flight per account and `maxParallel` per app. A worker only
+  // fills its own job and pushes it to `completions`; this coroutine alone changes the queues, the
+  // account state and the store, so every queue change happens synchronously between awaits and
+  // one Store connection with one transaction per completed batch is enough.
+  const requested = pacing.maxParallelAccounts;
+  // One Android device serves every Viber account, so Viber never runs two batches at once.
+  const maxParallel = app === 'viber' || !(requested >= 1) ? 1 : Math.floor(requested);
+  let onArrival: (() => void) | undefined;
+
+  /** Resolves when a batch returned, the run was aborted, or `ms` passed (when given). */
+  const wait = async (ms?: number): Promise<void> => {
+    if (completions.length > 0 || signal?.aborted) return;
+    const woken = Promise.withResolvers<void>();
+    const timer = new AbortController();
+    const onAbort = () => woken.resolve();
+    onArrival = woken.resolve;
+    signal?.addEventListener('abort', onAbort, { once: true });
+    try {
+      await (ms === undefined ? woken.promise : Promise.race([woken.promise, sleep(ms, timer.signal)]));
+    } finally {
+      onArrival = undefined;
+      signal?.removeEventListener('abort', onAbort);
+      timer.abort();
+    }
+  };
+
+  /** Drop answered numbers from a (small) retry list in place. */
+  const settle = (list: PhoneNumber[], answers: ReadonlyMap<string, CheckStatus>): void => {
+    const left = list.filter((n) => !answers.has(n.e164));
+    list.length = 0;
+    list.push(...left);
+  };
+
+  const runJob = async (job: InFlight): Promise<void> => {
+    const { slot, name, batch } = job;
+    try {
+      slot.session ??= await adapter.open({
+        app,
+        account: name,
+        accountDir: options.accountDir(app, name),
+        pacing,
+        options: config.apps[app].options,
+        log: (message) => log(`${name}: ${redactPhones(message)}`),
+      });
+      job.checked = true;
+      for (const n of batch) attempted.add(n.e164);
+      job.checkStartedAt = now();
+      const result = await slot.session.check(batch);
+      if (!(result instanceof Map)) throw new TypeError('the adapter returned no result map');
+      job.answers = result;
+    } catch (error) {
+      // `failed` rather than `failure !== undefined`: a rejected promise may carry no reason at all.
+      job.failed = true;
+      job.failure = error;
+    }
+    if (job.abandoned) return;
+    job.finishedAt = now();
+    completions.push(job);
+    onArrival?.();
+  };
+
+  /** Take the next batch off the queues, reserve it against the account's daily cap and start it. */
+  const dispatch = (name: string, slot: Slot, room: number, t: number): void => {
+    const retry = pending.length === 0 ? retries.shift() : undefined;
+    const size = Math.min(pacing.batchSize, room);
+    const batch = retry === undefined ? pending.splice(0, size) : retry.numbers.slice(0, size);
+    const job: InFlight = {
+      slot,
+      name,
+      batch,
+      retry,
+      dispatchedAt: t,
+      checked: false,
+      checkStartedAt: undefined,
+      finishedAt: t,
+      failed: false,
+      failure: undefined,
+      answers: new Map(),
+      abandoned: false,
+    };
+    slot.reserved += batch.length;
+    jobs.add(job);
+    void runJob(job);
+  };
+
+  /** Commit one finished batch: settle the reservation to the charge rules, store, requeue what was not answered. */
+  const complete = async (job: InFlight): Promise<void> => {
+    const { slot, name, batch, retry } = job;
+    jobs.delete(job);
+    slot.reserved -= batch.length;
+    const finished = job.finishedAt;
+    const wanted = new Set(batch.map((n) => n.e164));
+    let answers = job.answers;
+    // Re-read: another completion may have lifted this account's cooldown while the batch ran.
+    const base = refreshDay(store.getAccount(app, name), job.dispatchedAt);
+    let next: AccountState = base;
+    const lifted: AccountState[] = [];
+    let failedNumbers: string[] = [];
+    // The failure branch already put the batch back into the retry queue (or parked it).
+    let handedToRetries = false;
+    let unexpected = false;
+
+    if (!job.failed) {
+      slot.consecutiveErrors = 0;
+      successes += 1;
+      // Numbers the adapter did not answer for are unknown; they are retried on the next run.
+      const filled = new Map<string, CheckStatus>();
+      for (const n of batch) {
+        const value = answers.get(n.e164);
+        filled.set(n.e164, isCheckStatus(value) ? value : 'unknown');
+      }
+      answers = filled;
+      const took = finished - (job.checkStartedAt ?? finished);
+      slot.lastBatchMs = took;
+      next = {
+        ...base,
+        usedToday: base.usedToday + batch.length,
+        nextAllowedAt: finished + pacing.minIntervalMs + Math.floor(random() * pacing.jitterMs),
+        lastBatchMs: took,
+        avgBatchMs: ((base.avgBatchMs ?? 0) * base.batchesDone + took) / (base.batchesDone + 1),
+        batchesDone: base.batchesDone + 1,
+      };
+    } else {
+      const failure = job.failure;
+      const partial: Map<string, CheckStatus> =
+        failure instanceof RateLimited || failure instanceof AccountBanned ? failure.partial : new Map();
+      answers = new Map();
+      for (const [e164, status] of partial) {
+        if (wanted.has(e164) && isCheckStatus(status)) answers.set(e164, status);
+      }
+      next = { ...base, usedToday: base.usedToday + answers.size };
+      if (failure instanceof RateLimited) {
+        const rest =
+          failure.retryAfterMs !== undefined && Number.isFinite(failure.retryAfterMs) && failure.retryAfterMs > 0
+            ? failure.retryAfterMs
+            : pacing.rateLimitCooldownMs;
+        next.cooldownUntil = finished + rest;
+        log(`${name}: rate limited, resting until ${new Date(next.cooldownUntil).toISOString()}`);
+      } else if (failure instanceof AccountBanned) {
+        next.disabledReason = describeError(failure);
+        log(`WARNING ${name}: account disabled (${next.disabledReason}). Fix it, then: login ${app} --account ${name}`);
+      } else {
+        unexpected = true;
+        // Only a failed lookup says something about these numbers (not a session that would not open).
+        if (job.checked) failedNumbers = batch.map((n) => n.e164);
+        // The same batch failing repeatedly although this run already got answers points at the
+        // batch (e.g. one number the platform rejects), not at the account: park it so later
+        // numbers still run, even when it is the last work left. Without any success yet the
+        // failure is indistinguishable from an outage, so the account-level handling applies.
+        const entry: RetryBatch = retry ?? { numbers: [...batch], failures: 0, cooldowns: [] };
+        entry.failures += 1;
+        const park = entry.failures >= MAX_BATCH_FAILURES && successes > 0;
+        // A parked batch is blamed on its numbers, so it does not count against the account either:
+        // a few bad numbers in a row must not get an account that works dropped.
+        if (!park) slot.consecutiveErrors += 1;
+        summary.errors += 1;
+        log(`${name}: error (${slot.consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}): ${describeError(failure)}`);
+        retries.push(entry);
+        handedToRetries = true;
+        if (park) {
+          retries.splice(retries.indexOf(entry), 1);
+          quarantined += entry.numbers.length;
+          summary.parkedBatches += 1;
+          // The cooldowns this batch's earlier failures caused blamed the accounts for it: lift them.
+          for (const cooled of entry.cooldowns) {
+            if (cooled.account === name) {
+              if (next.cooldownUntil === cooled.set) next.cooldownUntil = cooled.previous;
+            } else {
+              const state = store.getAccount(app, cooled.account);
+              if (state.cooldownUntil === cooled.set) lifted.push({ ...state, cooldownUntil: cooled.previous });
+            }
+          }
+          log(
+            `${plural(entry.numbers.length, 'number')} failed ${entry.failures} times in a run that otherwise works; ` +
+              'leaving them unknown for this run (no account is put on cooldown for it)',
+          );
+        } else {
+          entry.cooldowns.push({ account: name, set: finished + pacing.errorCooldownMs, previous: next.cooldownUntil });
+          next.cooldownUntil = finished + pacing.errorCooldownMs;
+        }
+        if (slot.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          slot.dropped = true;
+          log(`${name}: dropped for the rest of this run after repeated errors`);
+        }
+      }
+      await closeSession(name, slot);
+    }
+
+    store.transaction(() => {
+      if (failedNumbers.length > 0) store.recordFailedChecks(app, failedNumbers, finished);
+      store.saveResults(app, answers, finished);
+      store.saveAccount(next);
+      for (const state of lifted) store.saveAccount(state);
+    });
+    slot.state = next;
+    // Mirror the store's upsert rule (an unknown never replaces a yes/not_found) so the report can reuse this map.
+    for (const [e164, status] of answers) {
+      const current = summary.results.get(e164);
+      if (current === undefined || status !== 'unknown' || current.status === 'unknown') {
+        summary.results.set(e164, { status, checkedAt: finished });
+      }
+    }
+    // What was not answered goes back to the queue it came from, in front, so the next batch repeats it.
+    if (retry !== undefined) {
+      settle(retry.numbers, answers);
+      if (!handedToRetries && retry.numbers.length > 0) retries.unshift(retry);
+    } else if (!unexpected && answers.size < batch.length) {
+      pending.unshift(...batch.filter((n) => !answers.has(n.e164)));
+    }
+    summary.answered += answers.size;
+    for (const [e164, status] of answers) {
+      if (status !== 'unknown') refreshed.add(e164);
+      slot.counts[status] += 1;
+    }
+    if (answers.size > 0) log(`${name}: ${answers.size} checked, ${queued()} left`);
+    progress();
+  };
+
+  /** A batch that did not return inside the grace window: its numbers stay unknown, and the account is charged for them. */
+  const abandon = (job: InFlight): void => {
+    job.abandoned = true;
+    jobs.delete(job);
+    const { slot, name, batch, retry } = job;
+    slot.reserved -= batch.length;
+    // The platform may already have counted the numbers, so charge them in full.
+    const base = refreshDay(store.getAccount(app, name), job.dispatchedAt);
+    const next: AccountState = { ...base, usedToday: base.usedToday + batch.length };
+    store.transaction(() => store.saveAccount(next));
+    slot.state = next;
+    if (retry !== undefined) retries.unshift(retry);
+    else pending.unshift(...batch);
+    log(`${name}: a batch of ${plural(batch.length, 'number')} did not return in time; its numbers stay unknown and count against today's cap`);
+  };
+
+  /**
+   * After an interrupt: let batches in flight return and commit. With one batch at a time (K = 1) the
+   * old contract holds: wait for it however long it takes (a second Ctrl-C force-quits). With K > 1
+   * the close window bounds the wait and batches still out after it are abandoned and charged.
+   */
+  const drain = async (): Promise<void> => {
+    if (jobs.size === 0) return;
+    let expired = false;
+    // Real time on purpose (like the close window): the batch is a real request even when pacing is simulated.
+    const timer =
+      maxParallel === 1
+        ? undefined
+        : setTimeout(() => {
+            expired = true;
+            onArrival?.();
+          }, options.closeTimeoutMs ?? CLOSE_TIMEOUT_MS);
+    try {
+      while (jobs.size > 0 && !expired) {
+        if (completions.length === 0) {
+          const woken = Promise.withResolvers<void>();
+          onArrival = woken.resolve;
+          await woken.promise;
+          onArrival = undefined;
+        }
+        while (completions.length > 0) await complete(completions.shift() as InFlight);
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+    for (const job of [...jobs]) abandon(job);
+  };
+
   try {
-    while (queued() > 0) {
+    for (;;) {
+      while (completions.length > 0) await complete(completions.shift() as InFlight);
+      if (queued() === 0) break;
       if (signal?.aborted) {
         summary.stopped = 'aborted';
+        await drain();
         break;
+      }
+      // Nothing to hand out right now: every worker slot is busy, or what is left is in flight.
+      if (jobs.size >= maxParallel || (pending.length === 0 && retries.length === 0)) {
+        await wait();
+        continue;
       }
       const t = now();
 
@@ -312,9 +685,12 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
       for (const [name, slot] of slots) {
         if (slot.dropped) continue;
         const state = refreshDay(store.getAccount(app, name), t);
+        slot.state = state;
         if (state.disabledReason !== null) continue;
         usable += 1;
-        const room = pacing.dailyCap - state.usedToday;
+        // One batch at a time per account: pacing starts when its batch returns.
+        if (slot.reserved > 0) continue;
+        const room = pacing.dailyCap - state.usedToday - slot.reserved;
         if (room <= 0) {
           capped = true;
           blockedWake = Math.min(blockedWake, Math.max(state.cooldownUntil, nextLocalMidnight(t)));
@@ -336,11 +712,16 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
         break;
       }
 
-      const chosen = ready.sort((a, b) => a.state.usedToday - b.state.usedToday || a.name.localeCompare(b.name))[0];
-      if (chosen === undefined) {
+      if (ready.length === 0) {
+        if (jobs.size > 0) {
+          // Others are still working: wake for the next account that becomes ready, or for a returning batch.
+          const wake = Math.min(intervalWake, options.wait ? blockedWake : Infinity);
+          await wait(Number.isFinite(wake) ? wake - t : undefined);
+          continue;
+        }
         if (intervalWake !== Infinity) {
           progress({ until: intervalWake, kind: 'pacing' });
-          await sleep(intervalWake - t, signal);
+          await wait(intervalWake - t);
           progress();
           continue;
         }
@@ -356,156 +737,19 @@ async function runApp(options: SchedulerOptions, app: App): Promise<AppRunSummar
         }
         log(`all accounts are resting; resuming at ${new Date(blockedWake).toISOString()} (${queued()} left)`);
         progress({ until: blockedWake, kind: 'cooldown' });
-        await sleep(blockedWake - t, signal);
+        await wait(blockedWake - t);
         progress();
         continue;
       }
       summary.blockedBy = [];
       summary.resumeAt = undefined;
 
-      const { slot } = chosen;
-      const retryBatch = pending.length === 0 ? retries[0] : undefined;
-      const batch = (retryBatch?.numbers ?? pending).slice(0, Math.min(pacing.batchSize, chosen.room));
-      const wanted = new Set(batch.map((n) => n.e164));
-      let answers = new Map<string, CheckStatus>();
-      let next = chosen.state;
-      // `failed` rather than `failure !== undefined`: a rejected promise may carry no reason at all.
-      let failed = false;
-      let failure: unknown;
-      const lifted: AccountState[] = [];
-      let failedNumbers: string[] = [];
-
-      let checking = false;
-      try {
-        slot.session ??= await adapter.open({
-          app,
-          account: chosen.name,
-          accountDir: options.accountDir(app, chosen.name),
-          pacing,
-          options: config.apps[app].options,
-          log: (message) => log(`${chosen.name}: ${redactPhones(message)}`),
-        });
-        checking = true;
-        for (const n of batch) attempted.add(n.e164);
-        answers = await slot.session.check(batch);
-        if (!(answers instanceof Map)) throw new TypeError('the adapter returned no result map');
-        slot.consecutiveErrors = 0;
-        successes += 1;
-      } catch (error) {
-        failed = true;
-        failure = error;
+      // Least-used account first; hand out batches until the app's worker limit or the queue is exhausted.
+      ready.sort((a, b) => a.state.usedToday - b.state.usedToday || a.name.localeCompare(b.name));
+      for (const candidate of ready) {
+        if (jobs.size >= maxParallel || (pending.length === 0 && retries.length === 0)) break;
+        dispatch(candidate.name, candidate.slot, candidate.room, t);
       }
-
-      const finished = now();
-      if (!failed) {
-        // Numbers the adapter did not answer for are unknown; they are retried on the next run.
-        const complete = new Map<string, CheckStatus>();
-        for (const n of batch) {
-          const value = answers.get(n.e164);
-          complete.set(n.e164, isCheckStatus(value) ? value : 'unknown');
-        }
-        answers = complete;
-        next = {
-          ...chosen.state,
-          usedToday: chosen.state.usedToday + batch.length,
-          nextAllowedAt: finished + pacing.minIntervalMs + Math.floor(random() * pacing.jitterMs),
-        };
-      } else {
-        const partial: Map<string, CheckStatus> =
-          failure instanceof RateLimited || failure instanceof AccountBanned ? failure.partial : new Map();
-        answers = new Map();
-        for (const [e164, status] of partial) {
-          if (wanted.has(e164) && isCheckStatus(status)) answers.set(e164, status);
-        }
-        next = { ...chosen.state, usedToday: chosen.state.usedToday + answers.size };
-        if (failure instanceof RateLimited) {
-          const wait =
-            failure.retryAfterMs !== undefined && Number.isFinite(failure.retryAfterMs) && failure.retryAfterMs > 0
-              ? failure.retryAfterMs
-              : pacing.rateLimitCooldownMs;
-          next.cooldownUntil = finished + wait;
-          log(`${chosen.name}: rate limited, resting until ${new Date(next.cooldownUntil).toISOString()}`);
-        } else if (failure instanceof AccountBanned) {
-          next.disabledReason = describeError(failure);
-          log(`WARNING ${chosen.name}: account disabled (${next.disabledReason}). Fix it, then: login ${app} --account ${chosen.name}`);
-        } else {
-          // Only a failed lookup says something about these numbers (not a session that would not open).
-          if (checking) failedNumbers = batch.map((n) => n.e164);
-          // The same batch failing repeatedly although this run already got answers points at the
-          // batch (e.g. one number the platform rejects), not at the account: park it so later
-          // numbers still run, even when it is the last work left. Without any success yet the
-          // failure is indistinguishable from an outage, so the account-level handling applies.
-          const entry = retryBatch ?? { numbers: [...batch], failures: 0, cooldowns: [] };
-          entry.failures += 1;
-          const park = entry.failures >= MAX_BATCH_FAILURES && successes > 0;
-          // A parked batch is blamed on its numbers, so it does not count against the account either:
-          // a few bad numbers in a row must not get an account that works dropped.
-          if (!park) slot.consecutiveErrors += 1;
-          summary.errors += 1;
-          log(`${chosen.name}: error (${slot.consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}): ${describeError(failure)}`);
-          if (retryBatch === undefined) {
-            pending.splice(0, batch.length);
-            retries.push(entry);
-          } else {
-            retries.push(retries.shift() as RetryBatch);
-          }
-          if (park) {
-            retries.splice(retries.indexOf(entry), 1);
-            quarantined += entry.numbers.length;
-            summary.parkedBatches += 1;
-            // The cooldowns this batch's earlier failures caused blamed the accounts for it: lift them.
-            for (const cooled of entry.cooldowns) {
-              if (cooled.account === chosen.name) {
-                if (next.cooldownUntil === cooled.set) next.cooldownUntil = cooled.previous;
-              } else {
-                const state = store.getAccount(app, cooled.account);
-                if (state.cooldownUntil === cooled.set) lifted.push({ ...state, cooldownUntil: cooled.previous });
-              }
-            }
-            log(
-              `${plural(entry.numbers.length, 'number')} failed ${entry.failures} times in a run that otherwise works; ` +
-                'leaving them unknown for this run (no account is put on cooldown for it)',
-            );
-          } else {
-            entry.cooldowns.push({ account: chosen.name, set: finished + pacing.errorCooldownMs, previous: next.cooldownUntil });
-            next.cooldownUntil = finished + pacing.errorCooldownMs;
-          }
-          if (slot.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-            slot.dropped = true;
-            log(`${chosen.name}: dropped for the rest of this run after repeated errors`);
-          }
-        }
-        await closeSession(chosen.name, slot);
-      }
-
-      store.transaction(() => {
-        if (failedNumbers.length > 0) store.recordFailedChecks(app, failedNumbers, finished);
-        store.saveResults(app, answers, finished);
-        store.saveAccount(next);
-        for (const state of lifted) store.saveAccount(state);
-      });
-      // Answered numbers leave whichever queue they came from. Answers only name numbers of the
-      // batch, which is the first `head` entries of `pending`: compact just that head, then one
-      // splice — a full scan with a splice per answer was quadratic on large inputs.
-      const settle = (list: PhoneNumber[], head: number) => {
-        const end = Math.min(head, list.length);
-        let removed = 0;
-        for (let i = 0; i < end; i += 1) {
-          const n = list[i] as PhoneNumber;
-          if (answers.has(n.e164)) removed += 1;
-          else if (removed > 0) list[i - removed] = n;
-        }
-        if (removed > 0) list.splice(end - removed, removed);
-      };
-      settle(pending, batch.length);
-      if (retryBatch !== undefined) {
-        settle(retryBatch.numbers, Number.POSITIVE_INFINITY);
-        const index = retries.indexOf(retryBatch);
-        if (retryBatch.numbers.length === 0 && index >= 0) retries.splice(index, 1);
-      }
-      summary.answered += answers.size;
-      for (const [e164, status] of answers) if (status !== 'unknown') refreshed.add(e164);
-      if (answers.size > 0) log(`${chosen.name}: ${answers.size} checked, ${queued()} left`);
       progress();
     }
   } finally {

@@ -9,6 +9,11 @@ import { APPS, terminalSafe } from './types.ts';
 export interface AppConfig extends PacingSettings {
   /** App-specific options (e.g. Telegram apiId/apiHash, Viber adb serial). */
   options: Record<string, unknown>;
+  /**
+   * Accounts of this app that may run a batch at the same time (opt-in, default 1). Viber is
+   * always 1: its accounts share the one Android device the adapter drives.
+   */
+  maxParallelAccounts: number;
 }
 
 export interface Config {
@@ -37,6 +42,7 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     rateLimitCooldownMs: 6 * HOUR,
     errorCooldownMs: 10 * MINUTE,
     options: {},
+    maxParallelAccounts: 1,
   },
   whatsapp: {
     enabled: true,
@@ -47,6 +53,7 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     rateLimitCooldownMs: 6 * HOUR,
     errorCooldownMs: 10 * MINUTE,
     options: {},
+    maxParallelAccounts: 1,
   },
   zalo: {
     enabled: true,
@@ -57,6 +64,7 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     rateLimitCooldownMs: 24 * HOUR,
     errorCooldownMs: 10 * MINUTE,
     options: {},
+    maxParallelAccounts: 1,
   },
   viber: {
     enabled: false,
@@ -67,6 +75,7 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     rateLimitCooldownMs: 12 * HOUR,
     errorCooldownMs: 10 * MINUTE,
     options: {},
+    maxParallelAccounts: 1,
   },
   line: {
     enabled: false,
@@ -77,6 +86,7 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     rateLimitCooldownMs: 24 * HOUR,
     errorCooldownMs: 10 * MINUTE,
     options: {},
+    maxParallelAccounts: 1,
   },
 };
 
@@ -227,7 +237,7 @@ function mergeApp(app: App, base: AppConfig, raw: unknown): AppConfig {
   if (!isPlainObject(raw)) fail(`apps.${app} must be an object`);
   const input = raw;
   for (const key of Object.keys(input)) {
-    if (key !== 'enabled' && key !== 'options' && !(PACING_KEYS as readonly string[]).includes(key)) {
+    if (key !== 'enabled' && key !== 'options' && key !== 'maxParallelAccounts' && !(PACING_KEYS as readonly string[]).includes(key)) {
       fail(`unknown setting "${key}" in apps.${app}`);
     }
   }
@@ -251,6 +261,16 @@ function mergeApp(app: App, base: AppConfig, raw: unknown): AppConfig {
   if (merged.batchSize < 1) fail(`apps.${app}.batchSize must be >= 1`);
   if (merged.dailyCap < 1) fail(`apps.${app}.dailyCap must be >= 1`);
   if (merged.rateLimitCooldownMs < 1) fail(`apps.${app}.rateLimitCooldownMs must be >= 1`);
+  const maxParallelAccounts = input.maxParallelAccounts;
+  if (maxParallelAccounts !== undefined) {
+    if (typeof maxParallelAccounts !== 'number' || !Number.isInteger(maxParallelAccounts) || maxParallelAccounts < 1) {
+      fail(`apps.${app}.maxParallelAccounts must be a whole number >= 1`);
+    }
+    if (app === 'viber' && maxParallelAccounts > 1) {
+      fail('apps.viber.maxParallelAccounts must be 1: all Viber accounts share the one Android device');
+    }
+    merged.maxParallelAccounts = maxParallelAccounts;
+  }
   if (input.options !== undefined) {
     if (!isPlainObject(input.options)) fail(`apps.${app}.options must be an object`);
     Object.assign(merged.options, input.options);

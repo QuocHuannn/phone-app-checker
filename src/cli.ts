@@ -38,7 +38,7 @@ import {
 } from './report.ts';
 import { plural } from './plural.ts';
 import { describeRun, runChecks, type SchedulerOptions } from './scheduler.ts';
-import { ensureDataDirectory, localDay, Store } from './store.ts';
+import { ensureDataDirectory, localDay, Store, type StoredResult } from './store.ts';
 import { APPS, redactPhones, terminalSafe, type Adapter, type App, type LoginMethod } from './types.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -236,8 +236,10 @@ export function createProgram(deps: CliDeps = {}): Command {
     out: string,
     target: ReportTarget,
     freshness: ReportFreshness,
+    /** Results the run already holds per app (the scheduler's mirror of the store); absent for `report`, which loads them itself. */
+    stored?: Partial<Record<App, Map<string, StoredResult>>>,
   ): void {
-    const rows = buildReport(store, input.entries, apps, freshness);
+    const rows = buildReport(store, input.entries, apps, freshness, stored);
     writeReport(out, rows, target);
     print(formatSummary(summarize(rows), printUi));
     log(`Report written to ${shownPath(resolve(out))}`);
@@ -366,7 +368,12 @@ export function createProgram(deps: CliDeps = {}): Command {
           exit(130);
           return;
         }
-        say('Interrupt received: finishing the current batch, then writing the report (Ctrl-C again to force quit)...');
+        const parallel = apps.some((app) => cfg.apps[app].maxParallelAccounts > 1);
+        say(
+          parallel
+            ? 'Interrupt received: waiting for the batches in flight, then writing the report (Ctrl-C again to force quit)...'
+            : 'Interrupt received: finishing the current batch, then writing the report (Ctrl-C again to force quit)...',
+        );
         abort.abort();
       };
       for (const signal of STOP_SIGNALS) process.on(signal, onInterrupt);
@@ -392,7 +399,7 @@ export function createProgram(deps: CliDeps = {}): Command {
         progress?.finish();
         const run = describeRun(summaries);
         for (const line of run.lines) log(line);
-        emitReport(store, input, apps, options.out, target, { now: now(), maxAgeMs: maxAgeDays * DAY_MS });
+        emitReport(store, input, apps, options.out, target, { now: now(), maxAgeMs: maxAgeDays * DAY_MS }, Object.fromEntries(summaries.map((s) => [s.app, s.results])));
         // Exit code is unchanged (0 = the command produced its report); the banner is the warning.
         for (const line of run.banner) log(ui.bold(ui.red(line)));
         announceReport(resolve(options.out), summaries.reduce((total, s) => total + s.inconclusive, 0));
@@ -443,7 +450,7 @@ export function createProgram(deps: CliDeps = {}): Command {
       const store = Store.open(cfg.dataDir);
       try {
         const today = localDay(now());
-        const header = ['app', 'account', 'state', 'used today'];
+        const header = ['app', 'account', 'state', 'used today', 'batch time (avg / last)'];
         const lines: string[][] = [];
         const recorded = store.listAccounts();
         for (const app of APPS) {
@@ -457,7 +464,8 @@ export function createProgram(deps: CliDeps = {}): Command {
             let status = 'ready';
             if (state.disabledReason !== null) status = `DISABLED: ${state.disabledReason}`;
             else if (state.cooldownUntil > now()) status = `cooling down until ${new Date(state.cooldownUntil).toLocaleString('sv-SE')}`;
-            lines.push([app, name, status, `${used}/${cfg.apps[app].dailyCap}`]);
+            const took = (ms: number | null) => (ms === null ? '-' : `${(ms / 1000).toFixed(1)}s`);
+            lines.push([app, name, status, `${used}/${cfg.apps[app].dailyCap}`, `${took(state.avgBatchMs)} / ${took(state.lastBatchMs)}`]);
           }
         }
         if (lines.length === 0) {

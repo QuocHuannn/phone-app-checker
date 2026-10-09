@@ -12,6 +12,7 @@
       "jitterMs": 60000,
       "rateLimitCooldownMs": 21600000,
       "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
       "options": {
         "apiId": null,
         "apiHash": null
@@ -25,6 +26,7 @@
       "jitterMs": 60000,
       "rateLimitCooldownMs": 21600000,
       "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
       "options": {
         "loginTimeoutMs": 180000,
         "connectTimeoutMs": 60000
@@ -38,6 +40,7 @@
       "jitterMs": 30000,
       "rateLimitCooldownMs": 86400000,
       "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
       "options": {}
     },
     "viber": {
@@ -48,6 +51,7 @@
       "jitterMs": 600000,
       "rateLimitCooldownMs": 43200000,
       "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
       "options": {
         "serial": "emulator-5554",
         "registeredQuery": "SELECT <number column> AS number FROM <table> WHERE <viber-user condition>",
@@ -70,6 +74,7 @@
       "jitterMs": 60000,
       "rateLimitCooldownMs": 86400000,
       "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
       "options": {
         "loginMode": "qr",
         "device": "DESKTOPWIN"

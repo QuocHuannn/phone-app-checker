@@ -212,9 +212,10 @@ describe('scheduler', () => {
       const events: ProgressEvent[] = [];
       await h.run({ numbers: numbers(4), onProgress: (event) => events.push(structuredClone(event)) });
       const waits = events.filter((event) => event.waiting !== undefined);
-      expect(waits).toEqual([{ app: 'telegram', needed: 4, remaining: 2, waiting: { until: NOON + 1000, kind: 'pacing' } }]);
+      expect(waits).toMatchObject([{ app: 'telegram', needed: 4, remaining: 2, waiting: { until: NOON + 1000, kind: 'pacing' } }]);
       const at = events.indexOf(waits[0] as ProgressEvent);
-      expect(events[at + 1]).toEqual({ app: 'telegram', needed: 4, remaining: 2 });
+      expect(events[at + 1]).toMatchObject({ app: 'telegram', needed: 4, remaining: 2 });
+      expect(events[at + 1]?.waiting).toBeUndefined();
     });
 
     it('says when every account rests (a cooldown) and when it resumes', async () => {
@@ -237,7 +238,8 @@ describe('scheduler', () => {
       const rest = events.find((event) => event.waiting?.kind === 'cooldown');
       expect(rest).toMatchObject({ needed: 4, remaining: 4, waiting: { kind: 'cooldown' } });
       expect(rest?.waiting?.until).toBeGreaterThan(NOON);
-      expect(events.at(-1)).toEqual({ app: 'telegram', needed: 4, remaining: 0 });
+      expect(events.at(-1)).toMatchObject({ app: 'telegram', needed: 4, remaining: 0 });
+      expect(events.at(-1)?.waiting).toBeUndefined();
     });
 
     it('reports nothing for an app with nothing to check, and a run without a listener is unchanged', async () => {
@@ -502,6 +504,9 @@ describe('daily cap and day rollover', () => {
       day: '2000-01-01',
       usedToday: 3,
       nextAllowedAt: 0,
+      lastBatchMs: null,
+      avgBatchMs: null,
+      batchesDone: 0,
     });
     const [summary] = await h.run({ numbers: numbers(3), wait: false });
     expect(summary).toMatchObject({ stopped: 'done', answered: 3 });

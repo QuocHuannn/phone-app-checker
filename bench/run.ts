@@ -3,8 +3,8 @@
 // a table and to bench/out/<timestamp>.json. Timings are printed, never asserted; the only gate
 // is the report sha256 for the committed golden configuration (see bench/golden.json).
 //   node --disable-warning=ExperimentalWarning bench/run.ts [--rows N] [--seed S] [--apps list]
-//       [--accounts K] [--latency-ms L] [--batch B] [--stages a,b,c] [--repo path] [--work path]
-//       [--golden path]
+//       [--accounts K] [--latency-ms L] [--batch B] [--parallel K] [--stages a,b,c] [--repo path]
+//       [--work path] [--golden path]
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
@@ -24,6 +24,8 @@ interface Options {
   accounts: number;
   latencyMs: number;
   batch: number;
+  /** `maxParallelAccounts` for the `sim` stage (1 = serial dispatch, the shipped default). */
+  parallel: number;
   stages: string[];
   repo: string;
   work: string;
@@ -31,7 +33,7 @@ interface Options {
 }
 
 function parseArgs(argv: string[]): Options {
-  const options: Partial<Options> = { rows: 20_000, seed: 1, accounts: 2, latencyMs: 0, batch: 10, repo: REPO, golden: DEFAULT_GOLDEN };
+  const options: Partial<Options> = { rows: 20_000, seed: 1, accounts: 2, latencyMs: 0, batch: 10, parallel: 1, repo: REPO, golden: DEFAULT_GOLDEN };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     const value = argv[i + 1];
@@ -42,6 +44,7 @@ function parseArgs(argv: string[]): Options {
       case '--accounts': options.accounts = Number(value); i += 1; break;
       case '--latency-ms': options.latencyMs = Number(value); i += 1; break;
       case '--batch': options.batch = Number(value); i += 1; break;
+      case '--parallel': options.parallel = Number(value); i += 1; break;
       case '--stages': options.stages = (value as string).split(','); i += 1; break;
       case '--repo': options.repo = resolve(value as string); i += 1; break;
       case '--work': options.work = resolve(value as string); i += 1; break;
@@ -75,6 +78,7 @@ function runStage(options: Options, stage: string, extra: string[]): StageResult
     '--accounts', String(options.accounts),
     '--latency-ms', String(options.latencyMs),
     '--batch', String(options.batch),
+    '--parallel', String(options.parallel),
     ...extra,
   ];
   const useTime = process.platform === 'darwin';

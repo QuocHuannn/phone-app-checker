@@ -1,5 +1,20 @@
-import { APPS, type App } from './types.ts';
+import { APPS, type App, type CheckStatus } from './types.ts';
 import { CURSOR, displayWidth, formatDuration, truncate, type DrawStream, type Ui } from './ui.ts';
+
+/** One account's state inside an app's `check` run, for the per-account dashboard rows. */
+export interface AccountProgress {
+  account: string;
+  /** working: a batch is in flight; waiting: pacing/idle; cooldown: resting after a throttle or cap; disabled: banned/dropped; done: nothing left for it. */
+  state: 'working' | 'waiting' | 'cooldown' | 'disabled' | 'done';
+  /** When the account is usable again (waiting/cooldown only). */
+  waitingUntil?: number;
+  /** Numbers this account answered this run, per status. */
+  counts: Record<CheckStatus, number>;
+  /** Numbers this account answered this run (sum of `counts`). */
+  done: number;
+  /** Wall time of its last completed batch, for judging whether parallelism pays. */
+  lastBatchMs?: number;
+}
 
 /** One app's state in a `check` run, reported by the scheduler after every change. */
 export interface ProgressEvent {
@@ -10,6 +25,8 @@ export interface ProgressEvent {
   remaining: number;
   /** Set while the app waits instead of working: when it resumes and why (a short pacing delay, or a cooldown / daily cap). */
   waiting?: { until: number; kind: 'pacing' | 'cooldown' };
+  /** Per-account rows, in account order; phase 6 renders them. */
+  accounts?: AccountProgress[];
 }
 
 export type ProgressMode = 'bar' | 'lines';

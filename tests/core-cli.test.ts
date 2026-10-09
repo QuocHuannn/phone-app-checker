@@ -353,6 +353,10 @@ describe('accounts and account-reset', () => {
     const listing = env.printed.join('\n');
     expect(listing).toMatch(/telegram\s+a\s+ready\s+2\/200/);
     expect(listing).toMatch(/zalo\s+z\s+DISABLED: logged out/);
+    // The account that never completed a batch has no timing; the one that did shows average and last.
+    expect(listing).toContain('batch time (avg / last)');
+    expect(listing).toMatch(/zalo\s+z\s+DISABLED: logged out\s+0\/100\s+- \/ -/);
+    expect(listing).toMatch(/telegram\s+a\s+ready\s+2\/200\s+\d+\.\ds \/ \d+\.\ds/);
 
     env.printed.length = 0;
     await run(['account-reset', 'zalo', 'z']);

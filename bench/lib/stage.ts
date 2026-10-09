@@ -31,10 +31,12 @@ interface Args {
   batch: number;
   work: string;
   defaultPacing: boolean;
+  /** `maxParallelAccounts` written into the sim config (1 keeps the historical serial loop). */
+  parallel: number;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Partial<Args> = { rows: 20_000, seed: 1, accounts: 2, latencyMs: 0, batch: 10, defaultPacing: false };
+  const args: Partial<Args> = { rows: 20_000, seed: 1, accounts: 2, latencyMs: 0, batch: 10, defaultPacing: false, parallel: 1 };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     const value = argv[i + 1];
@@ -49,6 +51,7 @@ function parseArgs(argv: string[]): Args {
       case '--latency-ms': args.latencyMs = Number(value); i += 1; break;
       case '--batch': args.batch = Number(value); i += 1; break;
       case '--default-pacing': args.defaultPacing = true; break;
+      case '--parallel': args.parallel = Number(value); i += 1; break;
       default: throw new Error(`unknown argument ${flag}`);
     }
   }
@@ -136,10 +139,14 @@ async function runCli(
   return { ms: ms(t0), error, checkedLines, logTail: logs.slice(-6), printed: prints.join('\n').slice(0, 600) };
 }
 
-function writeConfig(dir: string, dataDir: string, apps: string[], defaultPacing: boolean): string {
+function writeConfig(dir: string, dataDir: string, apps: string[], defaultPacing: boolean, parallel: number): string {
   const perApp: Record<string, Record<string, number>> = {};
   // --default-pacing keeps the shipped pacing and only lifts the daily cap so a run can finish.
-  for (const app of apps) perApp[app] = defaultPacing ? { dailyCap: 1_000_000_000 } : { minIntervalMs: 0, jitterMs: 0, dailyCap: 1_000_000_000 };
+  // The key is written only above 1, so K=1 runs use a config byte-identical to the phase-1 golden run.
+  for (const app of apps) {
+    perApp[app] = defaultPacing ? { dailyCap: 1_000_000_000 } : { minIntervalMs: 0, jitterMs: 0, dailyCap: 1_000_000_000 };
+    if (parallel > 1 && app !== 'viber') perApp[app].maxParallelAccounts = parallel;
+  }
   const cfgPath = join(dir, 'config.json');
   writeFileSync(cfgPath, JSON.stringify({ dataDir, apps: perApp }));
   return cfgPath;
@@ -205,7 +212,7 @@ async function main(): Promise<void> {
     const t0 = performance.now();
     let commits = 0;
     const app: App = 'telegram';
-    const state = { app, name: 'acc0', cooldownUntil: 0, disabledReason: null, day: '2026-10-10', usedToday: 0, nextAllowedAt: 0 };
+    const state = { app, name: 'acc0', cooldownUntil: 0, disabledReason: null, day: '2026-10-10', usedToday: 0, nextAllowedAt: 0, lastBatchMs: null, avgBatchMs: null, batchesDone: 0 };
     for (let i = 0; i < numbers.length; i += args.batch) {
       const slice = numbers.slice(i, i + args.batch);
       const answers = new Map<string, CheckStatus>(slice.map((n) => [n.e164, truthOf(app, n.e164)]));
@@ -228,7 +235,7 @@ async function main(): Promise<void> {
     const apps = args.apps;
     const dataDir = join(dir, 'data');
     const reportOut = join(dir, `report-${args.stage}.csv`);
-    const cfgPath = writeConfig(dir, dataDir, apps, args.stage === 'sim' ? true : args.defaultPacing);
+    const cfgPath = writeConfig(dir, dataDir, apps, args.stage === 'sim' ? true : args.defaultPacing, args.stage === 'sim' ? args.parallel : 1);
     const clock = new VirtualClock(START);
     const counters: FakeCounters = { calls: {}, numbers: {} };
     const txStats = instrumentStore(Store);
@@ -256,6 +263,7 @@ async function main(): Promise<void> {
       seed: args.seed,
       apps,
       accounts: args.accounts,
+      parallel: args.stage === 'sim' ? args.parallel : undefined,
       latencyMs: args.latencyMs,
       realMs: result.ms,
       simulatedMs: args.stage === 'report' ? undefined : clock.t - START,
@@ -272,13 +280,18 @@ async function main(): Promise<void> {
       logTail: result.logTail,
     };
     if (args.stage === 'sim') {
-      // Ideal concurrent bound: batches split over K accounts, each cycle = latency + mean pacing
-      // (minIntervalMs + jitterMs/2 of the shipped telegram config, read from the target's defaults).
+      // Lower bound on the simulated time: batches are limited both by the worker pool (min(K, accounts)
+      // batches at a time, each taking the latency) and by per-account pacing (each account starts a new
+      // batch only latency + mean pacing after the previous one; mean pacing = minIntervalMs + jitterMs/2
+      // of the shipped telegram config, read from the target's defaults). K=1 is the serial loop.
       const { DEFAULT_APPS } = (await imp(args.repo, 'src/config.ts')) as ConfigModule;
       const pacing = DEFAULT_APPS.telegram;
       const cycle = args.latencyMs + pacing.minIntervalMs + pacing.jitterMs / 2;
       const batches = counters.calls[apps[0] as string] ?? 0;
-      payload.idealConcurrentMin = Number(((Math.ceil(batches / args.accounts) * cycle) / 60_000).toFixed(1));
+      const workers = Math.max(1, Math.min(args.parallel, args.accounts));
+      const workerBound = Math.ceil(batches / workers) * args.latencyMs;
+      const pacingBound = Math.ceil(batches / args.accounts) * cycle;
+      payload.idealConcurrentMin = Number((Math.max(workerBound, pacingBound) / 60_000).toFixed(1));
       payload.simulatedMin = Number(((clock.t - START) / 60_000).toFixed(1));
       payload.serialLatencyBoundMin = Number(((batches * args.latencyMs) / 60_000).toFixed(1));
     }

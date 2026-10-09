@@ -1,0 +1,22 @@
+#!/bin/bash
+# phone-app-checker launcher: pins the bundled Node and the per-user data home.
+# Follows the ~/.local/bin -> current -> <version> symlink chain to find the bundle root.
+set -euo pipefail
+
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  case "$src" in
+    /*) ;;
+    *) src="$dir/$src" ;;
+  esac
+done
+root="$(cd -P "$(dirname "$src")" && pwd)"
+
+export PHONE_APP_CHECKER_HOME="${PHONE_APP_CHECKER_HOME:-$HOME/Library/Application Support/phone-app-checker}"
+# Node switches that change module resolution, TLS verification or output files. NODE_EXTRA_CA_CERTS is kept (corporate proxies).
+unset NODE_OPTIONS NODE_PATH NODE_TLS_REJECT_UNAUTHORIZED NODE_PRESERVE_SYMLINKS NODE_PRESERVE_SYMLINKS_MAIN \
+  NODE_COMPILE_CACHE NODE_REDIRECT_WARNINGS NODE_REPL_EXTERNAL_MODULE NODE_V8_COVERAGE
+
+exec "$root/runtime/bin/node" "$root/app/bin/phone-app-checker.js" "$@"

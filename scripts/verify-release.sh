@@ -381,9 +381,13 @@ main() {
   if awk '$1 == "FAIL" { bad = 1 } END { exit bad ? 0 : 1 }' "$T/doctor-upgrade.out"; then fail $id $label "doctor reports a FAIL row on the upgraded home" "$T/doctor-upgrade.out"; fi
   (cd "$T/work" && crp phone-app-checker report numbers.csv --apps telegram,zalo) >"$log" 2>&1 || fail $id $label "report on the upgraded home exited non-zero" "$log"
   [ -f "$T/work/report.csv" ] || fail $id $label "report.csv not written on the upgraded home" "$log"
-  db_check="$(cr "$installed/runtime/bin/node" -e 'const { DatabaseSync } = require("node:sqlite"); const db = new DatabaseSync(process.argv[1]); const uv = db.prepare("PRAGMA user_version").get().user_version; const r = db.prepare("SELECT COUNT(*) AS n FROM results").get().n; const a = db.prepare("SELECT COUNT(*) AS n FROM accounts").get().n; db.close(); process.stdout.write(`${uv} ${r} ${a}`);' "$data_home/data/checker.db" 2>"$log")" \
+  # The expected schema is whatever the bundle's own migration ladder ends at (a fresh Store runs it in memory), so a
+  # schema bump needs no edit here. The seeded 0.1.0 fixture must have been upgraded to exactly that version.
+  db_check="$(cr "$installed/runtime/bin/node" -e 'const { DatabaseSync } = require("node:sqlite"); const { Store } = require(process.argv[2] + "/src/store.js"); const fresh = new Store(":memory:"); const want = fresh.db.prepare("PRAGMA user_version").get().user_version; fresh.close(); const db = new DatabaseSync(process.argv[1]); const uv = db.prepare("PRAGMA user_version").get().user_version; const r = db.prepare("SELECT COUNT(*) AS n FROM results").get().n; const a = db.prepare("SELECT COUNT(*) AS n FROM accounts").get().n; db.close(); process.stdout.write(`${uv} ${want} ${r} ${a}`);' "$data_home/data/checker.db" "$installed/app" 2>"$log")" \
     || fail $id $label "could not read the upgraded checker.db" "$log"
-  [ "$db_check" = "2 3 1" ] || fail $id $label "unexpected database state after the upgrade: '$db_check' (expected schema 2 with 3 results and 1 account kept)"
+  read -r db_version db_want db_results db_accounts <<<"$db_check"
+  [ "$db_version" = "$db_want" ] && [ "$db_results $db_accounts" = "3 1" ] \
+    || fail $id $label "unexpected database state after the upgrade: '$db_check' (expected 'schema schema 3 1': the bundle's own schema version with 3 results and 1 account kept)"
   [ ! -e "$data_home/checker.config.json.v1-2.bak" ] || fail $id $label "a second config load created another backup (migration is not idempotent)"
   cr /bin/bash "$base/current/uninstall.sh" --purge-data --yes >"$T/purge4.log" 2>&1 || fail $id $label "uninstall.sh --purge-data --yes after the upgrade exited non-zero" "$T/purge4.log"
   [ ! -e "$data_home" ] || fail $id $label "$data_home still exists after the upgrade check"

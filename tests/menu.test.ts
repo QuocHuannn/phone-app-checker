@@ -408,13 +408,13 @@ const EN = ['--lang', 'en'];
 const SECRET = 'deadbeefcafe0123deadbeefcafe0123';
 
 describe('2 - login', () => {
-  it('lists the five apps with their status and runs login with the default account', async () => {
+  it('lists every app with its status and runs login with the default account', async () => {
     // 2 = login, 2 = WhatsApp, Enter = default account, 2 = QR (1 / Enter = pairing code).
     const f = fixture(['2', '2', '', '2', '0'], { accounts: { telegram: ['a', 'b'] } });
     await runMenu(f.host);
     const screen = f.screen();
     expect(screen).toMatch(/1\. telegram: logged in: 2 accounts \(a, b\)/);
-    for (const app of ['whatsapp', 'zalo', 'viber', 'line']) expect(screen).toMatch(new RegExp(`${app}: not set up`));
+    for (const app of APPS.filter((candidate) => candidate !== 'telegram')) expect(screen).toMatch(new RegExp(`${app}: not set up`));
     expect(f.runs).toEqual([['login', 'whatsapp', '--account', 'default', '--method', 'qr', ...EN]]);
     expect(screen).toContain('Next step: choose 1 ("Check a CSV file")');
     expect(screen).toContain('QR');
@@ -460,6 +460,15 @@ describe('2 - login', () => {
     expect(screen).toContain('Login of viber (account default) did not finish and nothing was saved');
     expect(screen).not.toContain('Next step');
     expect(screen).toContain('Goodbye.');
+  });
+
+  it('Threema: explains the Gateway ID and secret before login, then runs login with the default account', async () => {
+    const f = fixture(['2', String(APPS.indexOf('threema') + 1), '', '0']);
+    await runMenu(f.host);
+    expect(f.flat()).toContain('Threema will ask for: your Gateway ID');
+    expect(f.flat()).toContain('docs/threema-setup.md');
+    expect(f.runs).toEqual([['login', 'threema', '--account', 'default', ...EN]]);
+    expect(f.screen()).toContain('Next step');
   });
 
   describe('WhatsApp', () => {

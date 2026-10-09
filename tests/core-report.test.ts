@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { parsePhoneCsv, type InputEntry } from '../src/csv.ts';
 import { buildReport, formatReportCsv, formatSummary, REPORT_COLUMNS, summarize, writeReport, type ReportRow } from '../src/report.ts';
 import { Store } from '../src/store.ts';
-import type { App, CheckStatus } from '../src/types.ts';
+import { APPS, type App, type CheckStatus } from '../src/types.ts';
+import { COLS, countsFor, REPORT_HEADER, reportLine, statusesFor } from './helpers/report-rows.ts';
 
 const DAY = 24 * 60 * 60 * 1000;
 const T1 = Date.UTC(2026, 9, 1);
@@ -39,19 +40,31 @@ describe('report', () => {
   it('writes the exact, deterministic CSV', () => {
     const { store, entries } = fixture();
     const rows = buildReport(store, entries, ['telegram', 'whatsapp', 'zalo'], FRESH);
-    expect(REPORT_COLUMNS.join(',')).toBe(
-      'input,e164,country,telegram,whatsapp,zalo,viber,line,last_checked_at,' +
-        'telegram_checked_at,whatsapp_checked_at,zalo_checked_at,viber_checked_at,line_checked_at,' +
-        'telegram_stale,whatsapp_stale,zalo_stale,viber_stale,line_stale',
-    );
+    expect(REPORT_COLUMNS.join(',')).toBe(REPORT_HEADER);
     expect(formatReportCsv(rows)).toBe(
       [
         REPORT_COLUMNS.join(','),
-        '0901234567,+84901234567,VN,yes,yes,not_found,skipped,skipped,2026-10-04T00:00:00.000Z,' +
-          '2026-10-01T00:00:00.000Z,2026-10-03T00:00:00.000Z,2026-10-04T00:00:00.000Z,,,no,no,no,,',
-        '+65 9123 4567,+6591234567,SG,not_found,unknown,skipped,skipped,skipped,2026-10-02T00:00:00.000Z,' +
-          '2026-10-02T00:00:00.000Z,,,,,no,,,,',
-        'abc,,,invalid,invalid,invalid,invalid,invalid' + ','.repeat(11),
+        reportLine({
+          input: '0901234567',
+          e164: '+84901234567',
+          country: 'VN',
+          statuses: { telegram: 'yes', whatsapp: 'yes', zalo: 'not_found' },
+          otherwise: 'skipped',
+          lastChecked: '2026-10-04T00:00:00.000Z',
+          checked: { telegram: '2026-10-01T00:00:00.000Z', whatsapp: '2026-10-03T00:00:00.000Z', zalo: '2026-10-04T00:00:00.000Z' },
+          stale: { telegram: 'no', whatsapp: 'no', zalo: 'no' },
+        }),
+        reportLine({
+          input: '+65 9123 4567',
+          e164: '+6591234567',
+          country: 'SG',
+          statuses: { telegram: 'not_found', whatsapp: 'unknown' },
+          otherwise: 'skipped',
+          lastChecked: '2026-10-02T00:00:00.000Z',
+          checked: { telegram: '2026-10-02T00:00:00.000Z' },
+          stale: { telegram: 'no' },
+        }),
+        reportLine({ input: 'abc', e164: '', country: '', statuses: {}, otherwise: 'invalid' }),
         '',
       ].join('\n'),
     );
@@ -73,11 +86,11 @@ describe('report', () => {
     expect(row?.observations.telegram).toEqual({ checkedAt: T1, stale: false });
     const old = buildReport(store, entries, ['telegram', 'whatsapp'], { now: T4 + DAY, maxAgeMs: 2 * DAY })[0];
     expect(old?.observations).toEqual({ telegram: { checkedAt: T1, stale: true }, whatsapp: { checkedAt: T4, stale: false } });
-    // Columns: 0-2 input/e164/country, 3-7 statuses, 8 last_checked_at, 9-13 <app>_checked_at, 14-18 <app>_stale.
+    // Columns: input/e164/country, one status per app, last_checked_at, <app>_checked_at, <app>_stale (all derived from APPS).
     const cells = formatReportCsv([old as ReportRow]).split('\n')[1]?.split(',') ?? [];
-    expect(cells[8]).toBe('2026-10-04T00:00:00.000Z');
-    expect(cells.slice(9, 11)).toEqual(['2026-10-01T00:00:00.000Z', '2026-10-04T00:00:00.000Z']);
-    expect(cells.slice(14, 16)).toEqual(['yes', 'no']);
+    expect(cells[COLS.lastChecked]).toBe('2026-10-04T00:00:00.000Z');
+    expect(cells.slice(COLS.checked, COLS.checked + 2)).toEqual(['2026-10-01T00:00:00.000Z', '2026-10-04T00:00:00.000Z']);
+    expect(cells.slice(COLS.stale, COLS.stale + 2)).toEqual(['yes', 'no']);
   });
 
   it('gives an unknown attempt no observation time, and treats a future-dated result as stale', () => {
@@ -95,13 +108,7 @@ describe('report', () => {
   it('marks disabled apps skipped even when results are stored, and pending cells unknown', () => {
     const { store, entries } = fixture();
     const [first, second] = buildReport(store, entries, ['telegram'], FRESH);
-    expect(first?.statuses).toEqual({
-      telegram: 'yes',
-      whatsapp: 'skipped',
-      zalo: 'skipped',
-      viber: 'skipped',
-      line: 'skipped',
-    });
+    expect(first?.statuses).toEqual(statusesFor({ telegram: 'yes' }, 'skipped'));
     expect(first?.lastCheckedAt).toBe(T1);
     expect(second?.statuses.telegram).toBe('not_found');
     const withWhatsApp = buildReport(store, entries, ['telegram', 'whatsapp'], FRESH);
@@ -126,7 +133,9 @@ describe('report', () => {
     const store = new Store(':memory:');
     const { entries } = parsePhoneCsv('phone\n+84 (90) 123-4567\n', { defaultRegion: 'VN' });
     const csv = formatReportCsv(buildReport(store, entries, ['telegram'], FRESH));
-    expect(csv.split('\n')[1]).toBe('+84 (90) 123-4567,+84901234567,VN,unknown,skipped,skipped,skipped,skipped' + ','.repeat(11));
+    expect(csv.split('\n')[1]).toBe(
+      reportLine({ input: '+84 (90) 123-4567', e164: '+84901234567', country: 'VN', statuses: { telegram: 'unknown' }, otherwise: 'skipped' }),
+    );
   });
 
   it('writes the file atomically with private permissions', () => {
@@ -151,7 +160,7 @@ describe('summary', () => {
     expect(summary.perApp.whatsapp).toEqual({ yes: 1, not_found: 0, unknown: 1, skipped: 0, invalid: 1 });
     expect(summary.perApp.zalo).toEqual({ yes: 0, not_found: 1, unknown: 0, skipped: 1, invalid: 1 });
     expect(summary.perApp.viber.skipped).toBe(2);
-    expect(summary.yesByCountry.get('VN')).toEqual({ telegram: 1, whatsapp: 1, zalo: 0, viber: 0, line: 0 });
+    expect(summary.yesByCountry.get('VN')).toEqual(countsFor({ telegram: 1, whatsapp: 1 }));
 
     const text = formatSummary(summary);
     expect(text).toContain('Numbers: 3 unique (2 valid, 1 invalid)');
@@ -165,7 +174,7 @@ describe('summary', () => {
     const { store, entries } = fixture();
     const summary = summarize(buildReport(store, entries, ['telegram', 'whatsapp', 'zalo'], { now: T4 + DAY, maxAgeMs: 2 * DAY }));
     // telegram yes (T1, 4 days) and not_found (T2, 3 days) are stale; whatsapp T3 (2 days, not < 2) is stale; zalo T4 is fresh.
-    expect(summary.stale).toEqual({ telegram: 2, whatsapp: 1, zalo: 0, viber: 0, line: 0 });
+    expect(summary.stale).toEqual(countsFor({ telegram: 2, whatsapp: 1 }));
     expect(formatSummary(summary)).toContain('STALE: telegram 2, whatsapp 1 — 3 yes/not_found results are older than the max age or dated in the future');
   });
 });

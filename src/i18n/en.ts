@@ -86,6 +86,7 @@ export const en = {
   hintTelegram: 'Telegram will ask for: your phone number (+84...), the login code (not shown while you type) and the two-step password if you have one.',
   hintViber: 'Viber needs an Android phone connected by USB cable (see docs/viber-setup.md).',
   hintLine: 'LINE will guide you on the screen (see docs/line-setup.md).',
+  hintThreema: 'Threema will ask for: your Gateway ID (starts with *, 8 characters) and its secret (not shown while you type). See docs/threema-setup.md.',
 
   // 2 - choosing how to log in.
   loginMethodPrompt: ({ max }: { max: number }) => `Choose 1-${max} (Enter = 1): `,
@@ -198,6 +199,9 @@ export const en = {
   zaloQrExpired: ({ attempt, max }: { attempt: number; max: number }) => `The QR code expired. Making a new one (${attempt}/${max}).`,
   zaloQrGaveUp: 'The QR code expired too many times. Run the login again.',
   zaloQrDeclined: 'Zalo login was declined on the phone.',
+  threemaIdPrompt: 'Threema Gateway ID (8 characters, starts with *, for example *ABCDEFG): ',
+  threemaSecretPrompt: 'Threema Gateway API secret (not shown while you type): ',
+  threemaIdInvalid: 'A Gateway ID is "*" followed by 7 capital letters or digits, for example *ABCDEFG. Try again.',
   telegramPhonePrompt: 'Telegram phone number (international format, for example +84901234567): ',
   telegramCodePrompt: 'Login code sent by Telegram (not shown while you type): ',
   telegramPasswordPrompt: 'Two-step verification password (not shown while you type): ',

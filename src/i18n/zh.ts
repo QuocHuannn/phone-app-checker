@@ -67,6 +67,7 @@ export const zh = {
   hintTelegram: 'Telegram 会询问: 手机号码 (+84...)、登录验证码 (输入时不显示)，如果设置了两步验证还会要求输入密码。',
   hintViber: 'Viber 需要通过 USB 数据线连接的 Android 手机 (见 docs/viber-setup.md)。',
   hintLine: 'LINE 会在屏幕上给出指引 (见 docs/line-setup.md)。',
+  hintThreema: 'Threema 会询问: Gateway ID (以 * 开头，共 8 个字符) 和它的密钥 (输入时不显示)。见 docs/threema-setup.md。',
 
   loginMethodPrompt: ({ max }) => `请选择 1-${max} (Enter = 1): `,
   loginMethodInvalid: ({ max }) => `请输入 1 到 ${max} 之间的数字。`,
@@ -158,6 +159,9 @@ export const zh = {
   zaloQrExpired: ({ attempt, max }) => `二维码已过期。正在生成新的二维码 (${attempt}/${max})。`,
   zaloQrGaveUp: '二维码过期次数过多。请重新登录。',
   zaloQrDeclined: 'Zalo 登录在手机上被拒绝。',
+  threemaIdPrompt: 'Threema Gateway ID (8 个字符，以 * 开头，例如 *ABCDEFG): ',
+  threemaSecretPrompt: 'Threema Gateway API 密钥 (输入时不显示): ',
+  threemaIdInvalid: 'Gateway ID 是 "*" 加 7 个大写字母或数字，例如 *ABCDEFG。请重试。',
   telegramPhonePrompt: 'Telegram 手机号码 (国际格式，例如 +84901234567): ',
   telegramCodePrompt: 'Telegram 发送的登录验证码 (输入时不显示): ',
   telegramPasswordPrompt: '两步验证密码 (输入时不显示): ',

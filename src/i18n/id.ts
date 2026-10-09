@@ -68,6 +68,7 @@ export const id = {
   hintTelegram: 'Telegram akan meminta: nomor telepon (+84...), kode masuk (tidak tampil saat diketik), dan kata sandi dua langkah jika ada.',
   hintViber: 'Viber memerlukan ponsel Android yang terhubung dengan kabel USB (lihat docs/viber-setup.md).',
   hintLine: 'LINE akan memandu Anda di layar (lihat docs/line-setup.md).',
+  hintThreema: 'Threema akan meminta: Gateway ID (diawali *, 8 karakter) dan rahasianya (tidak tampil saat diketik). Lihat docs/threema-setup.md.',
 
   loginMethodPrompt: ({ max }) => `Pilih 1-${max} (Enter = 1): `,
   loginMethodInvalid: ({ max }) => `Ketik angka dari 1 sampai ${max}.`,
@@ -161,6 +162,9 @@ export const id = {
   zaloQrExpired: ({ attempt, max }) => `Kode QR kedaluwarsa. Membuat kode baru (${attempt}/${max}).`,
   zaloQrGaveUp: 'Kode QR terlalu sering kedaluwarsa. Jalankan login lagi.',
   zaloQrDeclined: 'Login Zalo ditolak di ponsel.',
+  threemaIdPrompt: 'Gateway ID Threema (8 karakter, diawali *, contoh *ABCDEFG): ',
+  threemaSecretPrompt: 'Rahasia API Threema Gateway (tidak tampil saat diketik): ',
+  threemaIdInvalid: 'Gateway ID adalah "*" diikuti 7 huruf kapital atau angka, contoh *ABCDEFG. Coba lagi.',
   telegramPhonePrompt: 'Nomor telepon Telegram (format internasional, contoh +84901234567): ',
   telegramCodePrompt: 'Kode masuk yang dikirim Telegram (tidak tampil saat diketik): ',
   telegramPasswordPrompt: 'Kata sandi verifikasi dua langkah (tidak tampil saat diketik): ',

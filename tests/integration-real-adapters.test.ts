@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { main } from '../src/cli.ts';
 import { APPS } from '../src/types.ts';
+import { reportLine } from './helpers/report-rows.ts';
 
 // Runs the five REAL adapters (no injection) against account directories that have no
 // credentials. Nothing reaches the network: every adapter must fail closed before connecting,
@@ -49,7 +50,10 @@ describe('real adapters without credentials', () => {
     expect(log).toMatch(/zalo: acc: error.*login zalo --account acc/);
     expect(log).toMatch(/viber: acc: error.*"registeredQuery" is required/);
     expect(log).toMatch(/line: acc: error.*login line --account acc/);
-    expect(readFileSync(out, 'utf8').split('\n')[1]).toBe('0901234567,+84901234567,VN,unknown,unknown,unknown,unknown,unknown' + ','.repeat(11));
+    expect(log).toMatch(/threema: acc: error.*login threema --account acc/);
+    expect(readFileSync(out, 'utf8').split('\n')[1]).toBe(
+      reportLine({ input: '0901234567', e164: '+84901234567', country: 'VN', statuses: {}, otherwise: 'unknown' }),
+    );
     // Nothing was conclusive: the run must say so loudly instead of looking finished.
     expect(log).toContain('INCOMPLETE');
     expect(log).toContain('no_accounts');

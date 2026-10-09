@@ -88,6 +88,18 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     options: {},
     maxParallelAccounts: 1,
   },
+  // Threema Gateway publishes no lookup limit: these are conservative guesses (docs/threema-setup.md).
+  threema: {
+    enabled: false,
+    batchSize: 1,
+    dailyCap: 100,
+    minIntervalMs: 5_000,
+    jitterMs: 5_000,
+    rateLimitCooldownMs: HOUR,
+    errorCooldownMs: 10 * MINUTE,
+    options: {},
+    maxParallelAccounts: 1,
+  },
 };
 
 export const DEFAULT_CONFIG_FILE = 'checker.config.json';

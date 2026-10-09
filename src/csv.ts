@@ -33,7 +33,7 @@ export interface ParseOptions {
 
 /** Header words that identify a phone column, matched on lower-cased, accent-stripped text. */
 const HEADER_HINT =
-  /\b(phone|mobile|tel|telephone|cell|cellphone|msisdn|gsm|sdt|sodt|zalo|whatsapp|viber)\b|dien thoai|di dong/;
+  /\b(phone|mobile|tel|telephone|cell|cellphone|msisdn|gsm|sdt|sodt|zalo|whatsapp|viber|threema)\b|dien thoai|di dong/;
 
 /** Rows sampled when guessing the phone column from content. */
 const SAMPLE_ROWS = 200;

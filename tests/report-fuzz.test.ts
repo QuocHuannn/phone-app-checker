@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { formatReportCsv, neutralizeFormula, REPORT_COLUMNS, writeReport, type ReportRow } from '../src/report.ts';
 import { normalizePhone } from '../src/phone.ts';
 import { Prng } from './helpers/prng.ts';
-import { reportRows } from './helpers/report-rows.ts';
+import { reportRows, SAMPLE_STATUSES, statusesFor } from './helpers/report-rows.ts';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -32,7 +32,7 @@ function row(input: string, e164 = '', overrides: Partial<ReportRow> = {}): Repo
     input,
     e164,
     country: e164 === '' ? '' : 'VN',
-    statuses: e164 === '' ? { telegram: 'invalid', whatsapp: 'invalid', zalo: 'invalid', viber: 'invalid', line: 'invalid' } : { telegram: 'yes', whatsapp: 'not_found', zalo: 'unknown', viber: 'skipped', line: 'skipped' },
+    statuses: e164 === '' ? statusesFor({}, 'invalid') : SAMPLE_STATUSES,
     observations: {},
     lastCheckedAt: undefined,
     ...overrides,
@@ -112,8 +112,8 @@ describe('formula escaping fuzz', () => {
   });
 
   it('is deterministic whatever the order of the status keys', () => {
-    const a = row('x', '+84901234567', { statuses: { telegram: 'yes', whatsapp: 'no_such' as never, zalo: 'unknown', viber: 'skipped', line: 'skipped' } });
-    const b = row('x', '+84901234567', { statuses: { line: 'skipped', viber: 'skipped', zalo: 'unknown', whatsapp: 'no_such' as never, telegram: 'yes' } });
+    const a = row('x', '+84901234567', { statuses: { ...SAMPLE_STATUSES, whatsapp: 'no_such' as never } });
+    const b = row('x', '+84901234567', { statuses: Object.fromEntries(Object.entries({ ...SAMPLE_STATUSES, whatsapp: 'no_such' }).reverse()) as typeof SAMPLE_STATUSES });
     expect(formatReportCsv([a])).toBe(formatReportCsv([b]));
   });
 });

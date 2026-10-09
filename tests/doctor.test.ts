@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -100,6 +100,55 @@ describe('runDoctor', () => {
     addAccount('telegram');
     const checks = byName(await runDoctor(input({ env: { TELEGRAM_API_ID: '12345', TELEGRAM_API_HASH: 'abcdef' } })));
     expect(checks.telegram).toMatchObject({ level: 'ok' });
+  });
+
+  describe('threema credentials', () => {
+    function threemaFile(content: string | undefined, mode = 0o600): string {
+      const dir = join(home, 'data', 'sessions', 'threema', 'default');
+      mkdirSync(dir, { recursive: true });
+      const file = join(dir, 'credentials.json');
+      if (content !== undefined) {
+        writeFileSync(file, content);
+        chmodSync(file, mode);
+      }
+      return file;
+    }
+
+    it('is disabled by default and needs no package (first-party adapter)', async () => {
+      writeConfig({});
+      const checks = byName(await runDoctor(input()));
+      expect(checks.threema).toMatchObject({ level: 'ok', detail: 'disabled (adapter available)' });
+    });
+
+    it('loads in --deep mode', async () => {
+      writeConfig({});
+      const loaded: App[] = [];
+      await runDoctor(input({ deep: true, loadAdapter: async (app) => (loaded.push(app), fakeAdapter(app)) }));
+      expect(loaded).toContain('threema');
+    });
+
+    it('is ok when the account has a private credentials file', async () => {
+      writeConfig({ apps: { threema: { enabled: true } } });
+      threemaFile('{}');
+      expect(byName(await runDoctor(input())).threema).toMatchObject({ level: 'ok' });
+    });
+
+    it('warns when the account directory has no credentials file', async () => {
+      writeConfig({ apps: { threema: { enabled: true } } });
+      threemaFile(undefined);
+      const check = byName(await runDoctor(input())).threema;
+      expect(check).toMatchObject({ level: 'warn' });
+      expect(check?.detail).toContain('login threema --account default');
+    });
+
+    it('warns when the credentials file can be read by other users', async () => {
+      writeConfig({ apps: { threema: { enabled: true } } });
+      threemaFile('{}', 0o644);
+      const check = byName(await runDoctor(input())).threema;
+      expect(check).toMatchObject({ level: 'warn' });
+      expect(check?.detail).toContain('readable by others');
+      expect(check?.detail).toContain('chmod 600');
+    });
   });
 
   it('fails when Viber is enabled and adb is missing', async () => {

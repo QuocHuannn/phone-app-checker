@@ -68,6 +68,7 @@ export const vi = {
   hintTelegram: 'Telegram sẽ hỏi: số điện thoại (+84...), mã đăng nhập (không hiện khi gõ), mật khẩu 2 bước nếu có.',
   hintViber: 'Viber cần điện thoại Android nối cáp USB (xem docs/viber-setup.md).',
   hintLine: 'LINE sẽ hướng dẫn trên màn hình (xem docs/line-setup.md).',
+  hintThreema: 'Threema sẽ hỏi: Gateway ID (bắt đầu bằng *, 8 ký tự) và mã bí mật của nó (không hiện khi gõ). Xem docs/threema-setup.md.',
 
   loginMethodPrompt: ({ max }) => `Chọn 1-${max} (Enter = 1): `,
   loginMethodInvalid: ({ max }) => `Hãy gõ một số từ 1 đến ${max}.`,
@@ -161,6 +162,9 @@ export const vi = {
   zaloQrExpired: ({ attempt, max }) => `Mã QR đã hết hạn. Đang tạo mã mới (${attempt}/${max}).`,
   zaloQrGaveUp: 'Mã QR đã hết hạn quá nhiều lần. Hãy đăng nhập lại.',
   zaloQrDeclined: 'Đăng nhập Zalo đã bị từ chối trên điện thoại.',
+  threemaIdPrompt: 'Gateway ID của Threema (8 ký tự, bắt đầu bằng *, ví dụ *ABCDEFG): ',
+  threemaSecretPrompt: 'Mã bí mật API của Threema Gateway (không hiện khi gõ): ',
+  threemaIdInvalid: 'Gateway ID gồm dấu "*" và 7 chữ cái in hoa hoặc chữ số, ví dụ *ABCDEFG. Hãy thử lại.',
   telegramPhonePrompt: 'Số điện thoại Telegram (dạng quốc tế, ví dụ +84901234567): ',
   telegramCodePrompt: 'Mã đăng nhập Telegram gửi đến (không hiện khi gõ): ',
   telegramPasswordPrompt: 'Mật khẩu xác minh 2 bước (không hiện khi gõ): ',

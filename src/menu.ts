@@ -39,7 +39,7 @@ const BACK_CHAR = /^b$/i;
  * deep links are short and LINE's are URLs, so theirs are estimated — being off by a version step changes
  * the announced need by a couple of rows, never the flow. Viber pairs over adb: no QR at all.
  */
-const QR_MAX_MODULES: Record<App, number> = { telegram: 49, whatsapp: 61, zalo: 61, line: 45, viber: 0 };
+const QR_MAX_MODULES: Record<App, number> = { telegram: 49, whatsapp: 61, zalo: 61, line: 45, viber: 0, threema: 0 };
 
 /** Outcome of one CLI command run from the menu; `error` is already terminal-safe. */
 export interface CommandResult {
@@ -594,6 +594,7 @@ const LOGIN_HINTS: Partial<Record<App, MessageKey>> = {
   telegram: 'hintTelegram',
   viber: 'hintViber',
   line: 'hintLine',
+  threema: 'hintThreema',
 };
 
 /** `undefined` when the user types `b` to go back; the name (or the default) otherwise. */

@@ -68,6 +68,7 @@ export const ko = {
   hintTelegram: 'Telegram이 전화번호(+84...), 로그인 코드(입력할 때 표시되지 않음), 그리고 있다면 2단계 인증 비밀번호를 물어봅니다.',
   hintViber: 'Viber는 USB 케이블로 연결된 Android 휴대폰이 필요합니다 (docs/viber-setup.md 참고).',
   hintLine: 'LINE은 화면에서 안내합니다 (docs/line-setup.md 참고).',
+  hintThreema: 'Threema가 Gateway ID(*로 시작, 8자)와 그 비밀 키(입력할 때 표시되지 않음)를 물어봅니다 (docs/threema-setup.md 참고).',
 
   loginMethodPrompt: ({ max }) => `1-${max} 중에서 선택하세요 (Enter = 1): `,
   loginMethodInvalid: ({ max }) => `1부터 ${max}까지의 숫자를 입력하세요.`,
@@ -161,6 +162,9 @@ export const ko = {
   zaloQrExpired: ({ attempt, max }) => `QR 코드가 만료되었습니다. 새 코드를 만듭니다 (${attempt}/${max}).`,
   zaloQrGaveUp: 'QR 코드가 너무 많이 만료되었습니다. 로그인을 다시 실행하세요.',
   zaloQrDeclined: '휴대폰에서 Zalo 로그인이 거부되었습니다.',
+  threemaIdPrompt: 'Threema Gateway ID (8자, *로 시작, 예: *ABCDEFG): ',
+  threemaSecretPrompt: 'Threema Gateway API 비밀 키 (입력할 때 표시되지 않음): ',
+  threemaIdInvalid: 'Gateway ID는 "*" 뒤에 대문자 또는 숫자 7자가 옵니다. 예: *ABCDEFG. 다시 시도하세요.',
   telegramPhonePrompt: 'Telegram 전화번호 (국제 형식, 예: +84901234567): ',
   telegramCodePrompt: 'Telegram이 보낸 로그인 코드 (입력할 때 표시되지 않음): ',
   telegramPasswordPrompt: '2단계 인증 비밀번호 (입력할 때 표시되지 않음): ',

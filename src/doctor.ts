@@ -1,8 +1,10 @@
+import { statSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { AdbError, type AdbDevice } from './android/adb.ts';
 import { readTelegramCredentials } from './adapters/telegram-credentials.ts';
-import { listAccountNames, type Config } from './config.ts';
+import { accountDirPath, listAccountNames, type Config } from './config.ts';
 import { packageVersion, readBuildInfo } from './home.ts';
 import { plural } from './plural.ts';
 import { Store } from './store.ts';
@@ -44,6 +46,7 @@ const ADAPTER_PACKAGE: Record<App, string | undefined> = {
   zalo: 'zca-js',
   viber: undefined,
   line: '@evex/linejs',
+  threema: undefined,
 };
 
 const requireForPackages = createRequire(import.meta.url);
@@ -136,6 +139,21 @@ async function adbProblem(config: Config, input: DoctorInput): Promise<{ level: 
   }
 }
 
+/**
+ * Threema keeps `{gatewayId, secret}` in `credentials.json` inside each account directory. A missing
+ * file means that account never finished login; a group/world-readable one exposes the Gateway secret.
+ */
+function threemaCredentialProblems(config: Config): string[] {
+  const problems: string[] = [];
+  for (const name of listAccountNames(config, 'threema')) {
+    const file = join(accountDirPath(config, 'threema', name), 'credentials.json');
+    const stat = statSync(file, { throwIfNoEntry: false });
+    if (stat === undefined) problems.push(`account "${name}" has no credentials.json: run login threema --account ${name}`);
+    else if ((stat.mode & 0o077) !== 0) problems.push(`account "${name}" credentials.json is readable by others (mode ${(stat.mode & 0o777).toString(8)}): run chmod 600 on it`);
+  }
+  return problems;
+}
+
 async function appCheck(app: App, config: Config, input: DoctorInput): Promise<DoctorCheck> {
   // Shallow (default): the adapter's client package must only resolve, which is ~1 ms; deep
   // (`doctor --deep`) imports the module like doctor always did before 0.2.0.
@@ -166,6 +184,7 @@ async function appCheck(app: App, config: Config, input: DoctorInput): Promise<D
     if (problem?.level === 'fail') failure = problem.detail;
     else if (problem !== undefined) warnings.push(problem.detail);
   }
+  if (app === 'threema') warnings.push(...threemaCredentialProblems(config));
   if (failure !== undefined) return { name: app, level: 'fail', detail: [failure, ...warnings].join('; ') };
   if (warnings.length > 0) return { name: app, level: 'warn', detail: warnings.join('; ') };
   return { name: app, level: 'ok', detail: `${available}; ${plural(accounts, 'account')}` };

@@ -406,7 +406,8 @@ export function summarize(rows: ReportRow[]): ReportSummary {
   }
   const yesByCountry = new Map<string, Record<App, number>>();
   let invalid = 0;
-  const stale: Record<App, number> = { telegram: 0, whatsapp: 0, zalo: 0, viber: 0, line: 0 };
+  const zeroCounts = (): Record<App, number> => Object.fromEntries(APPS.map((app) => [app, 0])) as Record<App, number>;
+  const stale = zeroCounts();
   for (const row of rows) {
     if (row.e164 === '') invalid += 1;
     for (const app of APPS) {
@@ -416,7 +417,7 @@ export function summarize(rows: ReportRow[]): ReportSummary {
       if (status !== 'yes') continue;
       let counts = yesByCountry.get(row.country);
       if (!counts) {
-        counts = { telegram: 0, whatsapp: 0, zalo: 0, viber: 0, line: 0 };
+        counts = zeroCounts();
         yesByCountry.set(row.country, counts);
       }
       counts[app] += 1;

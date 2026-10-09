@@ -8,6 +8,8 @@ export const APP_SCOPE: Record<App, (n: PhoneNumber) => boolean> = {
   zalo: (n) => n.country === 'VN',
   viber: () => true,
   line: () => true,
+  // Threema's lookup is by phone hash and works for any region; only users who linked a number are found.
+  threema: () => true,
 };
 
 /**
@@ -29,6 +31,8 @@ export async function loadAdapter(app: App): Promise<Adapter> {
         return (await import('./viber.ts')).viberAdapter;
       case 'line':
         return (await import('./line.ts')).lineAdapter;
+      case 'threema':
+        return (await import('./threema.ts')).threemaAdapter;
     }
   } catch (error) {
     throw new Error(`Cannot load the ${app} adapter: ${(error as Error).message}`, { cause: error });

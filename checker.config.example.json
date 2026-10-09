@@ -79,6 +79,17 @@
         "loginMode": "qr",
         "device": "DESKTOPWIN"
       }
+    },
+    "threema": {
+      "enabled": false,
+      "batchSize": 1,
+      "dailyCap": 100,
+      "minIntervalMs": 5000,
+      "jitterMs": 5000,
+      "rateLimitCooldownMs": 3600000,
+      "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
+      "options": {}
     }
   }
 }

@@ -9,7 +9,7 @@ import { saveTelegramCredentials } from '../src/config-write.ts';
 import { DOCTOR_FOOTER } from '../src/doctor.ts';
 import { LANGS, LANGUAGE_LABEL, LANGUAGE_NAMES, translate, type Lang, type MessageArgs, type MessageKey } from '../src/i18n/index.ts';
 import { isInteractive, normalizeDroppedPath, parseYesNo, runMenu, type CommandResult, type MenuHost } from '../src/menu.ts';
-import type { Adapter, App } from '../src/types.ts';
+import { APPS, type Adapter, type App } from '../src/types.ts';
 import { scriptedTerminal, type ScriptedTerminal } from './helpers/menu-io.ts';
 
 const REPO = resolve(import.meta.dirname, '..');
@@ -879,8 +879,11 @@ describe('language', () => {
     it('prints the login list without padding, so wide characters cannot misalign it', async () => {
       const f = fixture(['2', '', '0'], { accounts: { telegram: ['a', 'b'] }, host: { langFlag: lang } });
       await runMenu(f.host);
-      const lines = f.screen().split('\n').filter((line) => /^ {2}\d\. (telegram|whatsapp|zalo|viber|line):/.test(line));
-      expect(lines).toHaveLength(5);
+      const lines = f.screen().split('\n').filter((line) => {
+        const match = /^ {2}\d\. ([a-z]+):/.exec(line);
+        return match !== null && match[1] !== undefined && (APPS as readonly string[]).includes(match[1]);
+      });
+      expect(lines).toHaveLength(APPS.length);
       for (const line of lines) expect(line.slice(2)).not.toMatch(/ {2}/);
       expect(lines[0]).toBe(`  1. telegram: ${msg('appLoggedIn', { count: 2, names: 'a, b' })}`);
       expect(lines[1]).toBe(`  2. whatsapp: ${msg('appNotSetUp')}`);

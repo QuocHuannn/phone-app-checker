@@ -94,13 +94,14 @@ main() {
   for required in "$name/runtime/bin/node" "$name/runtime/LICENSE" "$name/phone-app-checker" "$name/install.sh" \
     "$name/uninstall.sh" "$name/INSTALL.md" "$name/INSTALL.vi.md" "$name/LICENSE" "$name/THIRD_PARTY_LICENSES.md" \
     "$name/VERSION" "$name/app/BUILD-INFO.json" \
-    "$name/app/bin/phone-app-checker.js" "$name/app/checker.config.example.json" \
+    "$name/app/bin/phone-app-checker.js" "$name/app/src/cli.js" "$name/app/checker.config.example.json" \
     "$name/app/node_modules/better-sqlite3/build/Release/better_sqlite3.node"; do
     grep -qxF "$required" "$T/listing.txt" || fail $id $label "missing from archive: $required"
   done
   forbidden="$(grep -E -e '/checker\.config\.json$' -e '\.csv$' -e '/\.env(\.[^/]*)?/?$' -e '\.map$' -e '/\.DS_Store$' \
     -e "^$name/data(/|$)" -e "^$name/app/data(/|$)" -e "^$name/app/tests(/|$)" \
-    -e "^$name/app/node_modules/vitest(/|$)" -e "^$name/app/node_modules/typescript(/|$)" "$T/listing.txt" || true)"
+    -e "^$name/app/node_modules/vitest(/|$)" -e "^$name/app/node_modules/typescript(/|$)" \
+    -e "^$name/app/(src|bin)/.*\.ts$" "$T/listing.txt" || true)"
   [ -z "$forbidden" ] || fail $id $label "forbidden entries in archive: $(printf '%s' "$forbidden" | head -n 5 | tr '\n' ' ')"
   # streaming verbose listing: modes, entry types, link confinement (no extraction, no size limit)
   tar -tzvf "$archive" >"$T/listing-verbose.txt" || fail $id $label "tar -tzvf failed"
@@ -179,11 +180,16 @@ main() {
 
   # --- V10 doctor --------------------------------------------------------------
   id=V10 label=doctor
-  crp phone-app-checker doctor >"$T/doctor.log" 2>&1 || fail $id $label "doctor exited non-zero" "$T/doctor.log"
+  # --deep imports every adapter module: the bundle's compiled JS is what gets integrity-checked.
+  crp phone-app-checker doctor --deep >"$T/doctor.log" 2>&1 || fail $id $label "doctor --deep exited non-zero" "$T/doctor.log"
   node_expected="$(/usr/bin/plutil -extract node raw -o - "$installed/app/BUILD-INFO.json")"
   awk -v want="node $node_expected, darwin/arm64" '$2 == "runtime" && index($0, want) { found = 1 } END { exit found ? 0 : 1 }' "$T/doctor.log" \
     || fail $id $label "runtime row does not show 'node $node_expected, darwin/arm64'" "$T/doctor.log"
-  for app in telegram whatsapp zalo viber line; do
+  # The app list comes from the bundle itself, so a new adapter is verified without editing this script.
+  apps="$(cd "$installed/app" && "$installed/runtime/bin/node" -e 'const { APPS } = require("./src/types.js"); process.stdout.write(APPS.join("\n") + "\n")' 2>"$log")" \
+    || fail $id $label "cannot read the app list from the bundle's src/types.js" "$log"
+  [ -n "$apps" ] || fail $id $label "app list from src/types.js is empty"
+  for app in $apps; do
     row="$(awk -v app="$app" '$2 == app { print $1; exit }' "$T/doctor.log")"
     [ -n "$row" ] || fail $id $label "no doctor row for $app" "$T/doctor.log"
     [ "$row" != "FAIL" ] || fail $id $label "doctor row for $app is FAIL" "$T/doctor.log"

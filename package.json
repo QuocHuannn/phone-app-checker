@@ -33,12 +33,15 @@
   "scripts": {
     "cli": "node --disable-warning=ExperimentalWarning src/cli.ts",
     "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "smoke": "node --disable-warning=ExperimentalWarning tests/smoke/cli-smoke.ts",
     "release:build": "bash scripts/build-release.sh",
     "release:verify": "bash scripts/verify-release.sh",
     "licenses": "node scripts/generate-third-party-licenses.mjs",
-    "licenses:check": "node scripts/generate-third-party-licenses.mjs --check"
+    "licenses:check": "node scripts/generate-third-party-licenses.mjs --check",
+    "bench": "node --disable-warning=ExperimentalWarning bench/run.ts",
+    "bench:startup": "node --disable-warning=ExperimentalWarning bench/startup.ts"
   },
   "engines": {
     "node": ">=22.18.0"

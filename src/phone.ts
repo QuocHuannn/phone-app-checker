@@ -1,10 +1,30 @@
-import { getCountryCallingCode, parseDigits, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
+import { createRequire } from 'node:module';
+import type {
+  CountryCode,
+  getCountryCallingCode,
+  parseDigits,
+  parsePhoneNumberFromString,
+  PhoneNumber as ParsedPhoneNumber,
+} from 'libphonenumber-js/max';
 import type { PhoneNumber } from './types.ts';
 
-type Parsed = NonNullable<ReturnType<typeof parsePhoneNumberFromString>>;
+/**
+ * libphonenumber costs ~20 ms to load and is only needed once a phone number is actually parsed
+ * (r2 §4.9), so `--help`, `-V` and friends must not pay for it. The CJS entry keeps the synchronous
+ * API; the exports map resolves `libphonenumber-js/max` to `max/index.cjs`.
+ */
+type Lib = {
+  parseDigits: typeof parseDigits;
+  parsePhoneNumberFromString: typeof parsePhoneNumberFromString;
+  getCountryCallingCode: typeof getCountryCallingCode;
+};
+let lib: Lib | undefined;
+const lp = (): Lib => (lib ??= createRequire(import.meta.url)('libphonenumber-js/max') as Lib);
+
+type Parsed = ParsedPhoneNumber;
 
 function parseValid(text: string, region: string, sameCallingCode?: string): Parsed | null {
-  const parsed = parsePhoneNumberFromString(text, region as CountryCode);
+  const parsed = lp().parsePhoneNumberFromString(text, region as CountryCode);
   if (!parsed || !parsed.isValid()) return null;
   if (sameCallingCode !== undefined && parsed.countryCallingCode !== sameCallingCode) return null;
   return parsed;
@@ -23,7 +43,7 @@ function isMobile(parsed: Parsed): boolean {
 /** Calling code of `region`, or undefined when libphonenumber does not know the region. */
 function callingCode(region: string): string | undefined {
   try {
-    return getCountryCallingCode(region as CountryCode);
+    return lp().getCountryCallingCode(region as CountryCode);
   } catch {
     return undefined;
   }
@@ -57,7 +77,7 @@ export function normalizePhone(raw: string, defaultRegion: string): PhoneNumber 
   // every later check sees the same characters a human sees.
   let text = raw
     .replace(/\p{Cf}/gu, '')
-    .replace(/\p{Nd}/gu, (digit) => parseDigits(digit))
+    .replace(/\p{Nd}/gu, (digit) => lp().parseDigits(digit))
     .replace(/\uFF0B/g, '+')
     // Tabs, thin and narrow no-break spaces and line breaks inside a cell are plain separators.
     .replace(/\s+/g, ' ')

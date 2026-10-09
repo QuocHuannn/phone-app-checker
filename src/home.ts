@@ -1,5 +1,5 @@
-import { closeSync, constants, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, unlinkSync, writeSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { closeSync, constants, existsSync, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, unlinkSync, writeSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_CONFIG_FILE } from './config.ts';
 import { assertSafeAppRoot } from './paths.ts';
@@ -7,7 +7,32 @@ import { assertSafeAppRoot } from './paths.ts';
 /** Open flag that refuses to follow a symlink in the last path component (POSIX only). */
 const NOFOLLOW = constants.O_NOFOLLOW ?? 0;
 
-const packageRoot = (name: string): string => fileURLToPath(new URL(`../${name}`, import.meta.url));
+/**
+ * Directory that holds the package files (`package.json`, `checker.config.example.json`,
+ * `BUILD-INFO.json`). A source checkout keeps this module at `src/home.ts` (parent is the root);
+ * `npm run build` emits it to `build/js/src/home.js` (root is `build/js`) and the release bundle
+ * stages it at `app/src/home.js` (root is `app`). Walk up to the nearest package.json named
+ * `phone-app-checker` so all three layouts resolve.
+ */
+const findPackageRoot = (): string => {
+  let dir = fileURLToPath(new URL('.', import.meta.url));
+  for (;;) {
+    const file = join(dir, 'package.json');
+    if (existsSync(file)) {
+      try {
+        const pkg: unknown = JSON.parse(readFileSync(file, 'utf8'));
+        if (typeof pkg === 'object' && pkg !== null && 'name' in pkg && pkg.name === 'phone-app-checker') return dir;
+      } catch {
+        // Unreadable or malformed package.json: keep walking up.
+      }
+    }
+    const parent = dirname(dir);
+    if (parent === dir) throw new Error(`no phone-app-checker package.json found above ${fileURLToPath(import.meta.url)}`);
+    dir = parent;
+  }
+};
+let packageRootDir: string | undefined;
+const packageRoot = (name: string): string => join((packageRootDir ??= findPackageRoot()), name);
 
 /** The example config shipped next to `src/` (in a checkout and in the release bundle alike). */
 export function exampleConfigPath(): string {

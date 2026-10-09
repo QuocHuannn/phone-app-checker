@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AdbError } from '../src/android/adb.ts';
 import { loadConfig } from '../src/config.ts';
 import { DOCTOR_FOOTER, formatDoctor, runDoctor, type DoctorCheck, type DoctorInput } from '../src/doctor.ts';
-import type { Adapter, App } from '../src/types.ts';
+import { APPS, type Adapter, type App } from '../src/types.ts';
 
 let home: string;
 
@@ -57,7 +57,7 @@ describe('runDoctor', () => {
     });
     for (const app of ['telegram', 'whatsapp', 'zalo', 'viber'] as const) addAccount(app);
     const checks = await runDoctor(input());
-    expect(checks.map((c) => c.name)).toEqual(['version', 'runtime', 'sqlite', 'config', 'data', 'telegram', 'whatsapp', 'zalo', 'viber', 'line']);
+    expect(checks.map((c) => c.name)).toEqual(['version', 'runtime', 'sqlite', 'config', 'data', ...APPS]);
     expect(checks.filter((c) => c.level !== 'ok')).toEqual([]);
     const named = byName(checks);
     expect(named.version?.detail).toContain('0.1.0');
@@ -65,14 +65,15 @@ describe('runDoctor', () => {
     expect(named.runtime?.detail).toContain(process.versions.node);
     expect(named.config?.detail).toBe(`${join(home, 'checker.config.json')} (exists)`);
     expect(named.data?.detail).toBe(join(home, 'data'));
-    expect(named.line?.detail).toBe('disabled (module loads)');
-    expect(named.telegram?.detail).toBe('module loads; 1 account');
+    expect(named.line?.detail).toBe('disabled (adapter package installed)');
+    expect(named.telegram?.detail).toBe('adapter package installed; 1 account');
   });
 
-  it('fails when an adapter module cannot be loaded, even a disabled one', async () => {
+  it('fails when an adapter module cannot be loaded, even a disabled one (--deep)', async () => {
     writeConfig({});
     const checks = await runDoctor(
       input({
+        deep: true,
         loadAdapter: async (app) => {
           if (app === 'line') throw new Error('Cannot load the line adapter: boom');
           return fakeAdapter(app);
@@ -167,7 +168,7 @@ describe('runDoctor', () => {
     const checks = byName(
       await runDoctor(
         input({
-          loadAdapter: async () => {
+          resolveAdapter: () => {
             throw new Error(`boom with ${hash} inside`);
           },
         }),
@@ -183,6 +184,60 @@ describe('runDoctor', () => {
     symlinkSync(target, join(home, 'data'));
     const checks = byName(await runDoctor(input()));
     expect(checks.data?.level).toBe('fail');
+  });
+
+  it('default doctor resolves adapter packages and never imports an adapter module', async () => {
+    writeConfig({});
+    const resolved: App[] = [];
+    const loaded: App[] = [];
+    const checks = await runDoctor(
+      input({
+        resolveAdapter: (app) => {
+          resolved.push(app);
+        },
+        loadAdapter: async (app) => {
+          loaded.push(app);
+          return fakeAdapter(app);
+        },
+      }),
+    );
+    expect(resolved).toEqual([...APPS]);
+    expect(loaded).toEqual([]);
+    expect(byName(checks).whatsapp).toMatchObject({ level: 'warn' });
+  });
+
+  it('--deep loads every adapter module instead of resolving packages', async () => {
+    writeConfig({});
+    const loaded: App[] = [];
+    const resolved: App[] = [];
+    await runDoctor(
+      input({
+        deep: true,
+        resolveAdapter: (app) => {
+          resolved.push(app);
+        },
+        loadAdapter: async (app) => {
+          loaded.push(app);
+          return fakeAdapter(app);
+        },
+      }),
+    );
+    expect(loaded).toEqual([...APPS]);
+    expect(resolved).toEqual([]);
+  });
+
+  it('fails an app whose adapter package cannot be resolved (shallow)', async () => {
+    writeConfig({});
+    const checks = await runDoctor(
+      input({
+        resolveAdapter: (app) => {
+          if (app === 'zalo') throw new Error(`Cannot find module 'zca-js'`);
+        },
+      }),
+    );
+    expect(byName(checks).zalo).toMatchObject({ level: 'fail' });
+    expect(byName(checks).zalo?.detail).toContain("Cannot find module 'zca-js'");
+    expect(byName(checks).telegram?.level).not.toBe('fail');
   });
 });
 

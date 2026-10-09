@@ -49,6 +49,8 @@ const STOP_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 /** Injection points for tests; production uses the defaults. */
 export interface CliDeps {
   loadAdapter?: (app: App) => Promise<Adapter>;
+  /** Package-resolution probe `doctor` uses by default (production default: resolve each adapter's package). */
+  resolveAdapter?: (app: App) => void;
   now?: () => number;
   sleep?: SchedulerOptions['sleep'];
   random?: () => number;
@@ -493,8 +495,9 @@ export function createProgram(deps: CliDeps = {}): Command {
 
   program
     .command('doctor')
-    .description('Check runtime, config, data directory and every adapter; exit 1 when something blocks use')
-    .action(guarded(async () => {
+    .description('Check runtime, config, data directory and adapters; exit 1 when a check reports FAIL')
+    .option('--deep', 'load every adapter module as well (default only resolves each adapter package)')
+    .action(guarded(async (options: { deep?: boolean }) => {
       const explicit = program.opts<GlobalOptions>().config;
       let setupError: unknown;
       try {
@@ -513,6 +516,8 @@ export function createProgram(deps: CliDeps = {}): Command {
           return loadConfig(explicit, home);
         },
         loadAdapter,
+        resolveAdapter: deps.resolveAdapter,
+        deep: options.deep === true,
         listDevices: adbDevices,
         env,
       });
@@ -551,7 +556,6 @@ async function execute(argv: string[], deps: CliDeps): Promise<{ code: number; e
 function menuHost(io: PromptIo, deps: CliDeps, langFlag?: string): MenuHost {
   const env = deps.env ?? process.env;
   const home = env[HOME_ENV] || undefined;
-  const log = deps.log ?? ((message: string) => console.error(message));
   const lifecycle = deps.lifecycleDir ?? lifecycleDir(env.HOME || undefined);
   const appHome = home === undefined ? undefined : resolve(home);
   const languageFile = appHome === undefined ? undefined : join(appHome, LANG_FILE);

@@ -1,0 +1,15 @@
+{
+  // Compiled build for the release bundle and `npm run build` (v0.2.0): emits JS to build/js with
+  // the repo layout (build/js/bin/phone-app-checker.js, build/js/src/**). allowJs carries the .js
+  // bin entry through and rewriteRelativeImportExtensions rewrites the .ts specifiers inside it
+  // and in every src module.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowJs": true,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": ".",
+    "outDir": "build/js"
+  },
+  "include": ["src/**/*.ts", "bin/**/*.js"]
+}

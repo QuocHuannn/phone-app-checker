@@ -174,7 +174,7 @@ describe.skipIf(process.platform !== 'darwin')('release scripts', () => {
       expect(profile).toContain('export PATH="$HOME/.local/bin:$PATH"');
 
       const calls = logged();
-      expect(calls.map((c) => c.argv)).toEqual([['--version'], ['doctor']]);
+      expect(calls.map((c) => c.argv)).toEqual([['--version'], ['doctor', '--deep']]);
       expect(result.stdout).toContain(join(defaultHome, 'checker.config.json'));
       expect(result.stdout).toContain('0.1.0');
       // A clean doctor is still only an offline check: the summary says so and never claims readiness.

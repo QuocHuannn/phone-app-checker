@@ -1,9 +1,24 @@
+import { createRequire } from 'node:module';
 import { en } from './en.ts';
-import { id } from './id.ts';
-import { ko } from './ko.ts';
-import { ms } from './ms.ts';
-import { vi } from './vi.ts';
-import { zh } from './zh.ts';
+
+/**
+ * Catalog loading: English is always needed (the menu's fallback and the default), the other five
+ * cost ~8 ms of startup and are only read when the run actually uses that language, so they load on
+ * first access. `require` of an ESM module keeps `translate` synchronous; the sibling file is `.ts`
+ * in a source checkout and `.js` in the compiled tree (`import.meta.url` tells which).
+ */
+const requireCatalog = createRequire(import.meta.url);
+const catalogExt = import.meta.url.endsWith('.ts') ? '.ts' : '.js';
+const catalogCache: Partial<Record<Lang, Catalog>> = {};
+function catalog(lang: Lang): Catalog {
+  if (lang === 'en') return en;
+  const cached = catalogCache[lang];
+  if (cached !== undefined) return cached;
+  const loaded = (requireCatalog(`./${lang}${catalogExt}`) as Record<Lang, Catalog>)[lang];
+  if (typeof loaded !== 'object' || loaded === null) throw new Error(`i18n catalog "${lang}" is missing or malformed`);
+  catalogCache[lang] = loaded;
+  return loaded;
+}
 
 /** Menu languages, in the order the language chooser lists them. English is the default. */
 export const LANGS = ['en', 'vi', 'id', 'ms', 'ko', 'zh'] as const;
@@ -36,7 +51,26 @@ export type Catalog = { [K in MessageKey]: (typeof en)[K] };
 export type MessageArgs<K extends MessageKey> = Catalog[K] extends (params: infer P) => string ? [params: P] : [];
 
 /** Exactly one catalog per language: a missing or extra language is a compile error. */
-export const CATALOGS: Record<Lang, Catalog> = { en, vi, id, ms, ko, zh };
+export const CATALOGS: Record<Lang, Catalog> = {
+  get en() {
+    return catalog('en');
+  },
+  get vi() {
+    return catalog('vi');
+  },
+  get id() {
+    return catalog('id');
+  },
+  get ms() {
+    return catalog('ms');
+  },
+  get ko() {
+    return catalog('ko');
+  },
+  get zh() {
+    return catalog('zh');
+  },
+};
 
 /** `value` as a language code (exact code, any case, surrounding blanks ignored), else `undefined`. */
 export function parseLang(value: string | undefined): Lang | undefined {
@@ -60,7 +94,7 @@ export function resolveLang(sources: { flag?: string; env: NodeJS.ProcessEnv; st
 /** Look a message up in `lang`'s catalog and fill in its parameters. */
 export function translate<K extends MessageKey>(lang: Lang, key: K, ...args: MessageArgs<K>): string {
   // Each function takes its own parameter type; `MessageArgs<K>` already guarantees the right one is passed.
-  const message: string | ((params: never) => string) = CATALOGS[lang][key];
+  const message: string | ((params: never) => string) = catalog(lang)[key];
   return typeof message === 'function' ? message(args[0] as never) : message;
 }
 

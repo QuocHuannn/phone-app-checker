@@ -1,5 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
-import { isSupportedCountry } from 'libphonenumber-js/max';
+import { createRequire } from 'node:module';
+import type { isSupportedCountry } from 'libphonenumber-js/max';
 import { join, resolve } from 'node:path';
 import type { App, PacingSettings } from './types.ts';
 import { APPS } from './types.ts';
@@ -82,6 +83,14 @@ export const DEFAULT_CONFIG_FILE = 'checker.config.json';
 
 /** Environment variable that switches the CLI to release mode: config and data live in this directory. */
 export const HOME_ENV = 'PHONE_APP_CHECKER_HOME';
+
+/**
+ * libphonenumber is only needed to validate `defaultRegion` when a config file is loaded; keep it
+ * off the `--help` / `-V` path (r2 §4.9; same pattern as src/phone.ts). CJS entry keeps this sync.
+ */
+type Lib = { isSupportedCountry: typeof isSupportedCountry };
+let lib: Lib | undefined;
+const lp = (): Lib => (lib ??= createRequire(import.meta.url)('libphonenumber-js/max') as Lib);
 
 const PACING_KEYS = [
   'batchSize',
@@ -212,7 +221,7 @@ export function loadConfig(path?: string, home?: string): Config {
   }
   // "UK" is not ISO (the United Kingdom is "GB"): an unknown code would silently mark every
   // national number in the CSV invalid.
-  if (!isSupportedCountry(defaultRegion)) fail(`defaultRegion "${defaultRegion}" is not a known country code (for example VN, SG, US, GB)`);
+  if (!lp().isSupportedCountry(defaultRegion)) fail(`defaultRegion "${defaultRegion}" is not a known country code (for example VN, SG, US, GB)`);
   const dataDir = raw.dataDir ?? './data';
   if (typeof dataDir !== 'string' || dataDir.trim() === '') fail('dataDir must be a non-empty string');
   const maxAgeDays = raw.maxAgeDays ?? 30;

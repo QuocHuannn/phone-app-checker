@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { DatabaseSync } from 'node:sqlite';
 import { AdbError, type AdbDevice } from './android/adb.ts';
 import { readTelegramCredentials } from './adapters/telegram-credentials.ts';
@@ -22,9 +23,37 @@ export interface DoctorInput {
   configExists: boolean;
   /** May throw: reported as a `config` failure and the config-dependent checks are skipped. */
   loadConfig: () => Config;
+  /** Imported adapter modules; only used when `deep` is set (default `doctor` never loads them). */
   loadAdapter: (app: App) => Promise<Adapter>;
+  /**
+   * Package-resolution probe used by the default (shallow) doctor for the adapter's client library.
+   * Viber has no npm package (first-party code + adb): it is never called for that app.
+   */
+  resolveAdapter?: (app: App) => void;
+  /** Import every adapter module (the pre-0.2.0 behaviour); without it only the packages' presence is checked. */
+  deep?: boolean;
   listDevices: (adbPath?: string) => Promise<AdbDevice[]>;
   env: NodeJS.ProcessEnv;
+}
+
+/** npm package that carries the app's client library; undefined when the adapter is first-party. */
+const ADAPTER_PACKAGE: Record<App, string | undefined> = {
+  telegram: '@mtcute/node',
+  whatsapp: 'baileys',
+  zalo: 'zca-js',
+  viber: undefined,
+  line: '@evex/linejs',
+};
+
+const requireForPackages = createRequire(import.meta.url);
+
+/**
+ * Default shallow probe: resolving a package entry point checks the dependency is installed without
+ * paying its import cost (tens to hundreds of ms per adapter, r2 §4.6).
+ */
+export function resolveAdapterPackage(app: App): void {
+  const pkg = ADAPTER_PACKAGE[app];
+  if (pkg !== undefined) requireForPackages.resolve(pkg);
 }
 
 const MIN_NODE = [22, 18, 0] as const;
@@ -107,13 +136,18 @@ async function adbProblem(config: Config, input: DoctorInput): Promise<{ level: 
 }
 
 async function appCheck(app: App, config: Config, input: DoctorInput): Promise<DoctorCheck> {
+  // Shallow (default): the adapter's client package must only resolve, which is ~1 ms; deep
+  // (`doctor --deep`) imports the module like doctor always did before 0.2.0.
+  const deep = input.deep === true;
   try {
-    await input.loadAdapter(app);
+    if (deep) await input.loadAdapter(app);
+    else (input.resolveAdapter ?? resolveAdapterPackage)(app);
   } catch (error) {
     return { name: app, level: 'fail', detail: message(error) };
   }
+  const available = deep ? 'module loads' : ADAPTER_PACKAGE[app] === undefined ? 'adapter available' : 'adapter package installed';
   const settings = config.apps[app];
-  if (!settings.enabled) return { name: app, level: 'ok', detail: 'disabled (module loads)' };
+  if (!settings.enabled) return { name: app, level: 'ok', detail: `disabled (${available})` };
 
   const warnings: string[] = [];
   let failure: string | undefined;
@@ -133,7 +167,7 @@ async function appCheck(app: App, config: Config, input: DoctorInput): Promise<D
   }
   if (failure !== undefined) return { name: app, level: 'fail', detail: [failure, ...warnings].join('; ') };
   if (warnings.length > 0) return { name: app, level: 'warn', detail: warnings.join('; ') };
-  return { name: app, level: 'ok', detail: `module loads; ${plural(accounts, 'account')}` };
+  return { name: app, level: 'ok', detail: `${available}; ${plural(accounts, 'account')}` };
 }
 
 /** Read-only prerequisites check (apart from `Store.open` hardening the data directory, as `report` does). */

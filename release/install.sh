@@ -568,7 +568,7 @@ main() {
   # Installing succeeded either way (files are in place and --version ran), so this does not change the
   # exit status; but a FAIL must never be followed by an unqualified success line.
   doctor_status=0
-  "$dest/phone-app-checker" doctor || doctor_status=$?
+  "$dest/phone-app-checker" doctor --deep || doctor_status=$?
   printf -- '--------------------------------\n\n'
 
   # --- 10. summary -----------------------------------------------------------
@@ -578,7 +578,7 @@ main() {
     printf '  NOT yet trustworthy: doctor checks offline readiness only. Run login, then a small trial with known-truth numbers.\n'
   else
     printf 'CHƯA SẴN SÀNG / NOT READY: phone-app-checker %s đã được chép vào máy nhưng doctor báo FAIL (mã / exit %s).\n' "$version" "$doctor_status"
-    printf '  Sửa mọi dòng FAIL ở trên rồi chạy lại / Fix every FAIL above, then run: phone-app-checker doctor\n'
+    printf '  Sửa mọi dòng FAIL ở trên rồi chạy lại / Fix every FAIL above, then run: phone-app-checker doctor --deep\n'
   fi
   printf '  Thư mục / Location : %s\n' "$dest"
   printf '  Lệnh / Command     : %s\n' "$HOME/.local/bin/phone-app-checker"

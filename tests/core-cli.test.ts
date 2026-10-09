@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createProgram, main, type CliDeps } from '../src/cli.ts';
 import { DOCTOR_FOOTER } from '../src/doctor.ts';
 import { Store } from '../src/store.ts';
-import { AccountBanned, type Adapter, type App, type CheckStatus } from '../src/types.ts';
+import { APPS, AccountBanned, type Adapter, type App, type CheckStatus } from '../src/types.ts';
 
 const NOW = Date.UTC(2026, 9, 8, 5, 0, 0);
 const ISO = '2026-10-08T05:00:00.000Z';
@@ -675,11 +675,15 @@ describe('version, doctor and app home', () => {
     });
   }
 
-  async function runDoctorCommand(extra: Partial<CliDeps> = {}, args: string[] = ['--config', env.config]): Promise<number | undefined> {
+  async function runDoctorCommand(
+    extra: Partial<CliDeps> = {},
+    args: string[] = ['--config', env.config],
+    tail: string[] = [],
+  ): Promise<number | undefined> {
     const before = process.exitCode;
     process.exitCode = undefined;
     try {
-      await program(extra).parseAsync([...args, 'doctor'], { from: 'user' });
+      await program(extra).parseAsync([...args, 'doctor', ...tail], { from: 'user' });
       return process.exitCode === undefined ? undefined : Number(process.exitCode);
     } finally {
       process.exitCode = before;
@@ -699,22 +703,44 @@ describe('version, doctor and app home', () => {
   it('doctor prints one row per check and exits 0 when nothing fails', async () => {
     expect(await runDoctorCommand()).toBeUndefined();
     const text = env.printed.join('\n');
-    for (const name of ['version', 'runtime', 'sqlite', 'config', 'data', 'telegram', 'whatsapp', 'zalo', 'viber', 'line']) {
+    for (const name of ['version', 'runtime', 'sqlite', 'config', 'data', ...APPS]) {
       expect(text).toMatch(new RegExp(`^(OK|WARN)\\s+${name}\\s`, 'm'));
     }
     expect(text.endsWith(DOCTOR_FOOTER)).toBe(true);
     expect(text).not.toMatch(/^FAIL/m);
   });
 
-  it('doctor exits 1 when an adapter cannot be loaded', async () => {
-    const code = await runDoctorCommand({
-      loadAdapter: async (app) => {
-        if (app === 'zalo') throw new Error('Cannot load the zalo adapter: boom');
-        return fakeAdapter(app);
+  it('doctor --deep exits 1 when an adapter module cannot be loaded', async () => {
+    const code = await runDoctorCommand(
+      {
+        loadAdapter: async (app) => {
+          if (app === 'zalo') throw new Error('Cannot load the zalo adapter: boom');
+          return fakeAdapter(app);
+        },
       },
-    });
+      ['--config', env.config],
+      ['--deep'],
+    );
     expect(code).toBe(1);
     expect(env.printed.join('\n')).toMatch(/^FAIL\s+zalo\s+Cannot load the zalo adapter: boom/m);
+    expect(env.printed.join('\n').endsWith(DOCTOR_FOOTER)).toBe(true);
+  });
+
+  it('doctor without --deep resolves adapter packages without importing adapter modules', async () => {
+    const loaded: App[] = [];
+    const resolved: App[] = [];
+    const code = await runDoctorCommand({
+      loadAdapter: async (app) => {
+        loaded.push(app);
+        return fakeAdapter(app);
+      },
+      resolveAdapter: (app) => {
+        resolved.push(app);
+      },
+    });
+    expect(code).toBeUndefined();
+    expect(loaded).toEqual([]);
+    expect(resolved).toEqual([...APPS]);
     expect(env.printed.join('\n').endsWith(DOCTOR_FOOTER)).toBe(true);
   });
 

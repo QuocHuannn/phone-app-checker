@@ -4,24 +4,24 @@
 
 Tài liệu này dành cho người **không cần biết lập trình**. Làm lần lượt từng mục, copy–paste từng lệnh vào ứng dụng **Terminal** (Spotlight: bấm `Cmd + Space`, gõ `Terminal`, Enter). Không cần cài Node.js, npm, Homebrew hay Xcode: mọi thứ đã nằm sẵn trong file tải về.
 
-> **Đọc trước khi dùng.** phone-app-checker kiểm tra một danh sách số điện thoại xem có tài khoản Telegram, WhatsApp, Zalo, Viber, LINE hay không, bằng các phần mềm *không chính thức* – cách dùng này **vi phạm điều khoản sử dụng** của các ứng dụng đó. Tài khoản dùng để kiểm tra có thể bị giới hạn hoặc bị khóa. Chỉ dùng **SIM/tài khoản riêng, chấp nhận mất**; tuyệt đối không dùng số cá nhân hay số đang phục vụ kinh doanh. Chỉ kiểm tra số của người đã đồng ý được liên hệ – công cụ **không** tự kiểm tra sự đồng ý đó. Xem thêm mục 11.
+> **Đọc trước khi dùng.** phone-app-checker kiểm tra một danh sách số điện thoại xem có tài khoản Telegram, WhatsApp, Zalo, Viber, LINE, Threema hay Matrix hay không. Telegram, WhatsApp, Zalo, LINE và Viber được tra cứu bằng các cách *không chính thức* – cách dùng này **vi phạm điều khoản sử dụng** của các ứng dụng đó, và tài khoản dùng để kiểm tra có thể bị giới hạn hoặc bị khóa. Threema và Matrix dùng giao diện tra cứu chính thức, nhưng mỗi lần tra cứu vẫn gửi một mã băm của số điện thoại tới Threema hoặc tới máy chủ định danh Matrix. Chỉ dùng **SIM/tài khoản riêng, chấp nhận mất**; tuyệt đối không dùng số cá nhân hay số đang phục vụ kinh doanh. Chỉ kiểm tra số của người đã đồng ý được liên hệ – công cụ **không** tự kiểm tra sự đồng ý đó. Xem thêm mục 11.
 >
-> Bản này được kiểm thử tự động trên máy phát triển (macOS 27, Apple Silicon). Với tài khoản thật, mới chỉ **WhatsApp** được chạy thử một lần (đăng nhập bằng mã ghép đôi và vài lượt tra cứu); **Telegram, Zalo, Viber, LINE chưa được kiểm chứng trên nền tảng thật**, chưa chạy thử trên Mac của bạn và chưa chạy thử trên macOS 13.5. Một kết quả `yes` / `not_found` chỉ là **quan sát tại một thời điểm** – không xác nhận người đó là ai, tài khoản còn hoạt động hay không, hay hiện giờ vẫn như vậy – nên phải đối chiếu thủ công như mục 12 trước khi tin dùng.
+> Bản này được kiểm thử tự động trên máy phát triển (macOS 27, Apple Silicon). Với tài khoản thật, mới chỉ **WhatsApp** được chạy thử một lần (đăng nhập bằng mã ghép đôi và vài lượt tra cứu); **Telegram, Zalo, Viber, LINE, Threema, Matrix chưa được kiểm chứng trên nền tảng thật**, chưa chạy thử trên Mac của bạn và chưa chạy thử trên macOS 13.5. Một kết quả `yes` / `not_found` chỉ là **quan sát tại một thời điểm** – không xác nhận người đó là ai, tài khoản còn hoạt động hay không, hay hiện giờ vẫn như vậy – nên phải đối chiếu thủ công như mục 12 trước khi tin dùng.
 
 ## Cách dùng nhanh: cài đặt, rồi chỉ cần gõ `phone-app-checker`
 
-1. Cài đặt (mục 4): `bash ~/Downloads/phone-app-checker-0.1.0-macos-arm64/install.sh`.
+1. Cài đặt (mục 4): `bash ~/Downloads/phone-app-checker-0.2.0-macos-arm64/install.sh`.
 2. Mở cửa sổ Terminal **mới** và gõ đúng một lệnh, không thêm gì khác, rồi nhấn Enter:
 
    ```sh
    phone-app-checker
    ```
 
-3. Một **menu** hiện ra (khung tên + phiên bản, dòng `Accounts ready:` cho biết app nào đã có tài khoản, rồi danh sách có màu). Mặc định menu bằng **tiếng Anh**; muốn tiếng Việt, bấm `L`, chọn `2` (Tiếng Việt), lựa chọn được nhớ cho lần sau (xem "Ngôn ngữ của menu" ngay dưới). **Dùng phím mũi tên ↑ ↓ rồi Enter**, hoặc bấm thẳng số của dòng (`1`–`6`, `L`, `0`) không cần Enter; `q` hoặc `Esc` để thoát (hoặc quay lại ở danh sách con); làm xong mỗi việc menu tự quay lại (Ctrl-C hoặc Ctrl-D cũng thoát gọn). Nếu Terminal không hỗ trợ (ví dụ đặt `NO_COLOR` hoặc `TERM=dumb`) menu tự chuyển về kiểu cũ: gõ số rồi Enter:
+3. Một **menu** hiện ra (khung tên + phiên bản, dòng `Accounts ready:` cho biết app nào đã có tài khoản, rồi danh sách). Mặc định menu bằng **tiếng Anh**; muốn tiếng Việt, bấm `L`, chọn `2` (Tiếng Việt), lựa chọn được nhớ cho lần sau (xem "Ngôn ngữ của menu" ngay dưới). **Dùng phím mũi tên ↑ ↓ rồi Enter**, hoặc bấm thẳng số của dòng (`1`–`6`, `L`, `0`) không cần Enter. **Phím `b` để quay lại** ở mọi câu hỏi (`q` và `Esc` cũng vậy trong danh sách), còn Enter nhận câu trả lời mặc định hiện trong dòng nhắc. Làm xong mỗi việc menu tự quay lại (Ctrl-C hoặc Ctrl-D cũng thoát gọn). Nếu Terminal không hỗ trợ màu hoặc phím mũi tên (ví dụ đặt `NO_COLOR` hoặc `TERM=dumb`), hoặc bạn chạy chương trình với `--plain`, menu tự chuyển về kiểu cũ: gõ số rồi Enter:
 
    | Số | Việc (tên trên menu tiếng Anh → tiếng Việt) |
    | --- | --- |
-   | 1 | `Check a CSV file` = Kiểm tra file CSV: **kéo file CSV từ Finder thả vào cửa sổ Terminal** rồi Enter, chọn ứng dụng, chọn nơi lưu báo cáo (mặc định `report.csv` cạnh file CSV; nếu đã có file cùng tên, menu hỏi trước khi ghi đè). Chưa đăng nhập tài khoản nào thì menu báo và đề nghị đăng nhập luôn. |
+   | 1 | `Check a CSV file` = Kiểm tra file CSV: **kéo file CSV từ Finder thả vào cửa sổ Terminal**, hoặc chọn một trong **5 file dùng gần nhất**, rồi Enter. Menu hiện **bản xem trước** (đọc cột nào, bao nhiêu số dùng được, những quốc gia nào) và hỏi xác nhận. Sau đó đánh dấu các ứng dụng bằng **phím cách (Space)** rồi Enter, và chọn nơi lưu báo cáo (mặc định `report.csv` cạnh file CSV; nếu đã có file cùng tên, menu hỏi trước khi ghi đè). Chưa đăng nhập tài khoản nào thì menu báo và đề nghị đăng nhập luôn. Trong danh sách file, `c` xóa danh sách và ngừng ghi nhớ file. |
    | 2 | `Log in an app account` = Đăng nhập tài khoản app: chọn ứng dụng và đặt tên tài khoản (Enter = `default`). WhatsApp và Telegram hỏi thêm cách đăng nhập (quét QR, hoặc mã ghép đôi / số điện thoại + mã); Telegram hỏi `api_id`/`api_hash` một lần và tự lưu vào file cấu hình (mục 6.1). Mã QR hiện ngay trong cửa sổ (mục 6.0). |
    | 3 | `View logged-in accounts` = Xem tài khoản đã đăng nhập (lệnh `accounts`). |
    | 4 | `Rebuild the latest report` = Dựng lại báo cáo từ kết quả đã lưu (lệnh `report`), không kiểm tra thêm. |
@@ -38,17 +38,19 @@ Tài liệu này dành cho người **không cần biết lập trình**. Làm l
 
    **Bạn sẽ thấy gì trên từng màn hình** (đây là bản chụp chữ từ lần chạy thử tự động trong cửa sổ 80x24; chỉ là hình minh họa, **chưa** chạy với tài khoản thật; màu và biểu tượng thấy trên Terminal thật):
 
-   - *Menu chính*: khung tên + phiên bản, trạng thái từng app (`✅` đã có tài khoản và số lượng, `⬜` chưa), danh sách dòng có biểu tượng, dòng nhắc phím ở cuối.
+   - *Menu chính*: khung tên + phiên bản, trạng thái từng app (`✔` đã có tài khoản và số lượng, `○` chưa), danh sách dòng, dòng nhắc phím ở cuối.
 
      ```text
-     ╭─ Phone App Checker 0.1.0 ──────────────────────────────────────────
+     ╭─ Phone App Checker 0.2.0 ─────────────────────────────────────────────
      │ Accounts ready:
-     │ ⬜ telegram – · ✅ whatsapp 1 · ⬜ zalo – · ⬜ viber – · ⬜ line –
-     ╰────────────────────────────────────────────────────────────────────
-     ❯ 1 🔍 Check a CSV file
-       2 🔑 Log in an app account
+     │ ✔ telegram 1 account · ✔ whatsapp 1 account · ○ zalo none
+     │ ○ viber none · ○ line none · ○ threema none · ○ matrix none
+     ╰───────────────────────────────────────────────────────────────────────
+
+     ❯ 1 Check a CSV file
+       2 Log in an app account
        ...
-       0 🚪 Quit
+       0 Quit
      ↑↓ move · Enter select · q quit
      ```
 
@@ -67,14 +69,27 @@ Tài liệu này dành cho người **không cần biết lập trình**. Làm l
 
    - *Chờ quét QR / kết nối*: dòng quay `⠋ Connecting to Telegram...` và `⠋ Waiting for you to scan the code...` (chỉ trên Terminal; khi chạy qua pipe hoặc ghi log không in gì thêm).
    - *Telegram từ chối*: mỗi lỗi là một câu dễ hiểu, ví dụ `Telegram rejected the api_id / api_hash (API_ID_INVALID). Copy both values again from https://my.telegram.org/apps, …`; `FLOOD_WAIT` cho biết phải đợi bao lâu.
-   - *Đang kiểm tra* (menu `1`): một dòng thanh tiến trình vẽ lại tại chỗ:
+   - *Kiểm tra cửa sổ trước khi quét QR*: trước khi đăng nhập bằng QR, menu kiểm tra cửa sổ Terminal đã đủ lớn chưa. Nếu chưa, menu nói mã cần bao nhiêu cột x dòng (ví dụ `This window is 80 x 24; the code needs 68 x 39.`) rồi chờ: kéo to cửa sổ (hoặc bấm Cmd+dấu trừ để thu nhỏ chữ) rồi Enter, gõ `c` để dùng mã ghép đôi thay thế (nếu ứng dụng có), hoặc `b` để quay lại.
+   - *Đang kiểm tra* (menu `1`): một bảng cập nhật trực tiếp, mỗi tài khoản một dòng (trạng thái, số đã xong, kết quả tới giờ, thời gian của lô vừa rồi), tốc độ, giờ dự kiến xong và đường dẫn file nhật ký của lần chạy. Bảng vẽ lại khoảng mỗi giây một lần:
 
      ```text
-     ⠹ ████████░░░░░░░░░░░░░░░░░░░░  27% 30/108  telegram 12/36 · whatsapp 12/36 · zalo 6/36
+     ╭─ Checking customers.csv · 4 numbers ────────────────────────────────────────
+     │ Elapsed 3 s · 149/min
+     │
+     │ APP       ACCOUNT  STATE   DONE  RESULTS    LAST
+     │ telegram  a        ✔ done  4/4   0y 4nf 0u  0.7s
+     │ zalo      z        ✔ done  3/3   0y 3nf 0u  0.7s
+     │
+     │ ████████████████████████████  100%  7 of 7 checks (4 numbers x 2 apps)
+     │ yes 0 · not_found 7 · unknown 0
+     │ Ctrl+C finishes this batch and saves the report.
+     │ Log: <thư mục dữ liệu>/check-<timestamp>.log
+     ╰──────────────────────────────────────────────────────────────────────────────
      ```
 
-     gồm phần trăm, đã xong/tổng, số của từng app, thời gian còn lại ước tính (`ETA`, chỉ hiện sau vài giây) và, khi tài khoản đang nghỉ, `pacing 4 s` hoặc `resting until 14:05`. Ctrl-C một lần: dừng gọn và lưu báo cáo.
-   - *Kết quả*: bảng tóm tắt có màu (`yes` xanh lá, `not_found` vàng, `invalid` đỏ, `unknown`/`skipped` mờ), rồi khung cuối:
+     `0y 4nf 0u` nghĩa là 0 yes, 4 not_found, 0 unknown. Tài khoản đang nghỉ hiện giờ địa phương nó chạy lại (ví dụ `resting until 14:05`). Bảng tự thu gọn khi cửa sổ thấp. Trên Terminal thường (`--plain`, `NO_COLOR`) các thông tin đó được in thành từng dòng có giờ, ví dụ `05:54 progress 100% 7/7 | telegram 4/4, zalo 3/3`. Ctrl-C một lần: dừng gọn và lưu báo cáo. File nhật ký (`check-<timestamp>.log` trong thư mục dữ liệu, giữ 5 file mới nhất) chứa các dòng chi tiết từng lô.
+   - *Tóm tắt*: `Done in 3 s · 4 numbers · 0 unfinished`, bảng có màu (`yes` xanh lá, `not_found` vàng, `invalid` đỏ, `unknown`/`skipped` mờ), `Accounts used: telegram a · zalo z`, rồi khung cuối. Sau đó bấm Enter để về menu, hoặc `o` để hiện báo cáo trong Finder.
+   - *Khung kết quả* (dòng in cuối cùng):
 
      ```text
      ╭─ Report saved to /tmp/ux/report.csv ──────────────────────────────
@@ -105,7 +120,7 @@ Tài liệu này dành cho người **không cần biết lập trình**. Làm l
 9. [Đọc kết quả trong báo cáo](#9-đọc-kết-quả-trong-báo-cáo)
 10. [Dữ liệu nằm ở đâu](#10-dữ-liệu-nằm-ở-đâu)
 11. [Quyền riêng tư và an toàn](#11-quyền-riêng-tư-và-an-toàn)
-12. [Cách thử nghiệm đề xuất và gửi kết quả về](#12-cách-thử-nghiệm-đề-xuất-và-gửi-kết-quả-về)
+12. [Cách thử nghiệm đề xuất và gửi kết quả về](#12-cách-thử-nghiệm-đề-xuất-a9-và-gửi-kết-quả-về)
 13. [Cập nhật, quay lại bản cũ, gỡ cài đặt](#13-cập-nhật-quay-lại-bản-cũ-gỡ-cài-đặt)
 14. [Sự cố thường gặp](#14-sự-cố-thường-gặp)
 
@@ -124,20 +139,20 @@ Tài liệu này dành cho người **không cần biết lập trình**. Làm l
 
 Bạn nhận được hai file đặt cùng một chỗ (ví dụ thư mục *Downloads*):
 
-- `phone-app-checker-0.1.0-macos-arm64.tar.gz`
-- `phone-app-checker-0.1.0-macos-arm64.tar.gz.sha256`
+- `phone-app-checker-0.2.0-macos-arm64.tar.gz`
+- `phone-app-checker-0.2.0-macos-arm64.tar.gz.sha256`
 
 Kiểm tra file không bị hỏng hoặc bị sửa trên đường chuyển:
 
 ```sh
 cd ~/Downloads
-shasum -a 256 -c phone-app-checker-0.1.0-macos-arm64.tar.gz.sha256
+shasum -a 256 -c phone-app-checker-0.2.0-macos-arm64.tar.gz.sha256
 ```
 
 Kết quả đúng:
 
 ```
-phone-app-checker-0.1.0-macos-arm64.tar.gz: OK
+phone-app-checker-0.2.0-macos-arm64.tar.gz: OK
 ```
 
 Nếu thấy `FAILED` hoặc `No such file`: **dừng lại**, không giải nén. Xin gửi lại file (hoặc đảm bảo bạn đang đứng trong thư mục chứa file – lệnh `cd` ở trên).
@@ -148,13 +163,13 @@ Nếu thấy `FAILED` hoặc `No such file`: **dừng lại**, không giải né
 
 ## 3. Giải nén
 
-Cách 1 (Finder): bấm đúp vào file `.tar.gz` trong *Downloads*. Một thư mục `phone-app-checker-0.1.0-macos-arm64` xuất hiện.
+Cách 1 (Finder): bấm đúp vào file `.tar.gz` trong *Downloads*. Một thư mục `phone-app-checker-0.2.0-macos-arm64` xuất hiện.
 
 Cách 2 (Terminal):
 
 ```sh
 cd ~/Downloads
-tar -xzf phone-app-checker-0.1.0-macos-arm64.tar.gz
+tar -xzf phone-app-checker-0.2.0-macos-arm64.tar.gz
 ```
 
 Thư mục chứa: `install.sh`, `uninstall.sh`, `INSTALL.md` (bản tiếng Anh), `INSTALL.vi.md` (chính tài liệu này), `LICENSE`, `THIRD_PARTY_LICENSES.md`, `VERSION`, `phone-app-checker`, `runtime/` (Node.js kèm sẵn) và `app/`.
@@ -162,7 +177,7 @@ Thư mục chứa: `install.sh`, `uninstall.sh`, `INSTALL.md` (bản tiếng Anh
 ## 4. Cài đặt
 
 ```sh
-bash ~/Downloads/phone-app-checker-0.1.0-macos-arm64/install.sh
+bash ~/Downloads/phone-app-checker-0.2.0-macos-arm64/install.sh
 ```
 
 > Chạy bằng lệnh `bash …` như trên. **Đừng bấm đúp vào `install.sh`** trong Finder – macOS có thể chặn hoặc mở nó bằng ứng dụng khác.
@@ -171,15 +186,15 @@ Trình cài đặt, không cần mật khẩu quản trị (không dùng `sudo`)
 
 1. Kiểm tra máy: chip Apple Silicon (không phải Terminal Rosetta), macOS ≥ 13.5. Không đạt → in lý do và dừng, chưa thay đổi gì.
 2. Giữ "khóa bảo trì" cho tới khi cài xong: trong lúc đó không lệnh `phone-app-checker` nào chạy hoặc mở được dữ liệu, và nếu đang có lệnh chạy thì trình cài đặt đợi tối đa ~3 giây rồi **từ chối** (mục 14).
-3. Chép chương trình vào thư mục tạm cạnh nơi cài rồi mới thay vào `~/Applications/phone-app-checker/0.1.0`. Bản cũ cùng số phiên bản (nếu có) **được giữ lại cho tới khi bản mới chạy được `phone-app-checker --version`**; lỗi hoặc bị ngắt giữa chừng thì quay về bản cũ.
+3. Chép chương trình vào thư mục tạm cạnh nơi cài rồi mới thay vào `~/Applications/phone-app-checker/0.2.0`. Bản cũ cùng số phiên bản (nếu có) **được giữ lại cho tới khi bản mới chạy được `phone-app-checker --version`**; lỗi hoặc bị ngắt giữa chừng thì quay về bản cũ.
 4. Gỡ dấu "tải từ Internet" (quarantine) của macOS khỏi bản đã cài, để Gatekeeper không chặn.
 5. Tạo lệnh `phone-app-checker` tại `~/.local/bin` và, nếu cần, thêm một đoạn nhỏ vào `~/.zprofile` (hoặc `~/.bash_profile`) để Terminal tìm thấy lệnh. File shell được ghi sang file tạm cùng thư mục rồi đổi tên đè lên (giữ nguyên quyền, không bao giờ bị cắt ngắn giữa chừng). Đoạn này nằm giữa hai dòng `# >>> phone-app-checker >>>` và `# <<< phone-app-checker <<<` và sẽ bị xóa khi gỡ cài đặt.
 6. Chạy `phone-app-checker --version` và `phone-app-checker doctor` (xem mục 5).
 
 Cuối cùng trình cài đặt in đường dẫn đã cài, đường dẫn file cấu hình, và cách xóa các bản cũ nếu có. **Dòng tóm tắt đầu tiên không bao giờ là lời khẳng định "xong"**:
 
-- Nếu `doctor` không có `FAIL`, nó in `Đã chép file / Files installed: phone-app-checker 0.1.0 (doctor: không có FAIL / no FAIL)` cùng dòng `NOT yet trustworthy: doctor checks offline readiness only. Run login, then a small trial with known-truth numbers.` – nghĩa là mới chép xong file; **chưa** đăng nhập, **chưa** thử với đáp án đã biết (mục 6 và 12).
-- Nếu `doctor` báo `FAIL`, nó in `CHƯA SẴN SÀNG / NOT READY: phone-app-checker 0.1.0 đã được chép vào máy nhưng doctor báo FAIL (mã / exit 1).` Các file vẫn nằm trên máy nên `install.sh` thoát với mã `0`; **đừng** coi mã thoát đó là "dùng được" – sửa mọi dòng `FAIL` ở trên rồi chạy lại `phone-app-checker doctor` cho tới khi không còn `FAIL`.
+- Nếu `doctor` không có `FAIL`, nó in `Đã chép file / Files installed: phone-app-checker 0.2.0 (doctor: không có FAIL / no FAIL)` cùng dòng `NOT yet trustworthy: doctor checks offline readiness only. Run login, then a small trial with known-truth numbers.` – nghĩa là mới chép xong file; **chưa** đăng nhập, **chưa** thử với đáp án đã biết (mục 6 và 12).
+- Nếu `doctor` báo `FAIL`, nó in `CHƯA SẴN SÀNG / NOT READY: phone-app-checker 0.2.0 đã được chép vào máy nhưng doctor báo FAIL (mã / exit 1).` Các file vẫn nằm trên máy nên `install.sh` thoát với mã `0`; **đừng** coi mã thoát đó là "dùng được" – sửa mọi dòng `FAIL` ở trên rồi chạy lại `phone-app-checker doctor` cho tới khi không còn `FAIL`.
 
 Khi gỡ cài đặt, đoạn PATH trong `~/.zprofile`/`~/.bash_profile` chỉ bị xóa nếu hai dòng đánh dấu còn **nguyên văn** (không thêm khoảng trắng hay ghi chú ở cuối dòng) và đi thành từng cặp. Nếu bạn đã sửa chúng, chương trình **không đụng vào** file đó và in hướng dẫn: tự xóa các dòng từ `# >>> phone-app-checker >>>` đến `# <<< phone-app-checker <<<`. Nếu `~/.zprofile` (hoặc `~/.bash_profile`) **do chính trình cài đặt tạo ra** (trước đó chưa có file) và sau khi bỏ đoạn PATH file trở nên trống, file trống đó cũng được xóa; file có sẵn từ trước (kể cả file trống) hoặc còn nội dung khác thì **luôn được giữ nguyên**. Việc nhớ "file do trình cài đặt tạo" nằm trong `~/Applications/phone-app-checker/.created-profiles` (bị xóa cùng thư mục cài đặt).
 
@@ -189,7 +204,7 @@ Khi gỡ cài đặt, đoạn PATH trong `~/.zprofile`/`~/.bash_profile` chỉ b
 phone-app-checker --version
 ```
 
-Phải in `0.1.0`. Nếu báo `command not found` xem mục 14.
+Phải in `0.2.0`. Nếu báo `command not found` xem mục 14.
 
 Sau đó gõ `phone-app-checker` (không thêm gì) để mở menu – xem "Cách dùng nhanh" ở đầu tài liệu. Các mục 5 đến 8 mô tả cùng các việc đó bằng lệnh gõ tay, dùng được song song với menu.
 
@@ -249,7 +264,7 @@ phone-app-checker doctor
 | `WARN` | Chưa làm xong một bước thiết lập (ví dụ chưa nhập `apiId`/`apiHash`, chưa đăng nhập tài khoản nào, chưa thấy thiết bị Android cho Viber). **Vẫn chạy được**, chỉ ứng dụng đó chưa dùng được. | Làm theo gợi ý ở cuối dòng. Lần đầu cài, các dòng `WARN` là bình thường. |
 | `FAIL` | Chương trình không chạy được (file cấu hình sai, thư mục dữ liệu bị lỗi quyền, thiếu `adb` khi đã bật Viber, …). | Sửa theo chi tiết ghi trên dòng đó rồi chạy lại `doctor`. |
 
-`doctor` thoát với lỗi chỉ khi có `FAIL`. Lặp lại cho tới khi **không còn `FAIL`**. Dòng của cả năm ứng dụng (telegram, whatsapp, zalo, viber, line) đều có mặt, kể cả ứng dụng đang tắt – `OK … disabled (module loads)` nghĩa là chương trình đã nạp được mô-đun của ứng dụng đó.
+`doctor` thoát với lỗi chỉ khi có `FAIL`. Lặp lại cho tới khi **không còn `FAIL`**. Dòng của mọi ứng dụng (telegram, whatsapp, zalo, viber, line, threema, matrix) đều có mặt, kể cả ứng dụng đang tắt – `OK … disabled (adapter package installed)` nghĩa là chương trình tìm thấy gói của ứng dụng đó, chưa nạp nó. Muốn nạp luôn mô-đun của từng ứng dụng (chậm hơn, khoảng nửa giây), chạy `phone-app-checker doctor --deep`: trình cài đặt chạy lệnh này một lần sau khi chép file.
 
 **`doctor` chỉ cho biết máy đã sẵn sàng *offline*** (máy, cấu hình, thư mục dữ liệu, mô-đun nạp được, có thư mục tài khoản). `OK` **không** có nghĩa là tài khoản còn đăng nhập hay ứng dụng còn trả lời đúng – điều đó chỉ biết sau khi bạn `login` và chạy thử file ~20 số có đáp án đã biết (mục 12). `doctor` không đọc số điện thoại nào và không mở kết nối tới ứng dụng nhắn tin. Vì vậy `doctor` **luôn** kết thúc bằng đúng ba dòng sau (dù có `FAIL` hay không):
 
@@ -478,7 +493,9 @@ Nghĩa: **báo cáo chưa hoàn chỉnh, đừng dùng làm kết quả cuối**
 
 Thư mục dữ liệu và `dataDir` phải là thư mục riêng, **không đồng bộ** và nằm **ngoài** `~/Applications/phone-app-checker`: dữ liệu khách hàng và phiên đăng nhập **không được nằm trong thư mục đồng bộ**. Chương trình từ chối (kể cả khi có file đánh dấu) khi `PHONE_APP_CHECKER_HOME` hoặc `dataDir` là `Documents`, `Desktop`, `Downloads`, `Library`, `Applications`, `Movies`, `Music`, `Pictures`, `Public`, `.local`, `.config`, `Library/Application Support`, `.local/bin`, thư mục home hay thư mục cha của nó, hoặc trùng/bao lấy thư mục cài đặt – hãy dùng một thư mục con riêng. Chương trình cũng từ chối **thư mục đồng bộ và mọi thư mục nằm bên trong nó**: iCloud Drive (`~/Library/Mobile Documents`, `~/iCloud Drive`), `~/Library/CloudStorage/*` (Dropbox, Google Drive, OneDrive, Box do macOS quản lý) và các thư mục `~/Dropbox*`, `~/Google Drive*` (`~/GoogleDrive*`), `~/OneDrive*`, `~/Box`, `~/Box Sync`, `~/Box Drive` (kể cả khi là symlink tới ổ khác). Ví dụ nên dùng: `~/phone-checks` hoặc để mặc định. Desktop và Documents có thể tự đồng bộ iCloud mà chương trình không phát hiện được; vì vậy đừng đặt dữ liệu ở đó.
 
-Cơ sở dữ liệu `checker.db` hiện dùng **lược đồ phiên bản 2** (thêm bảng `failed_checks` ghi nhớ các số trong lô lỗi; tự nâng cấp từ bản 1 khi mở). Sau khi bản mới đã mở nó, **bản dựng cũ hơn không mở lại được** (`Database was written by a newer version`): đừng quay về bản dựng cũ trên cùng thư mục dữ liệu nếu chưa sao lưu `checker.db`.
+Cơ sở dữ liệu `checker.db` hiện dùng **lược đồ phiên bản 3** (bản 2 thêm bảng `failed_checks` ghi nhớ các số trong lô lỗi; bản 3 thêm thời gian lô theo từng tài khoản). Nó tự nâng cấp từ các bản cũ khi mở và kết quả của bạn được giữ nguyên. Sau khi bản mới đã mở nó, **bản dựng cũ hơn không mở lại được** (`Database was written by a newer version`), nên **0.1.0 không mở được cơ sở dữ liệu mà 0.2.0 đã nâng cấp**: đừng quay về bản dựng cũ trên cùng thư mục dữ liệu nếu chưa sao lưu `checker.db`.
+
+**Nâng cấp từ 0.1.0.** Lần đầu 0.2.0 đọc `checker.config.json` của bạn, nó thêm `"configVersion": 2` và giữ file cũ ngay cạnh với tên `checker.config.json.v1.bak` (chỉ bạn đọc được; file này có thể chứa `apiHash` nên hãy coi như file cấu hình). Terminal in một dòng nêu tên bản sao lưu. Chạy lại không thay đổi gì nữa. Nếu sau này bạn cài lại 0.1.0, chép bản sao lưu đó đè lên `checker.config.json` và khôi phục bản sao của `checker.db` mà bạn đã chép **trước** khi nâng cấp.
 
 Mở thư mục dữ liệu: `open ~/Library/Application\ Support/phone-app-checker`. Thư mục `Library` bị ẩn trong Finder; dùng lệnh trên hoặc Finder → *Go → Go to Folder…* → dán `~/Library/Application Support/phone-app-checker`.
 
@@ -549,7 +566,7 @@ Nếu có thể, nói rõ: chip máy (About This Mac), **phiên bản macOS** (�
 bash ~/Downloads/phone-app-checker-<phiên bản mới>-macos-arm64/install.sh
 ```
 
-Chương trình mới được chép vào thư mục riêng, `current` đổi sang bản mới. **Cấu hình, phiên đăng nhập và kết quả giữ nguyên.** Bản cũ được giữ lại; trình cài đặt in lệnh `rm -rf` để xóa nếu bạn muốn. Lưu ý lược đồ cơ sở dữ liệu (mục 10): bản mới có thể nâng cấp `checker.db` và bản cũ hơn rồi không mở lại được.
+Chương trình mới được chép vào thư mục riêng, `current` đổi sang bản mới. **Cấu hình, phiên đăng nhập và kết quả giữ nguyên.** Bản cũ được giữ lại; trình cài đặt in lệnh `rm -rf` để xóa nếu bạn muốn. Khi nâng cấp từ 0.1.0, cấu hình và cơ sở dữ liệu kết quả cũng được nâng cấp ngay lần đầu bản mới chạy (mục 10). **Hãy chép sẵn một bản `checker.db` nếu bạn có thể muốn quay lại.**
 
 **Quay lại bản cũ** (ví dụ `0.1.0`):
 
@@ -557,7 +574,7 @@ Chương trình mới được chép vào thư mục riêng, `current` đổi sa
 bash ~/Applications/phone-app-checker/0.1.0/install.sh
 ```
 
-Chỉ đổi lại liên kết `current`, dữ liệu không đổi (xem lưu ý lược đồ ở mục 10 trước khi quay về một bản dựng cũ hơn).
+Lệnh này chỉ đổi lại liên kết `current`. Nó **không** hoàn tác việc nâng cấp dữ liệu: bản cũ không đọc được cấu hình hay cơ sở dữ liệu mà bản mới đã nâng cấp. Muốn quay về 0.1.0 bạn còn cần các bản sao lưu: chép `checker.config.json.v1.bak` đè lên `checker.config.json`, và đặt lại bản sao `checker.db` đã chép trước khi nâng cấp (không có bản sao đó thì bản cũ không mở được kết quả; xem mục 10).
 
 **Gỡ cài đặt** (xóa chương trình, lệnh, đoạn PATH; **giữ lại** cấu hình, phiên đăng nhập, kết quả):
 
@@ -571,7 +588,7 @@ bash ~/Applications/phone-app-checker/current/uninstall.sh
 bash ~/Applications/phone-app-checker/current/uninstall.sh --purge-data
 ```
 
-Chương trình hỏi lại; gõ đúng `DELETE` (chữ hoa) để xác nhận. **Nếu gõ sai hoặc để trống, chương trình vẫn được gỡ** (lệnh, đoạn PATH, thư mục cài đặt) và chỉ dữ liệu được giữ lại; lúc đó lệnh `~/Applications/phone-app-checker/current/uninstall.sh` ở trên **không còn nữa**. Muốn xóa dữ liệu sau này, chạy `uninstall.sh` **trong gói đã tải/giải nén** (ví dụ `bash ~/Downloads/phone-app-checker-0.1.0-macos-arm64/uninstall.sh --purge-data`); nó vẫn đọc `dataDir` trong `checker.config.json` **trước** khi xóa và báo thư mục `dataDir` nằm ngoài (sẽ **không** bị xóa). Nếu không xác định chắc chắn được `dataDir`, nó từ chối xóa dữ liệu và giữ nguyên cấu hình – xem `dataDir` trong file đó và tự xóa thư mục ấy. Trước khi xóa nên đăng xuất các thiết bị đã liên kết trên điện thoại (WhatsApp → Thiết bị đã liên kết; Zalo/LINE tương tự) nếu không dùng lại các tài khoản đó: xóa dữ liệu **chỉ xóa file trên máy này, không đăng xuất từ xa, và không phải xóa an toàn** (bản sao lưu/Time Machine có thể còn bản sao). File CSV và `report.csv` trong thư mục làm việc **không bị đụng tới** – tự xóa nếu không cần.
+Chương trình hỏi lại; gõ đúng `DELETE` (chữ hoa) để xác nhận. **Nếu gõ sai hoặc để trống, chương trình vẫn được gỡ** (lệnh, đoạn PATH, thư mục cài đặt) và chỉ dữ liệu được giữ lại; lúc đó lệnh `~/Applications/phone-app-checker/current/uninstall.sh` ở trên **không còn nữa**. Muốn xóa dữ liệu sau này, chạy `uninstall.sh` **trong gói đã tải/giải nén** (ví dụ `bash ~/Downloads/phone-app-checker-0.2.0-macos-arm64/uninstall.sh --purge-data`); nó vẫn đọc `dataDir` trong `checker.config.json` **trước** khi xóa và báo thư mục `dataDir` nằm ngoài (sẽ **không** bị xóa). Nếu không xác định chắc chắn được `dataDir`, nó từ chối xóa dữ liệu và giữ nguyên cấu hình – xem `dataDir` trong file đó và tự xóa thư mục ấy. Trước khi xóa nên đăng xuất các thiết bị đã liên kết trên điện thoại (WhatsApp → Thiết bị đã liên kết; Zalo/LINE tương tự) nếu không dùng lại các tài khoản đó: xóa dữ liệu **chỉ xóa file trên máy này, không đăng xuất từ xa, và không phải xóa an toàn** (bản sao lưu/Time Machine có thể còn bản sao). File CSV và `report.csv` trong thư mục làm việc **không bị đụng tới** – tự xóa nếu không cần.
 
 Khi chương trình đã gỡ, `uninstall.sh` đọc `checker.config.json` bằng **trình phân tích JSON thật** (Node đi kèm trong gói, hoặc `osascript` có sẵn của macOS) – giống hệt cách chương trình đọc, nên khóa viết kiểu `"\u0064ataDir"` vẫn được nhận ra. Nó **không bao giờ** suy ra "không có `dataDir`" từ việc tìm chuỗi văn bản. Nếu không có trình phân tích nào, không đọc được file hoặc file không phải JSON hợp lệ, `--purge-data` từ chối (chưa xóa gì, giữ nguyên cấu hình); gỡ cài đặt không kèm `--purge-data` vẫn chạy và ghi chú rằng `dataDir` không đọc được chắc chắn.
 
@@ -598,7 +615,7 @@ macOS đánh dấu file tải từ Internet. Trình cài đặt đã gỡ dấu 
 
 ```sh
 xattr -dr com.apple.quarantine ~/Applications/phone-app-checker
-xattr -dr com.apple.quarantine ~/Downloads/phone-app-checker-0.1.0-macos-arm64
+xattr -dr com.apple.quarantine ~/Downloads/phone-app-checker-0.2.0-macos-arm64
 ```
 
 Nếu vẫn bị chặn: *System Settings → Privacy & Security* → kéo xuống phần thông báo về `node` hoặc `phone-app-checker` → **Open Anyway**, rồi chạy lại. Nếu Mac do công ty quản lý (MDM) có thể chặn chương trình chưa được ký/duyệt: báo người quản trị IT hoặc người gửi bản này, kèm nội dung thông báo.
@@ -633,7 +650,7 @@ Lần cài/gỡ trước bị ngắt khi đang giữ khóa bảo trì. Chắc ch
 **`… is your Documents folder (hoặc Desktop, …), which holds your own files; refusing to use it …` / `… is, or lies inside, the synced folder …` / `… overlaps the installation folder …`**
 `PHONE_APP_CHECKER_HOME` hoặc `dataDir` đang trỏ vào thư mục riêng của bạn, vào thư mục đồng bộ (iCloud Drive, `~/Library/CloudStorage/*`, Dropbox, Google Drive, OneDrive, Box) hoặc vào/bao lấy `~/Applications/phone-app-checker`. Đừng cố vượt qua: dữ liệu khách hàng và phiên đăng nhập không được nằm trong thư mục đồng bộ. Dùng một thư mục con riêng ngoài các nơi đó (thông báo gợi ý tên), hoặc bỏ cấu hình tùy chỉnh để dùng mặc định.
 
-**`Database was written by a newer version (schema 2, supported 1)`**
+**`Database was written by a newer version (schema 3, supported 2)`**
 Bạn đang chạy một bản dựng cũ hơn trên dữ liệu đã được bản mới nâng cấp (mục 10). Cài lại bản mới. Chỉ khi chấp nhận mất kết quả đã lưu mới đổi tên `checker.db` (và `-wal`/`-shm`) để bản cũ tạo lại.
 
 **`no valid phone numbers (N invalid)` / `Cannot find a phone column` / `Cannot tell how the columns are separated`**

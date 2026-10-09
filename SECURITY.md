@@ -6,8 +6,8 @@ Security fixes are made for the latest released version and the `main` branch on
 
 | Version | Supported |
 | --- | --- |
-| latest release (0.1.x) | yes |
-| older releases | no |
+| latest release (0.2.x) | yes |
+| 0.1.x and older releases | no (upgrade; see the CHANGELOG "Upgrading from 0.1.0") |
 
 ## Reporting a vulnerability
 

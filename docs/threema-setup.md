@@ -6,7 +6,7 @@ The Threema adapter asks the **official Threema Gateway API** whether a phone nu
 
 ## What you need: a Gateway ID
 
-A **Gateway ID** is a Threema Gateway account identity: `*` followed by seven capital letters or digits (for example `*ABCDEFG`). It comes with an **API secret**. You get both by signing up at <https://gateway.threema.ch>. Sign-up is free, with no recurring fee. Sending messages through the Gateway costs credits (from CHF 0.01 per message); this tool never sends messages.
+A **Gateway ID** is a Threema Gateway account identity: `*` followed by seven capital letters or digits (for example `*ABCDEFG`). It comes with an **API secret**. You get both by signing up at <https://gateway.threema.ch>. Threema Gateway is a commercial service: sending messages costs credits (from CHF 0.01 per message), and the pricing and terms for your account are Threema's. This tool never sends messages. Whether a lookup uses credits has **not** been verified (see "Costs and credits").
 
 The Gateway ID is **not** your personal Threema ID. Use a Gateway account you control.
 

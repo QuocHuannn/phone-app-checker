@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AdbError } from '../src/android/adb.ts';
 import { loadConfig } from '../src/config.ts';
+import { packageVersion } from '../src/home.ts';
 import { DOCTOR_FOOTER, formatDoctor, runDoctor, type DoctorCheck, type DoctorInput } from '../src/doctor.ts';
 import { APPS, type Adapter, type App } from '../src/types.ts';
 
@@ -60,7 +61,7 @@ describe('runDoctor', () => {
     expect(checks.map((c) => c.name)).toEqual(['version', 'runtime', 'sqlite', 'config', 'data', ...APPS]);
     expect(checks.filter((c) => c.level !== 'ok')).toEqual([]);
     const named = byName(checks);
-    expect(named.version?.detail).toContain('0.1.0');
+    expect(named.version?.detail).toContain(packageVersion());
     expect(named.version?.detail).toContain('source checkout');
     expect(named.runtime?.detail).toContain(process.versions.node);
     expect(named.config?.detail).toBe(`${join(home, 'checker.config.json')} (exists)`);
@@ -393,11 +394,12 @@ describe('wording shared with the install guide and install.sh', () => {
   });
 
   it('the guide quotes the install.sh summary lines that qualify success and failure', () => {
-    const ready = 'Đã chép file / Files installed: phone-app-checker 0.1.0 (doctor: không có FAIL / no FAIL)';
+    const version = packageVersion();
+    const ready = `Đã chép file / Files installed: phone-app-checker ${version} (doctor: không có FAIL / no FAIL)`;
     const trust = 'NOT yet trustworthy: doctor checks offline readiness only. Run login, then a small trial with known-truth numbers.';
-    const notReady = 'CHƯA SẴN SÀNG / NOT READY: phone-app-checker 0.1.0 đã được chép vào máy nhưng doctor báo FAIL (mã / exit 1).';
+    const notReady = `CHƯA SẴN SÀNG / NOT READY: phone-app-checker ${version} đã được chép vào máy nhưng doctor báo FAIL (mã / exit 1).`;
     for (const line of [ready, trust, notReady]) expect(guide).toContain(line);
-    expect(installer).toContain(ready.replace('0.1.0', '%s'));
+    expect(installer).toContain(ready.replace(version, '%s'));
     expect(installer).toContain(trust);
     expect(installer).toContain('CHƯA SẴN SÀNG / NOT READY: phone-app-checker %s đã được chép vào máy nhưng doctor báo FAIL (mã / exit %s).');
   });

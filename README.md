@@ -1,6 +1,11 @@
 <div align="center">
 
-# phone-app-checker
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-horizontal-dark.svg">
+    <img src="docs/assets/logo-horizontal.svg" alt="Phone App Checker (phone-app-checker)" width="420">
+  </picture>
+</h1>
 
 **Find out which messaging apps a phone number is registered on: Telegram, WhatsApp, Zalo, Viber, LINE.**
 Local command-line tool. CSV in, CSV report out. No messages are ever sent.

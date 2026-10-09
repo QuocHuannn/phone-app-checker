@@ -1,6 +1,6 @@
 # Setup guides
 
-Start with the [project README](../README.md) (overview and quick start) and [responsible-use.md](responsible-use.md). The [reference](reference.md) documents `login`, `check`, `report`, `accounts`, configuration and data handling in depth; [architecture.md](architecture.md) explains how it works. Non-developers on a Mac using the packaged download: [install-macos.md](install-macos.md) (Vietnamese: [install-macos.vi.md](install-macos.vi.md)). Then set up each app you want to check.
+Start with the [project README](../README.md) (overview and quick start) and [responsible-use.md](responsible-use.md). The [reference](reference.md) documents `login`, `check`, `report`, `accounts`, configuration and data handling in depth; [architecture.md](architecture.md) explains how it works. Non-developers on a Mac using the packaged download: [install-macos.md](install-macos.md) (Vietnamese: [install-macos.vi.md](install-macos.vi.md)). Then set up each app you want to check. Logo and colours: [brand.md](brand.md).
 
 > **Packaged app:** the guides below show `npm run cli -- <command>`. In the macOS download, run the same commands as `phone-app-checker <command>` (for example `phone-app-checker login telegram --account tg1`); `data/` and `checker.config.json` then live in `~/Library/Application Support/phone-app-checker`.
 

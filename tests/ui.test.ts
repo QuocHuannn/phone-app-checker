@@ -37,6 +37,15 @@ describe('isRich / createUi: when ANSI is allowed', () => {
     expect(isRich(TTY, { ...RICH_ENV, NO_COLOR: '' })).toBe(true);
   });
 
+  it('PHONE_APP_CHECKER_PLAIN (anything but empty) forces the plain tier on a good terminal', () => {
+    expect(isRich(TTY, { ...RICH_ENV, PHONE_APP_CHECKER_PLAIN: '1' })).toBe(false);
+    expect(isRich(TTY, { ...RICH_ENV, PHONE_APP_CHECKER_PLAIN: '' })).toBe(true);
+    const ui = createUi(TTY, { ...RICH_ENV, PHONE_APP_CHECKER_PLAIN: '1' });
+    expect(ui.rich).toBe(false);
+    expect(ui.bold('x')).toBe('x');
+    expect(ui.icons.ok).toBe('[ok]');
+  });
+
   it('paints with standard SGR codes on a rich terminal, closing each style on its own so they nest', () => {
     const ui = createUi(TTY, RICH_ENV);
     expect(ui.rich).toBe(true);

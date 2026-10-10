@@ -1,4 +1,5 @@
 {
+  "configVersion": 2,
   "defaultRegion": "VN",
   "dataDir": "./data",
   "maxAgeDays": 30,
@@ -11,6 +12,7 @@
       "jitterMs": 60000,
       "rateLimitCooldownMs": 21600000,
       "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
       "options": {
         "apiId": null,
         "apiHash": null
@@ -24,6 +26,7 @@
       "jitterMs": 60000,
       "rateLimitCooldownMs": 21600000,
       "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
       "options": {
         "loginTimeoutMs": 180000,
         "connectTimeoutMs": 60000
@@ -37,6 +40,7 @@
       "jitterMs": 30000,
       "rateLimitCooldownMs": 86400000,
       "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
       "options": {}
     },
     "viber": {
@@ -47,6 +51,7 @@
       "jitterMs": 600000,
       "rateLimitCooldownMs": 43200000,
       "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
       "options": {
         "serial": "emulator-5554",
         "registeredQuery": "SELECT <number column> AS number FROM <table> WHERE <viber-user condition>",
@@ -69,9 +74,35 @@
       "jitterMs": 60000,
       "rateLimitCooldownMs": 86400000,
       "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
       "options": {
         "loginMode": "qr",
         "device": "DESKTOPWIN"
+      }
+    },
+    "threema": {
+      "enabled": false,
+      "batchSize": 1,
+      "dailyCap": 100,
+      "minIntervalMs": 5000,
+      "jitterMs": 5000,
+      "rateLimitCooldownMs": 3600000,
+      "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
+      "options": {}
+    },
+    "matrix": {
+      "enabled": false,
+      "batchSize": 1,
+      "dailyCap": 100,
+      "minIntervalMs": 5000,
+      "jitterMs": 5000,
+      "rateLimitCooldownMs": 21600000,
+      "errorCooldownMs": 600000,
+      "maxParallelAccounts": 1,
+      "options": {
+        "homeserver": "https://matrix.org",
+        "identityServer": "https://vector.im"
       }
     }
   }

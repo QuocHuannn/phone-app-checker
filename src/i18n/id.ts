@@ -9,7 +9,7 @@ export const id = {
   menuDoctor: 'Periksa kesiapan Mac (doctor)',
   menuGuide: 'Panduan / peringatan',
   menuQuit: 'Keluar',
-  menuPrompt: 'Pilih (0-6 atau L) lalu tekan Enter: ',
+  menuPrompt: 'Pilih 0-6 atau L, lalu Enter: ',
   menuInvalid: ({ choice }) => `Pilihan tidak valid: "${choice}". Ketik angka dari 0 sampai 6, atau L, lalu tekan Enter.`,
   goodbye: 'Sampai jumpa.',
 
@@ -32,8 +32,8 @@ export const id = {
 
   askCsvIntro: 'Seret file CSV dari Finder ke jendela ini (atau ketik lokasinya), lalu tekan Enter.',
   askCsvPrompt: ({ hint }) => `File CSV (${hint}): `,
-  askCsvHintBack: 'Enter untuk kembali',
-  askCsvHintDefault: ({ path }) => `Enter = ${path}`,
+  askCsvHintBack: 'b = kembali',
+  askCsvHintDefault: ({ path }) => `b = kembali · Enter = ${path}`,
   askReportPrompt: ({ path }) => `File laporan (Enter = ${path}): `,
   reportExists: ({ path }) => `File ${path} sudah ada. Timpa`,
 
@@ -57,9 +57,9 @@ export const id = {
   appNotSetUp: 'belum disiapkan',
   appLoggedIn: ({ count, names }) => `sudah masuk: ${count} akun (${names})`,
   loginAppsHeader: 'Aplikasi:',
-  loginAppPrompt: ({ max }) => `Masuk ke aplikasi mana? (angka 1-${max}, Enter untuk kembali): `,
+  loginAppPrompt: ({ max }) => `Masuk ke aplikasi mana? (angka 1-${max}, b = kembali): `,
   loginUnknown: ({ input, max }) => `Tidak dipahami: "${input}". Ketik angka dari 1 sampai ${max}.`,
-  askAccountPrompt: ({ name }) => `Nama akun (Enter = ${name}): `,
+  askAccountPrompt: ({ name }) => `Nama akun (Enter = ${name}, b = kembali): `,
   accountNameInvalid: 'Gunakan hanya huruf tanpa aksen, angka, "-" atau "_" (maksimal 32 karakter, diawali huruf atau angka).',
   accountExists: ({ account, app }) => `Akun "${account}" untuk ${app} sudah ada. Masuk ulang akan mengganti sesi masuk yang lama.`,
   loginAgainConfirm: 'Tetap masuk ulang?',
@@ -68,18 +68,22 @@ export const id = {
   hintTelegram: 'Telegram akan meminta: nomor telepon (+84...), kode masuk (tidak tampil saat diketik), dan kata sandi dua langkah jika ada.',
   hintViber: 'Viber memerlukan ponsel Android yang terhubung dengan kabel USB (lihat docs/viber-setup.md).',
   hintLine: 'LINE akan memandu Anda di layar (lihat docs/line-setup.md).',
+  hintThreema: 'Threema akan meminta: Gateway ID (diawali *, 8 karakter) dan rahasianya (tidak tampil saat diketik). Lihat docs/threema-setup.md.',
+  hintMatrix: 'Matrix akan meminta: homeserver (Enter = matrix.org), nama pengguna, dan kata sandi (tidak tampil saat diketik). Kata sandi dipakai sekali dan tidak disimpan. Lihat docs/matrix-setup.md.',
 
   loginMethodPrompt: ({ max }) => `Pilih 1-${max} (Enter = 1): `,
   loginMethodInvalid: ({ max }) => `Ketik angka dari 1 sampai ${max}.`,
   loginFailed: ({ app, account }) => `Login ${app} (akun ${account}) belum selesai dan tidak ada yang disimpan. Anda kembali ke menu: pilih 2 untuk mencoba lagi.`,
   whatsappMethodIntro: 'Bagaimana Anda ingin menautkan WhatsApp?',
-  whatsappMethodCode: '1) Tautkan dengan nomor telepon: ketik kode 8 karakter di ponsel (disarankan)',
-  whatsappMethodQr: '2) Pindai kode QR dengan ponsel',
-  whatsappPhonePrompt: 'Nomor telepon akun WhatsApp yang ditautkan, dengan kode negara (contoh +84901234567; Enter untuk kembali): ',
+  whatsappMethodCode: 'Tautkan dengan nomor telepon: ketik kode 8 karakter di ponsel (disarankan)',
+  whatsappMethodQr: 'Pindai kode QR dengan ponsel',
+  whatsappMethodCodeDetail: 'Di ponsel: WhatsApp > Pengaturan > Perangkat tertaut > Tautkan dengan nomor telepon',
+  whatsappMethodQrDetail: ({ need }) => `Butuh jendela minimal ${need}`,
+  whatsappPhonePrompt: 'Nomor telepon akun WhatsApp yang ditautkan, dengan kode negara (contoh +84901234567; b = kembali): ',
   whatsappPhoneInvalid: 'Nomor telepon ini tidak valid. Sertakan kode negara, contoh +84901234567.',
   telegramMethodIntro: 'Bagaimana Anda ingin masuk ke Telegram?',
-  telegramMethodQr: '1) Pindai kode QR dengan aplikasi Telegram di ponsel (default)',
-  telegramMethodCode: '2) Ketik kode masuk yang dikirim Telegram, memakai nomor telepon Anda',
+  telegramMethodQr: 'Pindai kode QR dengan aplikasi Telegram di ponsel (default)',
+  telegramMethodCode: 'Ketik kode masuk yang dikirim Telegram, memakai nomor telepon Anda',
   hintTelegramQr:
     'Telegram akan menampilkan kode QR: di ponsel buka Telegram > Pengaturan > Perangkat > Tautkan Perangkat Desktop, lalu pindai. Kata sandi dua langkah, jika ada, ditanyakan setelah memindai (tidak tampil saat diketik).',
 
@@ -126,11 +130,10 @@ export const id = {
   spinConnecting: 'Menghubungkan ke Telegram...',
   spinWaitingScan: 'Menunggu Anda memindai kode...',
   hintMenu: '↑↓ pindah · Enter pilih · q keluar',
-  hintBack: '↑↓ pindah · Enter pilih · Esc atau q kembali',
+  hintBack: '↑↓ pindah · Enter pilih · Esc, q atau b kembali',
   bannerAccounts: 'Akun siap:',
   emptyAccounts: 'Belum ada akun yang masuk. Pilih "Masuk ke akun aplikasi" dulu, lalu kembali ke sini.',
   loginPickApp: 'Masuk ke aplikasi mana?',
-  loginPickMethod: 'Bagaimana Anda ingin masuk?',
   reportSavedTo: ({ path }) => `Laporan disimpan di ${path}`,
   finalNextOpen: 'Berikutnya: buka file dengan Excel atau Numbers (klik dua kali file).',
   finalNextFinder: ({ command }) => `Untuk menampilkannya di Finder, ketik: ${command}`,
@@ -160,6 +163,16 @@ export const id = {
   zaloQrExpired: ({ attempt, max }) => `Kode QR kedaluwarsa. Membuat kode baru (${attempt}/${max}).`,
   zaloQrGaveUp: 'Kode QR terlalu sering kedaluwarsa. Jalankan login lagi.',
   zaloQrDeclined: 'Login Zalo ditolak di ponsel.',
+  threemaIdPrompt: 'Gateway ID Threema (8 karakter, diawali *, contoh *ABCDEFG): ',
+  threemaSecretPrompt: 'Rahasia API Threema Gateway (tidak tampil saat diketik): ',
+  threemaIdInvalid: 'Gateway ID adalah "*" diikuti 7 huruf kapital atau angka, contoh *ABCDEFG. Coba lagi.',
+  matrixHomeserverPrompt: ({ url }) => `Alamat homeserver Matrix (Enter = ${url}): `,
+  matrixHomeserverInvalid: 'Ketik alamat yang diawali https://, contoh https://matrix.org. Coba lagi.',
+  matrixUserPrompt: 'Nama pengguna Matrix (contoh alice, atau @alice:matrix.org): ',
+  matrixPasswordPrompt: 'Kata sandi Matrix (tidak tampil saat diketik; dipakai sekali, tidak disimpan): ',
+  matrixTermsIntro: ({ server }) => `Server identitas ${server} meminta Anda menerima ketentuannya sebelum menjawab pencarian. Baca di sini:`,
+  matrixTermsPrompt: 'Apakah Anda menerima ketentuan ini? (y/t): ',
+  matrixTermsDeclined: 'Ketentuan tidak diterima; tidak ada yang disimpan.',
   telegramPhonePrompt: 'Nomor telepon Telegram (format internasional, contoh +84901234567): ',
   telegramCodePrompt: 'Kode masuk yang dikirim Telegram (tidak tampil saat diketik): ',
   telegramPasswordPrompt: 'Kata sandi verifikasi dua langkah (tidak tampil saat diketik): ',
@@ -184,4 +197,179 @@ export const id = {
   guideBan: '- Gunakan SIM / akun khusus milik perusahaan yang boleh hilang: akun dapat dibatasi atau diblokir (ban).',
   guideEvidence: '- Hasil hanyalah pengamatan pada saat pemeriksaan, bukan bukti.',
   guideDetails: '- Rincian: README.md dan docs/install-macos.md.',
+
+  // v0.2.0: file terbaru, pratinjau CSV, checklist, gerbang QR, aksi akun, halaman panduan.
+  accountsWord: ({ count }) => (count === 1 ? '1 akun' : `${count} akun`),
+  accountsNone: 'belum ada',
+  pickCsvTitle: 'Pilih daftar nomor telepon (CSV)',
+  pickCsvDrag: 'Seret file CSV dari Finder ke jendela ini, atau pilih file yang pernah dipakai.',
+  pickCsvType: 'Ketik atau tempel path',
+  pickCsvRecentHint: 'angka dari daftar, atau b = kembali',
+  recentClear: 'hapus daftar dan berhenti mengingat file',
+  recentConfirm: 'Hapus daftar file terbaru dan berhenti mengingatnya?',
+  recentCleared: 'File terbaru dihapus; pengingat kini dimatikan.',
+  recentMissing: 'hilang',
+  recentWhenJustNow: 'baru saja',
+  recentWhenMinutes: ({ count }) => `${count} menit lalu`,
+  recentWhenHours: ({ count }) => `${count} jam lalu`,
+  recentWhenYesterday: 'kemarin',
+  previewTitle: ({ name, column }) => `${name} · kolom nomor telepon "${column}"`,
+  previewCounts: ({ rows, usable, unusable }) =>
+    `${rows} baris · ${usable} nomor bisa dipakai · ${unusable} tidak bisa dipakai`,
+  previewUnusable: ({ examples }) => `Tidak bisa dipakai, contoh: ${examples} (tetap dicatat di laporan)`,
+  previewCountries: ({ list }) => `Negara: ${list}`,
+  previewPrompt: 'Pakai file ini? (Enter = lanjut, b = pilih file lain): ',
+  appsTitle: 'Aplikasi mana?',
+  appsHint: '↑↓ pindah · spasi centang · Enter mulai · b kembali',
+  appsPickNone: 'Centang minimal satu aplikasi dengan tombol spasi.',
+  accountsTitle: 'Akun',
+  accountsActionHint: '↑↓ pindah · r reset cooldown · l masuk lagi · b kembali',
+  pressEnterForMenu: 'Tekan Enter untuk menu.',
+  guidePage: ({ n, m }) => `Panduan dan peringatan · halaman ${n} dari ${m}`,
+  guideNext: 'Enter = halaman berikutnya · b kembali',
+  qrGateTooSmall: ({ cols, rows, needCols, needRows }) =>
+    `Jendela ini ${cols} x ${rows}; kode butuh ${needCols} x ${needRows}.`,
+  qrGateEnlarge: 'Perbesar jendela (seret salah satu sudut), atau tekan Cmd+minus satu kali untuk memperkecil teks.',
+  qrGateAltWhatsapp: 'pakai kode pemasangan saja',
+  qrGateAltTelegram: 'pakai kode lewat nomor telepon saja',
+  qrGatePrompt: ({ alt }) =>
+    `Perbesar jendela, lalu tekan Enter untuk mencoba lagi${alt === '' ? '' : `, atau ketik c untuk ${alt}`} (b = kembali): `,
+  tgLoginTitle: 'Masuk ke Telegram',
+
+  // v0.2.0: live run dashboard, run log, summary, --plain flag.
+  dashTitle: ({ file, numbers }) => `Memeriksa ${file} · ${numbers} nomor`,
+  dashElapsed: ({ time }) => `Berjalan ${time}`,
+  dashSpeed: ({ rate }) => `${rate}/menit`,
+  dashEta: ({ left, clock }) => `sekitar ${left} lagi · selesai sekitar ${clock}`,
+  dashColApp: 'APLIKASI',
+  dashColAccount: 'AKUN',
+  dashColState: 'STATUS',
+  dashColDone: 'SELESAI',
+  dashColStatus: 'HASIL',
+  dashColLast: 'TERAKHIR',
+  dashWorking: 'bekerja',
+  dashWaiting: 'menunggu',
+  dashResting: ({ clock, left }) => `istirahat · lanjut ${clock} (dalam ${left})`,
+  dashDisabled: 'nonaktif',
+  dashDone: 'selesai',
+  dashStatusCounts: ({ yes, notFound, unknown }) =>
+    `${yes}y ${notFound}nf ${unknown}u`,
+  dashChecks: ({ done, total, numbers, apps }) =>
+    `${done} dari ${total} pemeriksaan (${numbers} nomor x ${apps} ${apps === 1 ? 'aplikasi' : 'aplikasi'})`,
+  dashCounts: ({ yes, notFound, unknown }) =>
+    `yes ${yes} · not_found ${notFound} · unknown ${unknown}`,
+  dashHintStop: 'Ctrl+C menyelesaikan batch ini dan menyimpan laporan.',
+  dashDetailsFile: ({ path }) => `Catatan log: ${path}`,
+  progressPercent: ({ percent, done, total }) =>
+    `progres ${percent}% ${done}/${total}`,
+  progressEta: ({ time }) => `perkiraan ${time}`,
+  progressPacing: ({ time }) => `jeda ${time}`,
+  progressRestingUntil: ({ clock }) => `istirahat sampai ${clock}`,
+  summaryDone: ({ time, numbers, unfinished }) =>
+    `Selesai dalam ${time} · ${numbers} nomor · ${unfinished} belum selesai`,
+  summaryNumbers: ({ total, valid, invalid }) =>
+    `Nomor: ${total} unik (${valid} valid, ${invalid} invalid)`,
+  summaryAccountsUsed: ({ list }) => `Akun yang dipakai: ${list}`,
+  summaryColApp: 'aplikasi',
+  summaryColYes: 'yes',
+  summaryColNotFound: 'not_found',
+  summaryColUnknown: 'unknown',
+  summaryColSkipped: 'skipped',
+  summaryColInvalid: 'invalid',
+  summaryColCountry: 'negara',
+  summaryYesByCountry: 'Terdaftar (yes) per negara:',
+  summaryStale: ({ apps, count }) =>
+    `STALE: ${apps} — ${count} ${count === 1 ? 'hasil' : 'hasil'} yes/not_found lebih tua dari umur maksimum atau berisi tanggal di masa depan ` +
+    '(lihat <app>_checked_at / <app>_stale di laporan): dipertahankan, tidak dikonfirmasi ulang.',
+  summaryFootnote:
+    '`not_found` juga bisa berarti orang itu menyembunyikan nomornya dari pencarian; `unknown` = belum diperiksa atau sedang di-throttle.',
+  cliNoValidNumbers: ({ invalid }) =>
+    `tidak ada nomor telepon yang valid (${invalid} invalid); periksa --column serta kolom nomor telepon dan kode negara di file`,
+  cliCsvColumn: ({ name }) => `kolom "${name}"`,
+  cliCsvColumnIndex: ({ index }) => `kolom ${index} (tanpa baris header)`,
+  cliCsvRead: ({ file, labelled, rows, unique, invalid, duplicates }) =>
+    `${file}: memakai ${labelled}; ${rows} ${rows === 1 ? 'baris' : 'baris'}, ${unique} unik` +
+    `${duplicates === 0 ? '' : `, ${duplicates} ${duplicates === 1 ? 'duplikat' : 'duplikat'} digabung`}, ${invalid} invalid`,
+  cliReportWritten: ({ path }) => `Laporan ditulis ke ${path}`,
+  cliInterruptOnce: 'Interupsi diterima: menyelesaikan batch yang sedang berjalan, lalu menulis laporan (Ctrl-C lagi untuk keluar paksa)...',
+  cliInterruptOnceParallel:
+    'Interupsi diterima: menunggu batch yang sedang berjalan, lalu menulis laporan (Ctrl-C lagi untuk keluar paksa)...',
+  cliInterruptTwice: 'Interupsi kedua, keluar sekarang.',
+  cliWarnNoValid: ({ reason }) => `PERINGATAN: ${reason}. Laporan di atas hanya berisi baris yang tidak valid.`,
+  cliColApp: 'aplikasi',
+  cliColAccount: 'akun',
+  cliColState: 'status',
+  cliColUsedToday: 'dipakai hari ini',
+  cliColBatchTime: 'waktu batch (rata-rata / terakhir)',
+  cliAccountReady: 'siap',
+  cliAccountDisabled: ({ reason }) => `DINONAKTIFKAN: ${reason}`,
+  cliAccountCooling: ({ time }) => `cooldown sampai ${time}`,
+  cliNoAccounts: 'Belum ada akun. Masuk dulu (menu 2, atau jalankan: phone-app-checker login <app> --account <name>).',
+  cliNoResetState: ({ app, account }) =>
+    `Tidak ada status tercatat untuk akun ${app} "${account}"; tidak ada yang direset.`,
+  cliResetDone: ({ app, account }) =>
+    `Cooldown dan tanda nonaktif untuk akun ${app} "${account}" sudah dibersihkan.`,
+  revealPrompt: 'o = tampilkan di Finder · Enter = menu',
+  revealDone: 'Laporan ditampilkan di Finder.',
+  revealFailed: 'Finder tidak bisa dibuka; path ada di atas.',
+  schNoAccounts: ({ numbers, app }) =>
+    `tidak ada akun, ${numbers} ${numbers === 1 ? 'nomor' : 'nomor'} belum diperiksa. Jalankan: login ${app} --account <name>`,
+  schToCheck: ({ numbers, accounts }) =>
+    `${numbers} ${numbers === 1 ? 'nomor' : 'nomor'} untuk diperiksa dengan ${accounts} ${accounts === 1 ? 'akun' : 'akun'}`,
+  schFailedBefore: ({ count }) =>
+    `${count} ${count === 1 ? 'nomor' : 'nomor'} gagal di run sebelumnya: diperiksa terakhir, satu per satu`,
+  schRateLimited: ({ account, time }) => `${account}: kena rate limit, istirahat sampai ${time}`,
+  schBanned: ({ account, reason, app }) =>
+    `PERINGATAN ${account}: akun dinonaktifkan (${reason}). Perbaiki dulu, lalu: login ${app} --account ${account}`,
+  schBatchError: ({ account, errors, max, reason }) =>
+    `${account}: galat (${errors}/${max}): ${reason}`,
+  schParked: ({ count, failures }) =>
+    `${count} ${count === 1 ? 'nomor' : 'nomor'} gagal ${failures} kali di run yang selain itu berjalan normal; ` +
+    'dibiarkan unknown untuk run ini (tidak ada akun yang kena cooldown karenanya)',
+  schDropped: ({ account }) => `${account}: dikeluarkan untuk sisa run ini setelah error berulang`,
+  schBatchTimeout: ({ account, count }) =>
+    `${account}: satu batch berisi ${count} ${count === 1 ? 'nomor' : 'nomor'} tidak kembali tepat waktu; nomornya tetap unknown dan dihitung terhadap batas harian`,
+  schNoUsable: ({ count }) =>
+    `tidak ada akun yang bisa dipakai (nonaktif atau bermasalah), ${count} ${count === 1 ? 'nomor' : 'nomor'} tidak diperiksa`,
+  schAllBlockedNowait: ({ count }) =>
+    `semua akun sedang cooldown atau sudah mencapai batas harian, ${count} ${count === 1 ? 'nomor' : 'nomor'} tidak diperiksa (--no-wait)`,
+  schAllResting: ({ time, count }) =>
+    `semua akun sedang istirahat; lanjut pukul ${time} (sisa ${count})`,
+  schChecked: ({ account, count, left }) =>
+    `${account}: ${count} diperiksa, sisa ${left}`,
+  schCloseError: ({ account, reason }) =>
+    `${account}: error saat menutup sesi: ${reason}`,
+  schStoppedByError: ({ reason }) => `berhenti karena error tak terduga: ${reason}`,
+  runComplete: 'semua konklusif',
+  runNotConclusive: 'selesai, TIDAK konklusif',
+  runStopDone: 'selesai',
+  runStopAborted: 'terputus',
+  runStopNoAccounts: 'tidak ada akun yang bisa dipakai',
+  runStopBlocked: 'terblokir',
+  runStopAdapterError: 'adapter tidak bisa dimuat',
+  runKept: ({ count }) => `, ${count} menyimpan hasil lama`,
+  runLine: ({ app, needed, attempted, conclusive, inconclusive, kept, remaining, label }) =>
+    `${app}: perlu ${needed}, dicoba ${attempted}, konklusif ${conclusive}, ` +
+    `tidak konklusif ${inconclusive}${kept}, tanpa jawaban ${remaining} (${label})`,
+  runIncomplete: ({ inconclusive, needed }) =>
+    `INCOMPLETE: ${inconclusive} dari ${needed} ${needed === 1 ? 'pemeriksaan' : 'pemeriksaan'} belum punya jawaban yes/not_found terbaru.`,
+  runNotFinal:
+    'Laporan ini BELUM final: sel yang bertanda unknown belum diperiksa, dan yes/not_found yang lama bisa saja sudah kedaluwarsa.',
+  runAppLine: ({ app, inconclusive, attempted, conclusive }) =>
+    `${app}: ${inconclusive} tidak konklusif (${attempted} dicoba, ${conclusive} konklusif)`,
+  runReasonNoAccounts: ({ app }) =>
+    `no_accounts: tidak ada akun ${app} yang bisa dipakai (masuk dulu, atau perbaiki yang dinonaktifkan: login ${app} --account <name>)`,
+  runReasonAdapterError: ({ app }) => `adapter_error: adapter ${app} tidak bisa dimuat`,
+  runReasonAborted: 'aborted: run diinterupsi',
+  runReasonCooldown: 'cooldown: semua akun sedang istirahat setelah kena rate limit atau error',
+  runReasonDailyCap: 'daily cap: semua akun yang bisa dipakai sudah mencapai batas harian',
+  runReasonErrors: ({ count }) => `errors: ${count} ${count === 1 ? 'batch' : 'batch'} gagal`,
+  runReasonParked: ({ batches, numbers }) =>
+    `batch diparkir: ${batches} ${batches === 1 ? 'batch' : 'batch'}, ${numbers} ${numbers === 1 ? 'nomor' : 'nomor'}, dibiarkan untuk run ini`,
+  runReasonUnknown: ({ count }) =>
+    `jawaban unknown: ${count} ${count === 1 ? 'nomor' : 'nomor'} kembali unknown`,
+  runReasonNotReached: 'not_reached: sebagian nomor tidak diperiksa',
+  runResumeHint: 'Jalankan perintah yang sama lagi untuk melanjutkan (nomor yang sudah selesai tidak diulang).',
+  runResumeAt: ({ time }) =>
+    `Lanjut berikutnya: ${time}. Jalankan perintah yang sama lagi pada waktu itu (nomor yang sudah selesai tidak diulang).`,
 } satisfies Catalog;

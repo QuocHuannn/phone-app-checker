@@ -35,3 +35,26 @@ export function openUrl(url: string, deps: OpenUrlDeps = {}): Promise<boolean> {
   }
   return promise;
 }
+
+/**
+ * Reveal `path` in Finder with macOS `/usr/bin/open -R`, no shell involved (the path is one argument).
+ * Resolves true when `open` accepted it. Refuses (false, nothing started) on other platforms and when
+ * stdout is not a terminal — the caller then prints the folder path instead. Any existing path is
+ * allowed: the report location was already validated when it was written.
+ */
+export function revealPath(path: string, deps: OpenUrlDeps = {}): Promise<boolean> {
+  const platform = deps.platform ?? process.platform;
+  const tty = deps.stdoutIsTTY ?? process.stdout.isTTY === true;
+  if (platform !== 'darwin' || !tty || path === '') return Promise.resolve(false);
+  const start = deps.spawn ?? spawn;
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  try {
+    const child = start('/usr/bin/open', ['-R', path], { stdio: 'ignore', detached: true });
+    child.once('error', () => resolve(false));
+    child.once('exit', (code) => resolve(code === 0));
+    child.unref();
+  } catch {
+    resolve(false);
+  }
+  return promise;
+}

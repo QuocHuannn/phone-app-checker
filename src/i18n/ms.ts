@@ -9,7 +9,7 @@ export const ms = {
   menuDoctor: 'Semak kesediaan Mac (doctor)',
   menuGuide: 'Panduan / amaran',
   menuQuit: 'Keluar',
-  menuPrompt: 'Pilih (0-6 atau L) kemudian tekan Enter: ',
+  menuPrompt: 'Pilih 0-6 atau L, kemudian Enter: ',
   menuInvalid: ({ choice }) => `Pilihan tidak sah: "${choice}". Taip nombor dari 0 hingga 6, atau L, kemudian tekan Enter.`,
   goodbye: 'Selamat tinggal.',
 
@@ -32,8 +32,8 @@ export const ms = {
 
   askCsvIntro: 'Seret fail CSV dari Finder ke tetingkap ini (atau taip laluannya), kemudian tekan Enter.',
   askCsvPrompt: ({ hint }) => `Fail CSV (${hint}): `,
-  askCsvHintBack: 'Enter untuk kembali',
-  askCsvHintDefault: ({ path }) => `Enter = ${path}`,
+  askCsvHintBack: 'b = kembali',
+  askCsvHintDefault: ({ path }) => `b = kembali · Enter = ${path}`,
   askReportPrompt: ({ path }) => `Fail laporan (Enter = ${path}): `,
   reportExists: ({ path }) => `Fail ${path} sudah wujud. Timpa`,
 
@@ -57,9 +57,9 @@ export const ms = {
   appNotSetUp: 'belum disediakan',
   appLoggedIn: ({ count, names }) => `telah log masuk: ${count} akaun (${names})`,
   loginAppsHeader: 'Aplikasi:',
-  loginAppPrompt: ({ max }) => `Log masuk ke aplikasi yang mana? (nombor 1-${max}, Enter untuk kembali): `,
+  loginAppPrompt: ({ max }) => `Log masuk ke aplikasi yang mana? (nombor 1-${max}, b = kembali): `,
   loginUnknown: ({ input, max }) => `Tidak difahami: "${input}". Taip nombor dari 1 hingga ${max}.`,
-  askAccountPrompt: ({ name }) => `Nama akaun (Enter = ${name}): `,
+  askAccountPrompt: ({ name }) => `Nama akaun (Enter = ${name}, b = kembali): `,
   accountNameInvalid: 'Gunakan hanya huruf tanpa tanda diakritik, nombor, "-" atau "_" (maksimum 32 aksara, bermula dengan huruf atau nombor).',
   accountExists: ({ account, app }) => `Akaun "${account}" bagi ${app} sudah wujud. Log masuk semula akan menggantikan sesi log masuk yang lama.`,
   loginAgainConfirm: 'Tetap log masuk semula?',
@@ -68,18 +68,22 @@ export const ms = {
   hintTelegram: 'Telegram akan meminta: nombor telefon (+84...), kod log masuk (tidak dipaparkan semasa menaip), dan kata laluan dua langkah jika ada.',
   hintViber: 'Viber memerlukan telefon Android yang disambungkan dengan kabel USB (lihat docs/viber-setup.md).',
   hintLine: 'LINE akan memandu anda pada skrin (lihat docs/line-setup.md).',
+  hintThreema: 'Threema akan meminta: Gateway ID (bermula dengan *, 8 aksara) dan rahsianya (tidak dipaparkan semasa menaip). Lihat docs/threema-setup.md.',
+  hintMatrix: 'Matrix akan meminta: homeserver (Enter = matrix.org), nama pengguna dan kata laluan (tidak dipaparkan semasa menaip). Kata laluan digunakan sekali dan tidak disimpan. Lihat docs/matrix-setup.md.',
 
   loginMethodPrompt: ({ max }) => `Pilih 1-${max} (Enter = 1): `,
   loginMethodInvalid: ({ max }) => `Taip nombor dari 1 hingga ${max}.`,
   loginFailed: ({ app, account }) => `Log masuk ${app} (akaun ${account}) belum selesai dan tiada apa yang disimpan. Anda kembali ke menu: pilih 2 untuk cuba lagi.`,
   whatsappMethodIntro: 'Bagaimana anda mahu memautkan WhatsApp?',
-  whatsappMethodCode: '1) Pautkan dengan nombor telefon: taip kod 8 aksara pada telefon (disyorkan)',
-  whatsappMethodQr: '2) Imbas kod QR dengan telefon',
-  whatsappPhonePrompt: 'Nombor telefon akaun WhatsApp yang dipautkan, dengan kod negara (contoh +84901234567; Enter untuk kembali): ',
+  whatsappMethodCode: 'Pautkan dengan nombor telefon: taip kod 8 aksara pada telefon (disyorkan)',
+  whatsappMethodQr: 'Imbas kod QR dengan telefon',
+  whatsappMethodCodeDetail: 'Pada telefon: WhatsApp > Tetapan > Peranti dipautkan > Pautkan dengan nombor telefon',
+  whatsappMethodQrDetail: ({ need }) => `Memerlukan tetingkap sekurang-kurangnya ${need}`,
+  whatsappPhonePrompt: 'Nombor telefon akaun WhatsApp yang dipautkan, dengan kod negara (contoh +84901234567; b = kembali): ',
   whatsappPhoneInvalid: 'Nombor telefon ini tidak sah. Sertakan kod negara, contoh +84901234567.',
   telegramMethodIntro: 'Bagaimana anda mahu log masuk ke Telegram?',
-  telegramMethodQr: '1) Imbas kod QR dengan aplikasi Telegram pada telefon (lalai)',
-  telegramMethodCode: '2) Taip kod log masuk yang dihantar Telegram, menggunakan nombor telefon anda',
+  telegramMethodQr: 'Imbas kod QR dengan aplikasi Telegram pada telefon (lalai)',
+  telegramMethodCode: 'Taip kod log masuk yang dihantar Telegram, menggunakan nombor telefon anda',
   hintTelegramQr:
     'Telegram akan memaparkan kod QR: pada telefon buka Telegram > Tetapan > Peranti > Pautkan Peranti Desktop, kemudian imbas. Kata laluan dua langkah, jika ada, ditanya selepas mengimbas (tidak dipaparkan semasa menaip).',
 
@@ -126,11 +130,10 @@ export const ms = {
   spinConnecting: 'Menyambung ke Telegram...',
   spinWaitingScan: 'Menunggu anda mengimbas kod...',
   hintMenu: '↑↓ alih · Enter pilih · q keluar',
-  hintBack: '↑↓ alih · Enter pilih · Esc atau q kembali',
+  hintBack: '↑↓ alih · Enter pilih · Esc, q atau b kembali',
   bannerAccounts: 'Akaun sedia:',
   emptyAccounts: 'Belum ada akaun yang log masuk. Pilih "Log masuk akaun aplikasi" dahulu, kemudian kembali ke sini.',
   loginPickApp: 'Log masuk ke aplikasi yang mana?',
-  loginPickMethod: 'Bagaimana anda mahu log masuk?',
   reportSavedTo: ({ path }) => `Laporan disimpan ke ${path}`,
   finalNextOpen: 'Seterusnya: buka fail dengan Excel atau Numbers (klik dua kali fail).',
   finalNextFinder: ({ command }) => `Untuk memaparkannya dalam Finder, taip: ${command}`,
@@ -160,6 +163,16 @@ export const ms = {
   zaloQrExpired: ({ attempt, max }) => `Kod QR tamat tempoh. Membuat kod baharu (${attempt}/${max}).`,
   zaloQrGaveUp: 'Kod QR terlalu kerap tamat tempoh. Jalankan log masuk sekali lagi.',
   zaloQrDeclined: 'Log masuk Zalo ditolak pada telefon.',
+  threemaIdPrompt: 'Gateway ID Threema (8 aksara, bermula dengan *, contoh *ABCDEFG): ',
+  threemaSecretPrompt: 'Rahsia API Threema Gateway (tidak dipaparkan semasa menaip): ',
+  threemaIdInvalid: 'Gateway ID ialah "*" diikuti 7 huruf besar atau digit, contoh *ABCDEFG. Cuba lagi.',
+  matrixHomeserverPrompt: ({ url }) => `Alamat homeserver Matrix (Enter = ${url}): `,
+  matrixHomeserverInvalid: 'Taip alamat yang bermula dengan https://, contoh https://matrix.org. Cuba lagi.',
+  matrixUserPrompt: 'Nama pengguna Matrix (contoh alice, atau @alice:matrix.org): ',
+  matrixPasswordPrompt: 'Kata laluan Matrix (tidak dipaparkan semasa menaip; digunakan sekali, tidak disimpan): ',
+  matrixTermsIntro: ({ server }) => `Pelayan identiti ${server} meminta anda menerima syaratnya sebelum menjawab carian. Baca di sini:`,
+  matrixTermsPrompt: 'Adakah anda menerima syarat ini? (y/t): ',
+  matrixTermsDeclined: 'Syarat tidak diterima; tiada apa yang disimpan.',
   telegramPhonePrompt: 'Nombor telefon Telegram (format antarabangsa, contoh +84901234567): ',
   telegramCodePrompt: 'Kod log masuk yang dihantar Telegram (tidak dipaparkan semasa menaip): ',
   telegramPasswordPrompt: 'Kata laluan pengesahan dua langkah (tidak dipaparkan semasa menaip): ',
@@ -184,4 +197,179 @@ export const ms = {
   guideBan: '- Gunakan SIM / akaun khas milik syarikat yang boleh dikorbankan: akaun boleh dihadkan atau disekat (ban).',
   guideEvidence: '- Keputusan hanyalah pemerhatian pada masa semakan, bukan bukti.',
   guideDetails: '- Butiran: README.md dan docs/install-macos.md.',
+
+  // v0.2.0: fail terkini, pratonton CSV, checklist, pintu QR, tindakan akaun, halaman panduan.
+  accountsWord: ({ count }) => (count === 1 ? '1 akaun' : `${count} akaun`),
+  accountsNone: 'tiada',
+  pickCsvTitle: 'Pilih senarai nombor telefon (CSV)',
+  pickCsvDrag: 'Seret fail CSV dari Finder ke tetingkap ini, atau pilih fail yang pernah digunakan.',
+  pickCsvType: 'Taip atau tampal laluan',
+  pickCsvRecentHint: 'nombor dalam senarai, atau b = kembali',
+  recentClear: 'kosongkan senarai dan berhenti mengingat fail',
+  recentConfirm: 'Kosongkan fail terkini dan berhenti mengingatnya?',
+  recentCleared: 'Fail terkini dikosongkan; mengingat kini dimatikan.',
+  recentMissing: 'tiada',
+  recentWhenJustNow: 'sebentar tadi',
+  recentWhenMinutes: ({ count }) => `${count} min lalu`,
+  recentWhenHours: ({ count }) => `${count} jam lalu`,
+  recentWhenYesterday: 'semalam',
+  previewTitle: ({ name, column }) => `${name} · lajur nombor telefon "${column}"`,
+  previewCounts: ({ rows, usable, unusable }) =>
+    `${rows} baris · ${usable} nombor boleh digunakan · ${unusable} tidak boleh digunakan`,
+  previewUnusable: ({ examples }) => `Tidak boleh digunakan, contoh: ${examples} (kekal dalam laporan)`,
+  previewCountries: ({ list }) => `Negara: ${list}`,
+  previewPrompt: 'Guna fail ini? (Enter = teruskan, b = pilih fail lain): ',
+  appsTitle: 'Aplikasi yang mana?',
+  appsHint: '↑↓ alih · baris spasi tandakan · Enter mula · b kembali',
+  appsPickNone: 'Tandakan sekurang-kurangnya satu aplikasi dengan baris spasi.',
+  accountsTitle: 'Akaun',
+  accountsActionHint: '↑↓ alih · r set semula cooldown · l log masuk semula · b kembali',
+  pressEnterForMenu: 'Tekan Enter untuk menu.',
+  guidePage: ({ n, m }) => `Panduan dan amaran · halaman ${n} daripada ${m}`,
+  guideNext: 'Enter = halaman seterusnya · b kembali',
+  qrGateTooSmall: ({ cols, rows, needCols, needRows }) =>
+    `Tetingkap ini ${cols} x ${rows}; kod memerlukan ${needCols} x ${needRows}.`,
+  qrGateEnlarge: 'Besarkan tetingkap (seret sudut), atau tekan Cmd+tolak sekali untuk mengecilkan teks.',
+  qrGateAltWhatsapp: 'guna kod pasangan sebaliknya',
+  qrGateAltTelegram: 'guna kod nombor telefon sebaliknya',
+  qrGatePrompt: ({ alt }) =>
+    `Besarkan tetingkap, kemudian tekan Enter untuk mencuba semula${alt === '' ? '' : `, atau taip c untuk ${alt}`} (b = kembali): `,
+  tgLoginTitle: 'Log masuk ke Telegram',
+
+  // v0.2.0: papan pemuka larian langsung, log larian, ringkasan, bendera --plain.
+  dashTitle: ({ file, numbers }: { file: string; numbers: number }) => `Menyemak ${file} · ${numbers} nombor`,
+  dashElapsed: ({ time }: { time: string }) => `Berlalu ${time}`,
+  dashSpeed: ({ rate }: { rate: number }) => `${rate} seminit`,
+  dashEta: ({ left, clock }: { left: string; clock: string }) => `baki kira-kira ${left} · siap kira-kira ${clock}`,
+  dashColApp: 'APLIKASI',
+  dashColAccount: 'AKAUN',
+  dashColState: 'STATUS',
+  dashColDone: 'SIAP',
+  dashColStatus: 'KEPUTUSAN',
+  dashColLast: 'AKHIR',
+  dashWorking: 'bekerja',
+  dashWaiting: 'menunggu',
+  dashResting: ({ clock, left }: { clock: string; left: string }) => `berehat · sambung semula ${clock} (dalam ${left})`,
+  dashDisabled: 'dinyahaktifkan',
+  dashDone: 'siap',
+  dashStatusCounts: ({ yes, notFound, unknown }: { yes: number; notFound: number; unknown: number }) =>
+    `${yes}y ${notFound}nf ${unknown}u`,
+  dashChecks: ({ done, total, numbers, apps }: { done: number; total: number; numbers: number; apps: number }) =>
+    `${done} daripada ${total} semakan (${numbers} nombor x ${apps} ${apps === 1 ? 'aplikasi' : 'aplikasi'})`,
+  dashCounts: ({ yes, notFound, unknown }: { yes: number; notFound: number; unknown: number }) =>
+    `yes ${yes} · not_found ${notFound} · unknown ${unknown}`,
+  dashHintStop: 'Ctrl+C menamatkan kumpulan ini dan menyimpan laporan.',
+  dashDetailsFile: ({ path }: { path: string }) => `Log terperinci: ${path}`,
+  progressPercent: ({ percent, done, total }: { percent: number; done: number; total: number }) =>
+    `kemajuan ${percent}% ${done}/${total}`,
+  progressEta: ({ time }: { time: string }) => `anggaran ${time}`,
+  progressPacing: ({ time }: { time: string }) => `rentak ${time}`,
+  progressRestingUntil: ({ clock }: { clock: string }) => `berehat sehingga ${clock}`,
+  summaryDone: ({ time, numbers, unfinished }: { time: string; numbers: number; unfinished: number }) =>
+    `Selesai dalam ${time} · ${numbers} nombor · ${unfinished} belum selesai`,
+  summaryNumbers: ({ total, valid, invalid }: { total: number; valid: number; invalid: number }) =>
+    `Nombor: ${total} unik (${valid} valid, ${invalid} invalid)`,
+  summaryAccountsUsed: ({ list }: { list: string }) => `Akaun digunakan: ${list}`,
+  summaryColApp: 'aplikasi',
+  summaryColYes: 'yes',
+  summaryColNotFound: 'not_found',
+  summaryColUnknown: 'unknown',
+  summaryColSkipped: 'skipped',
+  summaryColInvalid: 'invalid',
+  summaryColCountry: 'negara',
+  summaryYesByCountry: 'Berdaftar (yes) mengikut negara:',
+  summaryStale: ({ apps, count }: { apps: string; count: number }) =>
+    `USANG: ${apps} — ${count} keputusan yes/not_found ${count === 1 ? 'yang' : 'yang'} melebihi usia maksimum atau bertarikh pada masa hadapan ` +
+    '(lihat <app>_checked_at / <app>_stale dalam laporan): dikekalkan, tidak disahkan semula.',
+  summaryFootnote:
+    '`not_found` juga boleh bermaksud orang itu menyembunyikan nombornya daripada carian; `unknown` = belum disemak atau diperlahankan.',
+  cliNoValidNumbers: ({ invalid }: { invalid: number }) =>
+    `tiada nombor telefon yang sah (${invalid} invalid); semak --column serta lajur telefon dan kod negara dalam fail`,
+  cliCsvColumn: ({ name }: { name: string }) => `lajur "${name}"`,
+  cliCsvColumnIndex: ({ index }: { index: string }) => `lajur ${index} (tiada baris pengepala)`,
+  cliCsvRead: ({ file, labelled, rows, unique, invalid, duplicates }: { file: string; labelled: string; rows: number; unique: number; invalid: number; duplicates: number }) =>
+    `${file}: menggunakan ${labelled}; ${rows} ${rows === 1 ? 'baris' : 'baris'}, ${unique} unik` +
+    `${duplicates === 0 ? '' : `, ${duplicates} ${duplicates === 1 ? 'pendua' : 'pendua'} digabungkan`}, ${invalid} invalid`,
+  cliReportWritten: ({ path }: { path: string }) => `Laporan disimpan ke ${path}`,
+  cliInterruptOnce: 'Gangguan diterima: menyelesaikan kumpulan semasa, kemudian menulis laporan (Ctrl-C sekali lagi untuk paksa keluar)...',
+  cliInterruptOnceParallel:
+    'Gangguan diterima: menunggu kumpulan yang sedang berjalan, kemudian menulis laporan (Ctrl-C sekali lagi untuk paksa keluar)...',
+  cliInterruptTwice: 'Gangguan kedua, keluar sekarang.',
+  cliWarnNoValid: ({ reason }: { reason: string }) => `AMARAN: ${reason}. Laporan di atas hanya menyenaraikan baris invalid.`,
+  cliColApp: 'aplikasi',
+  cliColAccount: 'akaun',
+  cliColState: 'status',
+  cliColUsedToday: 'digunakan hari ini',
+  cliColBatchTime: 'masa kumpulan (purata / terakhir)',
+  cliAccountReady: 'sedia',
+  cliAccountDisabled: ({ reason }: { reason: string }) => `DINYAHAKTIFKAN: ${reason}`,
+  cliAccountCooling: ({ time }: { time: string }) => `cooldown sehingga ${time}`,
+  cliNoAccounts: 'Belum ada akaun. Log masuk dahulu (item menu 2, atau jalankan: phone-app-checker login <app> --account <name>).',
+  cliNoResetState: ({ app, account }: { app: string; account: string }) =>
+    `Tiada status direkodkan untuk akaun "${account}" bagi ${app}; tiada apa untuk diset semula.`,
+  cliResetDone: ({ app, account }: { app: string; account: string }) =>
+    `Cooldown dan penanda dinyahaktifkan untuk akaun "${account}" bagi ${app} telah dikosongkan.`,
+  revealPrompt: 'o = tunjuk dalam Finder · Enter = menu',
+  revealDone: 'Laporan ditunjukkan dalam Finder.',
+  revealFailed: 'Tidak dapat membuka Finder; laluan ada di atas.',
+  schNoAccounts: ({ numbers, app }: { numbers: number; app: string }) =>
+    `tiada akaun, ${numbers} ${numbers === 1 ? 'nombor' : 'nombor'} belum disemak. Jalankan: login ${app} --account <name>`,
+  schToCheck: ({ numbers, accounts }: { numbers: number; accounts: number }) =>
+    `${numbers} ${numbers === 1 ? 'nombor' : 'nombor'} untuk disemak dengan ${accounts} ${accounts === 1 ? 'akaun' : 'akaun'}`,
+  schFailedBefore: ({ count }: { count: number }) =>
+    `${count} ${count === 1 ? 'nombor' : 'nombor'} gagal dalam larian terdahulu: menyemaknya paling akhir, satu demi satu`,
+  schRateLimited: ({ account, time }: { account: string; time: string }) => `${account}: terhad kadar, berehat sehingga ${time}`,
+  schBanned: ({ account, reason, app }: { account: string; reason: string; app: string }) =>
+    `AMARAN ${account}: akaun dinyahaktifkan (${reason}). Baikinya, kemudian: login ${app} --account ${account}`,
+  schBatchError: ({ account, errors, max, reason }: { account: string; errors: number; max: number; reason: string }) =>
+    `${account}: ralat (${errors}/${max}): ${reason}`,
+  schParked: ({ count, failures }: { count: number; failures: number }) =>
+    `${count} ${count === 1 ? 'nombor' : 'nombor'} gagal ${failures} kali dalam larian yang sebaliknya berfungsi; ` +
+    'dibiarkan unknown untuk larian ini (tiada akaun diletakkan pada cooldown untuknya)',
+  schDropped: ({ account }: { account: string }) => `${account}: digugurkan untuk baki larian ini selepas ralat berulang`,
+  schBatchTimeout: ({ account, count }: { account: string; count: number }) =>
+    `${account}: satu kumpulan ${count} ${count === 1 ? 'nombor' : 'nombor'} tidak kembali tepat pada masanya; nombornya kekal unknown dan dikira dalam had hari ini`,
+  schNoUsable: ({ count }: { count: number }) =>
+    `tiada akaun boleh guna lagi (dinyahaktifkan atau gagal), ${count} ${count === 1 ? 'nombor' : 'nombor'} tidak disemak`,
+  schAllBlockedNowait: ({ count }: { count: number }) =>
+    `semua akaun sedang cooldown atau mencapai had harian, ${count} ${count === 1 ? 'nombor' : 'nombor'} tidak disemak (--no-wait)`,
+  schAllResting: ({ time, count }: { time: string; count: number }) =>
+    `semua akaun sedang berehat; sambung semula pada ${time} (baki ${count})`,
+  schChecked: ({ account, count, left }: { account: string; count: number; left: number }) =>
+    `${account}: ${count} disemak, baki ${left}`,
+  schCloseError: ({ account, reason }: { account: string; reason: string }) =>
+    `${account}: ralat semasa menutup sesi: ${reason}`,
+  schStoppedByError: ({ reason }: { reason: string }) => `dihentikan oleh ralat tidak dijangka: ${reason}`,
+  runComplete: 'semua muktamad',
+  runNotConclusive: 'selesai, TIDAK muktamad',
+  runStopDone: 'selesai',
+  runStopAborted: 'dihentikan',
+  runStopNoAccounts: 'tiada akaun boleh guna',
+  runStopBlocked: 'disekat',
+  runStopAdapterError: 'adapter tidak dapat dimuatkan',
+  runKept: ({ count }: { count: number }) => `, ${count} mengekalkan keputusan lama`,
+  runLine: ({ app, needed, attempted, conclusive, inconclusive, kept, remaining, label }: { app: string; needed: number; attempted: number; conclusive: number; inconclusive: number; kept: string; remaining: number; label: string }) =>
+    `${app}: perlu ${needed}, dicuba ${attempted}, muktamad ${conclusive}, ` +
+    `tidak muktamad ${inconclusive}${kept}, tiada jawapan ${remaining} (${label})`,
+  runIncomplete: ({ inconclusive, needed }: { inconclusive: number; needed: number }) =>
+    `INCOMPLETE: ${inconclusive} daripada ${needed} ${needed === 1 ? 'semakan' : 'semakan'} tiada jawapan yes/not_found baharu.`,
+  runNotFinal:
+    'Laporan ini BUKAN muktamad: sel bertanda unknown belum disemak, dan yes/not_found yang lebih lama mungkin usang.',
+  runAppLine: ({ app, inconclusive, attempted, conclusive }: { app: string; inconclusive: number; attempted: number; conclusive: number }) =>
+    `${app}: ${inconclusive} tidak muktamad (${attempted} dicuba, ${conclusive} muktamad)`,
+  runReasonNoAccounts: ({ app }: { app: string }) =>
+    `no_accounts: tiada akaun ${app} boleh guna (log masuk, atau baiki yang dinyahaktifkan: login ${app} --account <name>)`,
+  runReasonAdapterError: ({ app }: { app: string }) => `adapter_error: adapter ${app} tidak dapat dimuatkan`,
+  runReasonAborted: 'aborted: larian dihentikan',
+  runReasonCooldown: 'cooldown: setiap akaun berehat selepas had kadar atau ralat',
+  runReasonDailyCap: 'daily cap: setiap akaun boleh guna telah mencapai had hariannya',
+  runReasonErrors: ({ count }: { count: number }) => `errors: ${count} ${count === 1 ? 'kumpulan' : 'kumpulan'} gagal`,
+  runReasonParked: ({ batches, numbers }: { batches: number; numbers: number }) =>
+    `parked batches: ${batches} ${batches === 1 ? 'kumpulan' : 'kumpulan'}, ${numbers} ${numbers === 1 ? 'nombor' : 'nombor'}, diketepikan untuk larian ini`,
+  runReasonUnknown: ({ count }: { count: number }) =>
+    `unknown answers: ${count} ${count === 1 ? 'nombor' : 'nombor'} kembali sebagai unknown`,
+  runReasonNotReached: 'not_reached: sesetengah nombor tidak disemak',
+  runResumeHint: 'Jalankan arahan yang sama sekali lagi untuk meneruskan (nombor yang selesai tidak diulang).',
+  runResumeAt: ({ time }: { time: string }) =>
+    `Sambungan semula seterusnya: ${time}. Jalankan arahan yang sama pada masa itu (nombor yang selesai tidak diulang).`,
 } satisfies Catalog;

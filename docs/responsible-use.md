@@ -1,6 +1,6 @@
 # Responsible use
 
-phone-app-checker tells you whether a phone number is registered on Telegram, WhatsApp, Zalo, Viber or LINE. Looking up whether a number has an account is a form of processing personal data, and doing it at scale against platforms that do not allow it carries real risk for you, for the accounts you use, and for the people whose numbers you check. Read this page before you run the tool.
+phone-app-checker tells you whether a phone number is registered on Telegram, WhatsApp, Zalo, Viber, LINE, Threema or Matrix. Looking up whether a number has an account is a form of processing personal data, and doing it at scale against platforms that do not allow it carries real risk for you, for the accounts you use, and for the people whose numbers you check. Read this page before you run it.
 
 This page is general information, **not legal advice**. Rules differ by country and change; you are responsible for knowing and following the ones that apply to you.
 
@@ -28,15 +28,25 @@ Typical obligations include having a lawful basis (often consent), telling peopl
 
 ## Platform terms of service and account risk
 
-- The tool talks to each platform through **unofficial, reverse-engineered clients** (Baileys, mtcute, zca-js, linejs) or, for Viber, by driving the real Viber app on an Android device. None of the five platforms offers a sanctioned way to do this, and **their terms of service probably forbid it**.
+- The tool talks to Telegram, WhatsApp, Zalo and LINE through **unofficial, reverse-engineered clients** (mtcute, Baileys, zca-js, linejs) and, for Viber, by driving the real Viber app on an Android device. None of these platforms offers a sanctioned way to do this, and **their terms of service probably forbid it**.
+- Threema and Matrix are reached through their **official lookup interfaces** (the Threema Gateway API, and the Matrix identity-service API). That is not a licence to check any list: each operator's terms and acceptable-use rules still apply to you, and the Threema Gateway terms and the identity server's terms were **not** reviewed for customer-list checking (an open question, see [threema-setup.md](threema-setup.md) and [matrix-setup.md](matrix-setup.md)).
 - The accounts you log in with can be rate-limited, restricted, or **permanently banned**, and so can the phone numbers behind them. Use dedicated, disposable SIMs and accounts, never a personal or business-critical number. Age new accounts with a few days of normal use first.
-- The defaults are conservative guesses; platforms publish no limits. Start small, watch `phone-app-checker accounts`, and raise limits slowly.
+- The defaults are conservative guesses; platforms publish no limits. Start small, watch `phone-app-checker accounts`, and raise limits slowly. Raising `maxParallelAccounts` above 1 runs several sessions at once and **raises the ban exposure**; the default is 1.
 - You, not the project, accept this risk by running the tool.
+
+## Who sees the number: Threema and Matrix
+
+A lookup on these two apps discloses the number, in hashed form, to a third party that is not the person you check:
+
+- **Threema.** The adapter sends `HMAC-SHA256(key, number)` to the Threema Gateway together with your Gateway ID and secret. Threema publishes the key, so the hash is a **pseudonym, not protection**: anyone can recompute it for a known number. Treat each lookup as telling Threema that you asked about that number.
+- **Matrix.** The adapter sends a salted SHA-256 hash of the number to the identity server you configured (default `https://vector.im`), together with an identity token obtained from your Matrix account. The operator sees which hashes you ask about and from which account.
+
+Both apps are **disabled by default**. Do not enable them for a list you may not disclose to those operators, and say so in your own privacy notice. Neither adapter was verified against the live service.
 
 ## Accuracy: what a result means
 
 - A result is an **observation at a point in time**, not proof of identity, of an active account, or of consent.
-- `not_found` does **not** mean the person has no account. Users can hide themselves from search by phone number (Telegram, Zalo, LINE), Viber's answer depends on contact sync, and a silent soft throttle on the platform side can look like `not_found`.
+- `not_found` does **not** mean the person has no account. Users can hide themselves from search by phone number (Telegram, Zalo, LINE), Viber's answer depends on contact sync, a silent soft throttle on the platform side can look like `not_found`, and on **Threema and Matrix** it usually means only that the person never linked a phone number (many users never do), so `not_found` is a weak lower bound there.
 - **LINE** phone search is meaningful only in a few regions (Hong Kong, Japan, South Korea, Taiwan, Thailand); elsewhere `not_found` carries almost no information.
 - **Zalo** is checked for Vietnamese (`+84`) numbers only.
 - Before trusting a run, test with a small file of numbers whose answers you already know, per app.
@@ -44,7 +54,7 @@ Typical obligations include having a lawful basis (often consent), telling peopl
 
 ## Not affiliated
 
-phone-app-checker is an independent project. It is **not affiliated with, endorsed by, or sponsored by** Telegram, WhatsApp / Meta, Zalo / VNG, Viber / Rakuten, or LINE / LY Corporation. All product names and trademarks belong to their owners and are used only to say which service a check is about.
+phone-app-checker is an independent project. It is **not affiliated with, endorsed by, or sponsored by** Telegram, WhatsApp / Meta, Zalo / VNG, Viber / Rakuten, LINE / LY Corporation, Threema or the Matrix.org Foundation. All product names and trademarks belong to their owners and are used only to say which service a check is about.
 
 ## If something goes wrong
 

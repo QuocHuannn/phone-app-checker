@@ -17,6 +17,7 @@
 !/README.md
 !/SECURITY.md
 !/THIRD_PARTY_LICENSES.md
+!/bench/
 !/bin/
 !/checker.config.example.json
 !/docs/
@@ -26,6 +27,7 @@
 !/scripts/
 !/src/
 !/tests/
+!/tsconfig.build.json
 !/tsconfig.json
 !/vitest.config.ts
 
@@ -53,8 +55,8 @@ login-qr*.png
 *.key
 
 # Build output and tooling noise
+bench/out/
 node_modules/
-dist/
 *.tsbuildinfo
 *.log
 .DS_Store

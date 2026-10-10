@@ -32,8 +32,8 @@ export const vi = {
 
   askCsvIntro: 'Kéo file CSV từ Finder thả vào cửa sổ này (hoặc gõ đường dẫn), rồi nhấn Enter.',
   askCsvPrompt: ({ hint }) => `File CSV (${hint}): `,
-  askCsvHintBack: 'Enter để quay lại',
-  askCsvHintDefault: ({ path }) => `Enter = ${path}`,
+  askCsvHintBack: 'b = quay lại',
+  askCsvHintDefault: ({ path }) => `b = quay lại · Enter = ${path}`,
   askReportPrompt: ({ path }) => `File báo cáo (Enter = ${path}): `,
   reportExists: ({ path }) => `File ${path} đã có. Ghi đè`,
 
@@ -57,9 +57,9 @@ export const vi = {
   appNotSetUp: 'chưa thiết lập',
   appLoggedIn: ({ count, names }) => `đã đăng nhập: ${count} tài khoản (${names})`,
   loginAppsHeader: 'Các app:',
-  loginAppPrompt: ({ max }) => `Đăng nhập app nào? (số 1-${max}, Enter để quay lại): `,
+  loginAppPrompt: ({ max }) => `Đăng nhập app nào? (số 1-${max}, b = quay lại): `,
   loginUnknown: ({ input, max }) => `Không hiểu "${input}". Gõ một số từ 1 đến ${max}.`,
-  askAccountPrompt: ({ name }) => `Tên tài khoản (Enter = ${name}): `,
+  askAccountPrompt: ({ name }) => `Tên tài khoản (Enter = ${name}, b = quay lại): `,
   accountNameInvalid: 'Tên chỉ gồm chữ không dấu, số, "-" hoặc "_" (tối đa 32 ký tự, bắt đầu bằng chữ hoặc số).',
   accountExists: ({ account, app }) => `Tài khoản "${account}" của ${app} đã có. Đăng nhập lại sẽ thay phiên đăng nhập cũ.`,
   loginAgainConfirm: 'Vẫn đăng nhập lại?',
@@ -68,18 +68,22 @@ export const vi = {
   hintTelegram: 'Telegram sẽ hỏi: số điện thoại (+84...), mã đăng nhập (không hiện khi gõ), mật khẩu 2 bước nếu có.',
   hintViber: 'Viber cần điện thoại Android nối cáp USB (xem docs/viber-setup.md).',
   hintLine: 'LINE sẽ hướng dẫn trên màn hình (xem docs/line-setup.md).',
+  hintThreema: 'Threema sẽ hỏi: Gateway ID (bắt đầu bằng *, 8 ký tự) và mã bí mật của nó (không hiện khi gõ). Xem docs/threema-setup.md.',
+  hintMatrix: 'Matrix sẽ hỏi: máy chủ homeserver (Enter = matrix.org), tên đăng nhập và mật khẩu (không hiện khi gõ). Mật khẩu chỉ dùng một lần và không được lưu. Xem docs/matrix-setup.md.',
 
   loginMethodPrompt: ({ max }) => `Chọn 1-${max} (Enter = 1): `,
   loginMethodInvalid: ({ max }) => `Hãy gõ một số từ 1 đến ${max}.`,
   loginFailed: ({ app, account }) => `Đăng nhập ${app} (tài khoản ${account}) chưa hoàn tất và chưa lưu gì. Bạn đã quay lại menu: chọn 2 để thử lại.`,
   whatsappMethodIntro: 'Bạn muốn liên kết WhatsApp bằng cách nào?',
-  whatsappMethodCode: '1) Liên kết bằng số điện thoại: nhập mã 8 ký tự trên điện thoại (khuyên dùng)',
-  whatsappMethodQr: '2) Quét mã QR bằng điện thoại',
-  whatsappPhonePrompt: 'Số điện thoại của tài khoản WhatsApp cần liên kết, có mã quốc gia (ví dụ +84901234567; Enter để quay lại): ',
+  whatsappMethodCode: 'Liên kết bằng số điện thoại: nhập mã 8 ký tự trên điện thoại (nên dùng)',
+  whatsappMethodQr: 'Quét mã QR bằng điện thoại',
+  whatsappMethodCodeDetail: 'Trên điện thoại: WhatsApp > Cài đặt > Thiết bị đã liên kết > Liên kết bằng số điện thoại',
+  whatsappMethodQrDetail: ({ need }) => `Cần cửa sổ ít nhất ${need}`,
+  whatsappPhonePrompt: 'Số điện thoại của tài khoản WhatsApp cần liên kết, có mã quốc gia (ví dụ +84901234567; b = quay lại): ',
   whatsappPhoneInvalid: 'Số điện thoại này không hợp lệ. Hãy gõ kèm mã quốc gia, ví dụ +84901234567.',
   telegramMethodIntro: 'Bạn muốn đăng nhập Telegram bằng cách nào?',
-  telegramMethodQr: '1) Quét mã QR bằng app Telegram trên điện thoại (mặc định)',
-  telegramMethodCode: '2) Nhập mã đăng nhập Telegram gửi đến, dùng số điện thoại của bạn',
+  telegramMethodQr: 'Quét mã QR bằng app Telegram trên điện thoại (mặc định)',
+  telegramMethodCode: 'Nhập mã đăng nhập Telegram gửi đến, dùng số điện thoại của bạn',
   hintTelegramQr:
     'Telegram sẽ hiện mã QR: trên điện thoại mở Telegram > Cài đặt > Thiết bị > Liên kết thiết bị máy tính, rồi quét. Mật khẩu 2 bước (nếu có) sẽ được hỏi sau khi quét (không hiện khi gõ).',
 
@@ -126,11 +130,10 @@ export const vi = {
   spinConnecting: 'Đang kết nối tới Telegram...',
   spinWaitingScan: 'Đang chờ bạn quét mã...',
   hintMenu: '↑↓ di chuyển · Enter chọn · q thoát',
-  hintBack: '↑↓ di chuyển · Enter chọn · Esc hoặc q quay lại',
+  hintBack: '↑↓ di chuyển · Enter chọn · Esc, q hoặc b quay lại',
   bannerAccounts: 'Tài khoản sẵn sàng:',
   emptyAccounts: 'Chưa có tài khoản nào đăng nhập. Hãy chọn "Đăng nhập tài khoản app" trước, rồi quay lại đây.',
   loginPickApp: 'Đăng nhập vào app nào?',
-  loginPickMethod: 'Bạn muốn đăng nhập bằng cách nào?',
   reportSavedTo: ({ path }) => `Đã lưu báo cáo vào ${path}`,
   finalNextOpen: 'Tiếp theo: mở file bằng Excel hoặc Numbers (nhấp đúp vào file).',
   finalNextFinder: ({ command }) => `Để hiện file trong Finder, gõ: ${command}`,
@@ -160,6 +163,16 @@ export const vi = {
   zaloQrExpired: ({ attempt, max }) => `Mã QR đã hết hạn. Đang tạo mã mới (${attempt}/${max}).`,
   zaloQrGaveUp: 'Mã QR đã hết hạn quá nhiều lần. Hãy đăng nhập lại.',
   zaloQrDeclined: 'Đăng nhập Zalo đã bị từ chối trên điện thoại.',
+  threemaIdPrompt: 'Gateway ID của Threema (8 ký tự, bắt đầu bằng *, ví dụ *ABCDEFG): ',
+  threemaSecretPrompt: 'Mã bí mật API của Threema Gateway (không hiện khi gõ): ',
+  threemaIdInvalid: 'Gateway ID gồm dấu "*" và 7 chữ cái in hoa hoặc chữ số, ví dụ *ABCDEFG. Hãy thử lại.',
+  matrixHomeserverPrompt: ({ url }) => `Địa chỉ homeserver Matrix (Enter = ${url}): `,
+  matrixHomeserverInvalid: 'Hãy gõ địa chỉ bắt đầu bằng https://, ví dụ https://matrix.org. Hãy thử lại.',
+  matrixUserPrompt: 'Tên đăng nhập Matrix (ví dụ alice, hoặc @alice:matrix.org): ',
+  matrixPasswordPrompt: 'Mật khẩu Matrix (không hiện khi gõ; chỉ dùng một lần, không được lưu): ',
+  matrixTermsIntro: ({ server }) => `Máy chủ định danh ${server} yêu cầu bạn chấp nhận điều khoản trước khi trả lời tra cứu. Đọc tại đây:`,
+  matrixTermsPrompt: 'Bạn có chấp nhận các điều khoản này không? (c/k): ',
+  matrixTermsDeclined: 'Điều khoản chưa được chấp nhận; chưa lưu gì.',
   telegramPhonePrompt: 'Số điện thoại Telegram (dạng quốc tế, ví dụ +84901234567): ',
   telegramCodePrompt: 'Mã đăng nhập Telegram gửi đến (không hiện khi gõ): ',
   telegramPasswordPrompt: 'Mật khẩu xác minh 2 bước (không hiện khi gõ): ',
@@ -184,4 +197,176 @@ export const vi = {
   guideBan: '- Dùng SIM / tài khoản riêng của công ty, chấp nhận mất được: tài khoản có thể bị giới hạn hoặc khóa (ban).',
   guideEvidence: '- Kết quả chỉ là quan sát tại thời điểm kiểm tra, không phải bằng chứng.',
   guideDetails: '- Chi tiết: README.md và docs/install-macos.md.',
+
+  // v0.2.0: file gần đây, xem trước CSV, checklist, cổng QR, tác vụ tài khoản, trang hướng dẫn.
+  accountsWord: ({ count }) => (count === 1 ? '1 tài khoản' : `${count} tài khoản`),
+  accountsNone: 'chưa có',
+  pickCsvTitle: 'Chọn danh sách số điện thoại (CSV)',
+  pickCsvDrag: 'Kéo file CSV từ Finder thả vào cửa sổ này, hoặc chọn file đã dùng gần đây.',
+  pickCsvType: 'Gõ hoặc dán đường dẫn',
+  pickCsvRecentHint: 'một số trong danh sách, hoặc b = quay lại',
+  recentClear: 'xóa danh sách và ngừng ghi nhớ file',
+  recentConfirm: 'Xóa danh sách file gần đây và ngừng ghi nhớ?',
+  recentCleared: 'Đã xóa danh sách file gần đây; đã tắt ghi nhớ.',
+  recentMissing: 'không còn',
+  recentWhenJustNow: 'vừa xong',
+  recentWhenMinutes: ({ count }) => `${count} phút trước`,
+  recentWhenHours: ({ count }) => `${count} giờ trước`,
+  recentWhenYesterday: 'hôm qua',
+  previewTitle: ({ name, column }) => `${name} · cột số điện thoại "${column}"`,
+  previewCounts: ({ rows, usable, unusable }) => `${rows} dòng · ${usable} số dùng được · ${unusable} không dùng được`,
+  previewUnusable: ({ examples }) => `Không dùng được, ví dụ: ${examples} (vẫn ghi vào báo cáo)`,
+  previewCountries: ({ list }) => `Quốc gia: ${list}`,
+  previewPrompt: 'Dùng file này? (Enter = tiếp tục, b = chọn file khác): ',
+  appsTitle: 'Kiểm tra app nào?',
+  appsHint: '↑↓ di chuyển · phím cách chọn · Enter bắt đầu · b quay lại',
+  appsPickNone: 'Hãy đánh dấu ít nhất một app bằng phím cách.',
+  accountsTitle: 'Tài khoản',
+  accountsActionHint: '↑↓ di chuyển · r xóa thời gian chờ · l đăng nhập lại · b quay lại',
+  pressEnterForMenu: 'Nhấn Enter để về menu.',
+  guidePage: ({ n, m }) => `Hướng dẫn và cảnh báo · trang ${n}/${m}`,
+  guideNext: 'Enter = trang tiếp · b quay lại',
+  qrGateTooSmall: ({ cols, rows, needCols, needRows }) => `Cửa sổ này là ${cols} x ${rows}; mã cần ${needCols} x ${needRows}.`,
+  qrGateEnlarge: 'Phóng to cửa sổ (kéo một góc), hoặc nhấn Cmd+dấu trừ một lần để thu nhỏ chữ.',
+  qrGateAltWhatsapp: 'dùng mã ghép đôi thay thế',
+  qrGateAltTelegram: 'dùng mã đăng nhập theo số điện thoại thay thế',
+  qrGatePrompt: ({ alt }) => `Phóng to cửa sổ rồi nhấn Enter để thử lại${alt === '' ? '' : `, hoặc gõ c để ${alt}`} (b = quay lại): `,
+  tgLoginTitle: 'Đăng nhập Telegram',
+
+  // v0.2.0: live run dashboard, run log, summary, --plain flag.
+  dashTitle: ({ file, numbers }) => `Đang kiểm tra ${file} · ${numbers} số`,
+  dashElapsed: ({ time }) => `Đã chạy ${time}`,
+  dashSpeed: ({ rate }) => `${rate}/phút`,
+  dashEta: ({ left, clock }) => `còn khoảng ${left} · xong khoảng ${clock}`,
+  dashColApp: 'ỨNG DỤNG',
+  dashColAccount: 'TÀI KHOẢN',
+  dashColState: 'TRẠNG THÁI',
+  dashColDone: 'XONG',
+  dashColStatus: 'KẾT QUẢ',
+  dashColLast: 'GẦN NHẤT',
+  dashWorking: 'đang chạy',
+  dashWaiting: 'đang chờ',
+  dashResting: ({ clock, left }) => `nghỉ · tiếp tục ${clock} (sau ${left})`,
+  dashDisabled: 'vô hiệu',
+  dashDone: 'xong',
+  dashStatusCounts: ({ yes, notFound, unknown }) =>
+    `${yes}y ${notFound}nf ${unknown}u`,
+  dashChecks: ({ done, total, numbers, apps }) =>
+    `${done} trên ${total} lượt kiểm (${numbers} số x ${apps} ${apps === 1 ? 'app' : 'app'})`,
+  dashCounts: ({ yes, notFound, unknown }) =>
+    `yes ${yes} · not_found ${notFound} · unknown ${unknown}`,
+  dashHintStop: 'Ctrl+C để kết thúc đợt này và lưu báo cáo.',
+  dashDetailsFile: ({ path }) => `Nhật ký: ${path}`,
+  progressPercent: ({ percent, done, total }) =>
+    `tiến độ ${percent}% ${done}/${total}`,
+  progressEta: ({ time }) => `dự kiến ${time}`,
+  progressPacing: ({ time }) => `giãn nhịp ${time}`,
+  progressRestingUntil: ({ clock }) => `nghỉ đến ${clock}`,
+  summaryDone: ({ time, numbers, unfinished }) =>
+    `Xong trong ${time} · ${numbers} số · ${unfinished} chưa xong`,
+  summaryNumbers: ({ total, valid, invalid }) =>
+    `Số điện thoại: ${total} duy nhất (${valid} hợp lệ, ${invalid} không hợp lệ)`,
+  summaryAccountsUsed: ({ list }) => `Tài khoản đã dùng: ${list}`,
+  summaryColApp: 'ứng dụng',
+  summaryColYes: 'yes',
+  summaryColNotFound: 'not_found',
+  summaryColUnknown: 'unknown',
+  summaryColSkipped: 'skipped',
+  summaryColInvalid: 'invalid',
+  summaryColCountry: 'quốc gia',
+  summaryYesByCountry: 'Đã đăng ký (yes) theo quốc gia:',
+  summaryStale: ({ apps, count }) =>
+    `STALE: ${apps} — ${count} ${count === 1 ? 'kết quả' : 'kết quả'} yes/not_found cũ hơn tuổi tối đa hoặc có ngày ở tương lai ` +
+    '(xem <app>_checked_at / <app>_stale trong báo cáo): được giữ lại, không xác nhận lại.',
+  summaryFootnote:
+    '`not_found` cũng có thể nghĩa là người đó ẩn số điện thoại khỏi tìm kiếm; `unknown` = chưa kiểm tra hoặc bị giới hạn tần suất.',
+  cliNoValidNumbers: ({ invalid }) =>
+    `không có số điện thoại hợp lệ (${invalid} không hợp lệ); hãy kiểm tra --column, cột số điện thoại trong tệp và mã quốc gia`,
+  cliCsvColumn: ({ name }) => `cột "${name}"`,
+  cliCsvColumnIndex: ({ index }) => `cột ${index} (không có hàng tiêu đề)`,
+  cliCsvRead: ({ file, labelled, rows, unique, invalid, duplicates }) =>
+    `${file}: dùng ${labelled}; ${rows} ${rows === 1 ? 'hàng' : 'hàng'}, ${unique} duy nhất` +
+    `${duplicates === 0 ? '' : `, gộp ${duplicates} ${duplicates === 1 ? 'bản trùng' : 'bản trùng'}`}, ${invalid} không hợp lệ`,
+  cliReportWritten: ({ path }) => `Đã ghi báo cáo vào ${path}`,
+  cliInterruptOnce: 'Đã nhận lệnh ngắt: đang hoàn tất đợt hiện tại rồi ghi báo cáo (nhấn Ctrl-C lần nữa để buộc thoát)...',
+  cliInterruptOnceParallel:
+    'Đã nhận lệnh ngắt: đang chờ các đợt đang chạy rồi ghi báo cáo (nhấn Ctrl-C lần nữa để buộc thoát)...',
+  cliInterruptTwice: 'Ngắt lần thứ hai, thoát ngay.',
+  cliWarnNoValid: ({ reason }) => `CẢNH BÁO: ${reason}. Báo cáo trên chỉ liệt kê các hàng không hợp lệ.`,
+  cliColApp: 'ứng dụng',
+  cliColAccount: 'tài khoản',
+  cliColState: 'trạng thái',
+  cliColUsedToday: 'đã dùng hôm nay',
+  cliColBatchTime: 'thời gian đợt (TB / gần nhất)',
+  cliAccountReady: 'sẵn sàng',
+  cliAccountDisabled: ({ reason }) => `VÔ HIỆU: ${reason}`,
+  cliAccountCooling: ({ time }) => `đang nghỉ đến ${time}`,
+  cliNoAccounts: 'Chưa có tài khoản nào. Hãy đăng nhập trước (mục menu 2, hoặc chạy: phone-app-checker login <app> --account <name>).',
+  cliNoResetState: ({ app, account }) =>
+    `Không có trạng thái đã ghi cho tài khoản "${account}" của ${app}; không có gì để đặt lại.`,
+  cliResetDone: ({ app, account }) =>
+    `Đã xóa cooldown và cờ disabled cho tài khoản "${account}" của ${app}.`,
+  revealPrompt: 'o = hiện trong Finder · Enter = menu',
+  revealDone: 'Báo cáo đã được hiển thị trong Finder.',
+  revealFailed: 'Không mở được Finder; đường dẫn ở phía trên.',
+  schNoAccounts: ({ numbers, app }) =>
+    `không có tài khoản, ${numbers} ${numbers === 1 ? 'số' : 'số'} chưa được kiểm tra. Chạy: login ${app} --account <name>`,
+  schToCheck: ({ numbers, accounts }) =>
+    `${numbers} ${numbers === 1 ? 'số' : 'số'} cần kiểm tra với ${accounts} ${accounts === 1 ? 'tài khoản' : 'tài khoản'}`,
+  schFailedBefore: ({ count }) =>
+    `${count} ${count === 1 ? 'số' : 'số'} thất bại ở lần chạy trước: kiểm tra chúng sau cùng, từng số một`,
+  schRateLimited: ({ account, time }) => `${account}: bị giới hạn tần suất, nghỉ đến ${time}`,
+  schBanned: ({ account, reason, app }) =>
+    `CẢNH BÁO ${account}: tài khoản disabled (${reason}). Khắc phục rồi chạy: login ${app} --account ${account}`,
+  schBatchError: ({ account, errors, max, reason }) =>
+    `${account}: lỗi (${errors}/${max}): ${reason}`,
+  schParked: ({ count, failures }) =>
+    `${count} ${count === 1 ? 'số' : 'số'} thất bại ${failures} lần trong một lần chạy vốn bình thường; ` +
+    'để chúng ở trạng thái unknown trong lần chạy này (không tài khoản nào bị cooldown vì việc này)',
+  schDropped: ({ account }) => `${account}: bị loại khỏi phần còn lại của lần chạy này sau nhiều lỗi lặp lại`,
+  schBatchTimeout: ({ account, count }) =>
+    `${account}: một đợt ${count} ${count === 1 ? 'số' : 'số'} không phản hồi kịp thời; các số đó vẫn ở trạng thái unknown và tính vào hạn mức hôm nay`,
+  schNoUsable: ({ count }) =>
+    `không còn tài khoản dùng được (bị disabled hoặc lỗi), ${count} ${count === 1 ? 'số' : 'số'} chưa kiểm tra`,
+  schAllBlockedNowait: ({ count }) =>
+    `tất cả tài khoản đang cooldown hoặc đã đạt hạn mức ngày, ${count} ${count === 1 ? 'số' : 'số'} chưa kiểm tra (--no-wait)`,
+  schAllResting: ({ time, count }) =>
+    `tất cả tài khoản đang nghỉ; tiếp tục lúc ${time} (còn ${count} số)`,
+  schChecked: ({ account, count, left }) =>
+    `${account}: đã kiểm ${count}, còn ${left}`,
+  schCloseError: ({ account, reason }) =>
+    `${account}: lỗi khi đóng phiên: ${reason}`,
+  schStoppedByError: ({ reason }) => `dừng do lỗi không mong đợi: ${reason}`,
+  runComplete: 'tất cả đều kết luận',
+  runNotConclusive: 'đã xong, CHƯA kết luận',
+  runStopDone: 'đã xong',
+  runStopAborted: 'bị ngắt',
+  runStopNoAccounts: 'không có tài khoản dùng được',
+  runStopBlocked: 'bị chặn',
+  runStopAdapterError: 'không tải được adapter',
+  runKept: ({ count }) => `, ${count} giữ kết quả cũ`,
+  runLine: ({ app, needed, attempted, conclusive, inconclusive, kept, remaining, label }) =>
+    `${app}: cần ${needed}, đã thử ${attempted}, kết luận ${conclusive}, ` +
+    `chưa kết luận ${inconclusive}${kept}, không trả lời ${remaining} (${label})`,
+  runIncomplete: ({ inconclusive, needed }) =>
+    `INCOMPLETE: ${inconclusive} trong ${needed} ${needed === 1 ? 'lượt kiểm' : 'lượt kiểm'} chưa có câu trả lời yes/not_found mới.`,
+  runNotFinal:
+    'Báo cáo CHƯA phải bản cuối: các ô ghi unknown là chưa kiểm tra, và kết quả yes/not_found cũ có thể đã lỗi thời.',
+  runAppLine: ({ app, inconclusive, attempted, conclusive }) =>
+    `${app}: ${inconclusive} chưa kết luận (${attempted} đã thử, ${conclusive} kết luận)`,
+  runReasonNoAccounts: ({ app }) =>
+    `no_accounts: không có tài khoản ${app} nào dùng được (đăng nhập, hoặc sửa một tài khoản disabled: login ${app} --account <name>)`,
+  runReasonAdapterError: ({ app }) => `adapter_error: không tải được adapter ${app}`,
+  runReasonAborted: 'aborted: lần chạy đã bị ngắt',
+  runReasonCooldown: 'cooldown: mọi tài khoản đang nghỉ sau khi bị giới hạn tần suất hoặc gặp lỗi',
+  runReasonDailyCap: 'daily cap: mọi tài khoản dùng được đã đạt giới hạn ngày',
+  runReasonErrors: ({ count }) => `errors: ${count} ${count === 1 ? 'đợt' : 'đợt'} thất bại`,
+  runReasonParked: ({ batches, numbers }) =>
+    `parked batches: ${batches} ${batches === 1 ? 'đợt' : 'đợt'}, ${numbers} ${numbers === 1 ? 'số' : 'số'}, đã bỏ qua cho lần chạy này`,
+  runReasonUnknown: ({ count }) =>
+    `unknown answers: ${count} ${count === 1 ? 'số' : 'số'} trả về unknown`,
+  runReasonNotReached: 'not_reached: một số số chưa được kiểm tra',
+  runResumeHint: 'Chạy lại đúng lệnh đó để tiếp tục (các số đã xong sẽ không bị lặp lại).',
+  runResumeAt: ({ time }) =>
+    `Lần tiếp tục tiếp theo: ${time}. Chạy lại đúng lệnh đó vào lúc đó (các số đã xong sẽ không bị lặp lại).`,
 } satisfies Catalog;

@@ -22,8 +22,12 @@ export interface Icons {
   bullet: string;
   arrow: string;
   pointer: string;
+  /** Ready / done (green) and "not set up / none" (dim): words always travel with them, never the icon alone. */
   ready: string;
   empty: string;
+  /** A step that is running now (cyan) and one that is resting until a time (dim cyan). */
+  working: string;
+  waiting: string;
   ellipsis: string;
   /** Horizontal rule piece and the box corners / bar. */
   rule: string;
@@ -41,8 +45,10 @@ const UNICODE_ICONS: Icons = {
   bullet: '•',
   arrow: '›',
   pointer: '❯',
-  ready: '✅',
-  empty: '⬜',
+  ready: '✔',
+  empty: '○',
+  working: '●',
+  waiting: '◷',
   ellipsis: '…',
   rule: '─',
   topLeft: '╭',
@@ -58,8 +64,10 @@ const ASCII_ICONS: Icons = {
   bullet: '-',
   arrow: '>',
   pointer: '>',
-  ready: '[x]',
+  ready: '[ok]',
   empty: '[ ]',
+  working: '*',
+  waiting: '~',
   ellipsis: '...',
   rule: '-',
   topLeft: '+',
@@ -95,10 +103,24 @@ const ESC = '\u001b';
 const ANSI = /\u001b\[[0-?]*[ -/]*[@-~]/g;
 
 /**
+ * Set (to anything but empty) to force the plain tier everywhere: no colour, no cursor movement,
+ * no raw-key navigation — the accessible fallback for screen readers, braille displays and slow
+ * terminals. Read by `isRich`, `detectMode` (qr.ts) and the QR screen's cursor handling.
+ */
+export const PLAIN_ENV = 'PHONE_APP_CHECKER_PLAIN';
+
+/** True when the plain tier is forced (see {@link PLAIN_ENV}). */
+export function plainForced(env: NodeJS.ProcessEnv): boolean {
+  return (env[PLAIN_ENV] ?? '') !== '';
+}
+
+/**
  * Whether ANSI escape sequences may be written to `stream`: it is a terminal, `TERM` names one that
- * understands them (not unset, not "dumb") and `NO_COLOR` is not set (to anything but empty, no-color.org).
+ * understands them (not unset, not "dumb"), `NO_COLOR` is not set (to anything but empty, no-color.org)
+ * and the plain tier is not forced with {@link PLAIN_ENV}.
  */
 export function isRich(stream: UiStream, env: NodeJS.ProcessEnv): boolean {
+  if (plainForced(env)) return false;
   if (stream.isTTY !== true) return false;
   const term = env.TERM?.trim().toLowerCase();
   if (term === undefined || term === '' || term === 'dumb') return false;
@@ -279,6 +301,24 @@ export function formatDuration(ms: number): string {
   const hours = Math.floor(minutes / 60);
   return `${hours} h ${String(minutes % 60).padStart(2, '0')} min`;
 }
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * A clock time in local time, `HH:MM` when it falls on the same local calendar day as `now`
+ * (default: the real current time), `DD Mon HH:MM` otherwise — so a resume tomorrow or next week
+ * is never ambiguous. Replaces `toISOString()` in user-visible text, which was always UTC.
+ */
+export function formatLocalTime(ms: number, now?: number): string {
+  const at = new Date(ms);
+  const time = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  const ref = new Date(now ?? Date.now());
+  const sameDay =
+    at.getFullYear() === ref.getFullYear() && at.getMonth() === ref.getMonth() && at.getDate() === ref.getDate();
+  return sameDay ? time : `${pad(at.getDate())} ${MONTH_NAMES[at.getMonth()]} ${time}`;
+}
+
+const pad = (n: number): string => String(n).padStart(2, '0');
 
 export type Tone = 'info' | 'ok' | 'warn' | 'error';
 

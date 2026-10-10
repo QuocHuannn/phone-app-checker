@@ -1,11 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AdbError } from '../src/android/adb.ts';
 import { loadConfig } from '../src/config.ts';
+import { packageVersion } from '../src/home.ts';
 import { DOCTOR_FOOTER, formatDoctor, runDoctor, type DoctorCheck, type DoctorInput } from '../src/doctor.ts';
-import type { Adapter, App } from '../src/types.ts';
+import { APPS, type Adapter, type App } from '../src/types.ts';
 
 let home: string;
 
@@ -57,22 +58,23 @@ describe('runDoctor', () => {
     });
     for (const app of ['telegram', 'whatsapp', 'zalo', 'viber'] as const) addAccount(app);
     const checks = await runDoctor(input());
-    expect(checks.map((c) => c.name)).toEqual(['version', 'runtime', 'sqlite', 'config', 'data', 'telegram', 'whatsapp', 'zalo', 'viber', 'line']);
+    expect(checks.map((c) => c.name)).toEqual(['version', 'runtime', 'sqlite', 'config', 'data', ...APPS]);
     expect(checks.filter((c) => c.level !== 'ok')).toEqual([]);
     const named = byName(checks);
-    expect(named.version?.detail).toContain('0.1.0');
+    expect(named.version?.detail).toContain(packageVersion());
     expect(named.version?.detail).toContain('source checkout');
     expect(named.runtime?.detail).toContain(process.versions.node);
     expect(named.config?.detail).toBe(`${join(home, 'checker.config.json')} (exists)`);
     expect(named.data?.detail).toBe(join(home, 'data'));
-    expect(named.line?.detail).toBe('disabled (module loads)');
-    expect(named.telegram?.detail).toBe('module loads; 1 account');
+    expect(named.line?.detail).toBe('disabled (adapter package installed)');
+    expect(named.telegram?.detail).toBe('adapter package installed; 1 account');
   });
 
-  it('fails when an adapter module cannot be loaded, even a disabled one', async () => {
+  it('fails when an adapter module cannot be loaded, even a disabled one (--deep)', async () => {
     writeConfig({});
     const checks = await runDoctor(
       input({
+        deep: true,
         loadAdapter: async (app) => {
           if (app === 'line') throw new Error('Cannot load the line adapter: boom');
           return fakeAdapter(app);
@@ -99,6 +101,101 @@ describe('runDoctor', () => {
     addAccount('telegram');
     const checks = byName(await runDoctor(input({ env: { TELEGRAM_API_ID: '12345', TELEGRAM_API_HASH: 'abcdef' } })));
     expect(checks.telegram).toMatchObject({ level: 'ok' });
+  });
+
+  describe('threema credentials', () => {
+    function threemaFile(content: string | undefined, mode = 0o600): string {
+      const dir = join(home, 'data', 'sessions', 'threema', 'default');
+      mkdirSync(dir, { recursive: true });
+      const file = join(dir, 'credentials.json');
+      if (content !== undefined) {
+        writeFileSync(file, content);
+        chmodSync(file, mode);
+      }
+      return file;
+    }
+
+    it('is disabled by default and needs no package (first-party adapter)', async () => {
+      writeConfig({});
+      const checks = byName(await runDoctor(input()));
+      expect(checks.threema).toMatchObject({ level: 'ok', detail: 'disabled (adapter available)' });
+    });
+
+    it('loads in --deep mode', async () => {
+      writeConfig({});
+      const loaded: App[] = [];
+      await runDoctor(input({ deep: true, loadAdapter: async (app) => (loaded.push(app), fakeAdapter(app)) }));
+      expect(loaded).toContain('threema');
+    });
+
+    it('is ok when the account has a private credentials file', async () => {
+      writeConfig({ apps: { threema: { enabled: true } } });
+      threemaFile('{}');
+      expect(byName(await runDoctor(input())).threema).toMatchObject({ level: 'ok' });
+    });
+
+    it('warns when the account directory has no credentials file', async () => {
+      writeConfig({ apps: { threema: { enabled: true } } });
+      threemaFile(undefined);
+      const check = byName(await runDoctor(input())).threema;
+      expect(check).toMatchObject({ level: 'warn' });
+      expect(check?.detail).toContain('login threema --account default');
+    });
+
+    it('warns when the credentials file can be read by other users', async () => {
+      writeConfig({ apps: { threema: { enabled: true } } });
+      threemaFile('{}', 0o644);
+      const check = byName(await runDoctor(input())).threema;
+      expect(check).toMatchObject({ level: 'warn' });
+      expect(check?.detail).toContain('readable by others');
+      expect(check?.detail).toContain('chmod 600');
+    });
+  });
+
+  describe('matrix credentials', () => {
+    function matrixFile(content: string | undefined, mode = 0o600): void {
+      const dir = join(home, 'data', 'sessions', 'matrix', 'default');
+      mkdirSync(dir, { recursive: true });
+      if (content === undefined) return;
+      const file = join(dir, 'credentials.json');
+      writeFileSync(file, content);
+      chmodSync(file, mode);
+    }
+
+    it('is disabled by default and needs no package (first-party adapter)', async () => {
+      writeConfig({});
+      expect(byName(await runDoctor(input())).matrix).toMatchObject({ level: 'ok', detail: 'disabled (adapter available)' });
+    });
+
+    it('loads in --deep mode', async () => {
+      writeConfig({});
+      const loaded: App[] = [];
+      await runDoctor(input({ deep: true, loadAdapter: async (app) => (loaded.push(app), fakeAdapter(app)) }));
+      expect(loaded).toContain('matrix');
+    });
+
+    it('is ok when the account has a private credentials file', async () => {
+      writeConfig({ apps: { matrix: { enabled: true } } });
+      matrixFile('{}');
+      expect(byName(await runDoctor(input())).matrix).toMatchObject({ level: 'ok' });
+    });
+
+    it('warns when the account directory has no credentials file', async () => {
+      writeConfig({ apps: { matrix: { enabled: true } } });
+      matrixFile(undefined);
+      const check = byName(await runDoctor(input())).matrix;
+      expect(check).toMatchObject({ level: 'warn' });
+      expect(check?.detail).toContain('login matrix --account default');
+    });
+
+    it('warns when the credentials file can be read by other users', async () => {
+      writeConfig({ apps: { matrix: { enabled: true } } });
+      matrixFile('{}', 0o644);
+      const check = byName(await runDoctor(input())).matrix;
+      expect(check).toMatchObject({ level: 'warn' });
+      expect(check?.detail).toContain('readable by others');
+      expect(check?.detail).toContain('chmod 600');
+    });
   });
 
   it('fails when Viber is enabled and adb is missing', async () => {
@@ -167,7 +264,7 @@ describe('runDoctor', () => {
     const checks = byName(
       await runDoctor(
         input({
-          loadAdapter: async () => {
+          resolveAdapter: () => {
             throw new Error(`boom with ${hash} inside`);
           },
         }),
@@ -183,6 +280,60 @@ describe('runDoctor', () => {
     symlinkSync(target, join(home, 'data'));
     const checks = byName(await runDoctor(input()));
     expect(checks.data?.level).toBe('fail');
+  });
+
+  it('default doctor resolves adapter packages and never imports an adapter module', async () => {
+    writeConfig({});
+    const resolved: App[] = [];
+    const loaded: App[] = [];
+    const checks = await runDoctor(
+      input({
+        resolveAdapter: (app) => {
+          resolved.push(app);
+        },
+        loadAdapter: async (app) => {
+          loaded.push(app);
+          return fakeAdapter(app);
+        },
+      }),
+    );
+    expect(resolved).toEqual([...APPS]);
+    expect(loaded).toEqual([]);
+    expect(byName(checks).whatsapp).toMatchObject({ level: 'warn' });
+  });
+
+  it('--deep loads every adapter module instead of resolving packages', async () => {
+    writeConfig({});
+    const loaded: App[] = [];
+    const resolved: App[] = [];
+    await runDoctor(
+      input({
+        deep: true,
+        resolveAdapter: (app) => {
+          resolved.push(app);
+        },
+        loadAdapter: async (app) => {
+          loaded.push(app);
+          return fakeAdapter(app);
+        },
+      }),
+    );
+    expect(loaded).toEqual([...APPS]);
+    expect(resolved).toEqual([]);
+  });
+
+  it('fails an app whose adapter package cannot be resolved (shallow)', async () => {
+    writeConfig({});
+    const checks = await runDoctor(
+      input({
+        resolveAdapter: (app) => {
+          if (app === 'zalo') throw new Error(`Cannot find module 'zca-js'`);
+        },
+      }),
+    );
+    expect(byName(checks).zalo).toMatchObject({ level: 'fail' });
+    expect(byName(checks).zalo?.detail).toContain("Cannot find module 'zca-js'");
+    expect(byName(checks).telegram?.level).not.toBe('fail');
   });
 });
 
@@ -211,6 +362,26 @@ describe('formatDoctor', () => {
       expect(text.endsWith(`\n\n${DOCTOR_FOOTER}`)).toBe(true);
     }
   });
+
+  it('wraps a long fix instruction to the window with a hanging indent and loses no word', () => {
+    const detail = 'no account yet: log in (menu item 2, or: phone-app-checker login telegram --account <name>); api_id/api_hash: the menu asks for them when you log in';
+    const prefix = 'WARN  telegram  ';
+    for (const columns of [40, 60, 80]) {
+      const rows = formatDoctor([{ name: 'telegram', level: 'warn', detail }], columns).split('\n\n')[0]?.split('\n') ?? [];
+      expect(rows.length).toBeGreaterThan(1);
+      for (const row of rows) expect(row.length).toBeLessThanOrEqual(columns);
+      expect(rows[0]?.startsWith(prefix)).toBe(true);
+      for (const row of rows.slice(1)) expect(row.startsWith(' '.repeat(prefix.length))).toBe(true);
+      const words = (text: string): string[] => text.split(/\s+/).filter((word) => word !== '');
+      expect(words(rows.join(' ').replace(prefix.trim(), ''))).toEqual(words(detail));
+    }
+  });
+
+  it('puts the footer in its own paragraph after a blank line', () => {
+    const text = formatDoctor([{ name: 'data', level: 'ok', detail: 'fine' }], 40);
+    expect(text.split('\n\n')).toHaveLength(2);
+    expect(text.endsWith(DOCTOR_FOOTER)).toBe(true);
+  });
 });
 
 describe('wording shared with the install guide and install.sh', () => {
@@ -223,11 +394,12 @@ describe('wording shared with the install guide and install.sh', () => {
   });
 
   it('the guide quotes the install.sh summary lines that qualify success and failure', () => {
-    const ready = 'Đã chép file / Files installed: phone-app-checker 0.1.0 (doctor: không có FAIL / no FAIL)';
+    const version = packageVersion();
+    const ready = `Đã chép file / Files installed: phone-app-checker ${version} (doctor: không có FAIL / no FAIL)`;
     const trust = 'NOT yet trustworthy: doctor checks offline readiness only. Run login, then a small trial with known-truth numbers.';
-    const notReady = 'CHƯA SẴN SÀNG / NOT READY: phone-app-checker 0.1.0 đã được chép vào máy nhưng doctor báo FAIL (mã / exit 1).';
+    const notReady = `CHƯA SẴN SÀNG / NOT READY: phone-app-checker ${version} đã được chép vào máy nhưng doctor báo FAIL (mã / exit 1).`;
     for (const line of [ready, trust, notReady]) expect(guide).toContain(line);
-    expect(installer).toContain(ready.replace('0.1.0', '%s'));
+    expect(installer).toContain(ready.replace(version, '%s'));
     expect(installer).toContain(trust);
     expect(installer).toContain('CHƯA SẴN SÀNG / NOT READY: phone-app-checker %s đã được chép vào máy nhưng doctor báo FAIL (mã / exit %s).');
   });

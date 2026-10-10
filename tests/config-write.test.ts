@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, sy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadConfig } from '../src/config.ts';
+import { CURRENT_CONFIG_VERSION, loadConfig } from '../src/config.ts';
 import { parseTelegramApiHash, parseTelegramApiId, saveTelegramCredentials } from '../src/config-write.ts';
 import { readTelegramCredentials } from '../src/adapters/telegram-credentials.ts';
 
@@ -36,6 +36,7 @@ describe('saveTelegramCredentials', () => {
     saveTelegramCredentials(file, 1234567, HASH);
     const written = JSON.parse(readFileSync(file, 'utf8'));
     expect(written).toEqual({
+      configVersion: CURRENT_CONFIG_VERSION,
       defaultRegion: 'SG',
       apps: { zalo: { enabled: false }, telegram: { dailyCap: 7, options: { apiId: 1234567, apiHash: HASH, other: 'kept' } } },
     });
@@ -49,10 +50,24 @@ describe('saveTelegramCredentials', () => {
 
   it('creates the file when it is missing, and tolerates a byte order mark', () => {
     saveTelegramCredentials(file, 42, HASH);
-    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ apps: { telegram: { options: { apiId: 42, apiHash: HASH } } } });
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({
+      configVersion: CURRENT_CONFIG_VERSION,
+      apps: { telegram: { options: { apiId: 42, apiHash: HASH } } },
+    });
     writeFileSync(file, `\uFEFF${JSON.stringify({ maxAgeDays: 3 })}`);
     saveTelegramCredentials(file, 43, HASH);
-    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ maxAgeDays: 3, apps: { telegram: { options: { apiId: 43, apiHash: HASH } } } });
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({
+      configVersion: CURRENT_CONFIG_VERSION,
+      maxAgeDays: 3,
+      apps: { telegram: { options: { apiId: 43, apiHash: HASH } } },
+    });
+  });
+
+  it('refuses a file written by a newer version instead of stamping it older', () => {
+    writeFileSync(file, JSON.stringify({ configVersion: CURRENT_CONFIG_VERSION + 1, apps: { telegram: {} } }));
+    const before = readFileSync(file, 'utf8');
+    expect(() => saveTelegramCredentials(file, 1, HASH)).toThrow(/needs a newer version/);
+    expect(readFileSync(file, 'utf8')).toBe(before);
   });
 
   it('refuses a config that is not valid JSON or has the wrong shape, leaving it untouched and never quoting it', () => {

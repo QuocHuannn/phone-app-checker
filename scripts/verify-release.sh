@@ -1,5 +1,5 @@
 #!/bin/bash
-# Clean-room verification of the macOS portable release archive (checks V1-V19).
+# Clean-room verification of the macOS portable release archive (checks V1-V20).
 # Usage: npm run release:verify [-- path/to/phone-app-checker-<version>-macos-arm64.tar.gz]
 # Everything runs inside a temp directory with an empty environment (no Node on PATH, temp HOME whose
 # data path contains a space, simulated browser quarantine, installed bundle read-only while it is used).
@@ -94,13 +94,14 @@ main() {
   for required in "$name/runtime/bin/node" "$name/runtime/LICENSE" "$name/phone-app-checker" "$name/install.sh" \
     "$name/uninstall.sh" "$name/INSTALL.md" "$name/INSTALL.vi.md" "$name/LICENSE" "$name/THIRD_PARTY_LICENSES.md" \
     "$name/VERSION" "$name/app/BUILD-INFO.json" \
-    "$name/app/bin/phone-app-checker.js" "$name/app/checker.config.example.json" \
+    "$name/app/bin/phone-app-checker.js" "$name/app/src/cli.js" "$name/app/checker.config.example.json" \
     "$name/app/node_modules/better-sqlite3/build/Release/better_sqlite3.node"; do
     grep -qxF "$required" "$T/listing.txt" || fail $id $label "missing from archive: $required"
   done
   forbidden="$(grep -E -e '/checker\.config\.json$' -e '\.csv$' -e '/\.env(\.[^/]*)?/?$' -e '\.map$' -e '/\.DS_Store$' \
     -e "^$name/data(/|$)" -e "^$name/app/data(/|$)" -e "^$name/app/tests(/|$)" \
-    -e "^$name/app/node_modules/vitest(/|$)" -e "^$name/app/node_modules/typescript(/|$)" "$T/listing.txt" || true)"
+    -e "^$name/app/node_modules/vitest(/|$)" -e "^$name/app/node_modules/typescript(/|$)" \
+    -e "^$name/app/(src|bin)/.*\.ts$" "$T/listing.txt" || true)"
   [ -z "$forbidden" ] || fail $id $label "forbidden entries in archive: $(printf '%s' "$forbidden" | head -n 5 | tr '\n' ' ')"
   # streaming verbose listing: modes, entry types, link confinement (no extraction, no size limit)
   tar -tzvf "$archive" >"$T/listing-verbose.txt" || fail $id $label "tar -tzvf failed"
@@ -179,11 +180,16 @@ main() {
 
   # --- V10 doctor --------------------------------------------------------------
   id=V10 label=doctor
-  crp phone-app-checker doctor >"$T/doctor.log" 2>&1 || fail $id $label "doctor exited non-zero" "$T/doctor.log"
+  # --deep imports every adapter module: the bundle's compiled JS is what gets integrity-checked.
+  crp phone-app-checker doctor --deep >"$T/doctor.log" 2>&1 || fail $id $label "doctor --deep exited non-zero" "$T/doctor.log"
   node_expected="$(/usr/bin/plutil -extract node raw -o - "$installed/app/BUILD-INFO.json")"
   awk -v want="node $node_expected, darwin/arm64" '$2 == "runtime" && index($0, want) { found = 1 } END { exit found ? 0 : 1 }' "$T/doctor.log" \
     || fail $id $label "runtime row does not show 'node $node_expected, darwin/arm64'" "$T/doctor.log"
-  for app in telegram whatsapp zalo viber line; do
+  # The app list comes from the bundle itself, so a new adapter is verified without editing this script.
+  apps="$(cd "$installed/app" && "$installed/runtime/bin/node" -e 'const { APPS } = require("./src/types.js"); process.stdout.write(APPS.join("\n") + "\n")' 2>"$log")" \
+    || fail $id $label "cannot read the app list from the bundle's src/types.js" "$log"
+  [ -n "$apps" ] || fail $id $label "app list from src/types.js is empty"
+  for app in $apps; do
     row="$(awk -v app="$app" '$2 == app { print $1; exit }' "$T/doctor.log")"
     [ -n "$row" ] || fail $id $label "no doctor row for $app" "$T/doctor.log"
     [ "$row" != "FAIL" ] || fail $id $label "doctor row for $app is FAIL" "$T/doctor.log"
@@ -349,7 +355,45 @@ main() {
   [ "$macho_count" -ge 4 ] || fail $id $label "inspected only $macho_count Mach-O files (expected node, better_sqlite3.node, sharp .node, libvips dylib)"
   pass $id "$label ($macho_count Mach-O files, all minos <= $MACOS_FLOOR; load commands only, not a run on macOS $MACOS_FLOOR)"
 
-  printf '\nAll checks passed (V1-V19) for %s\n' "$archive_file"
+  # --- V20 upgrade from a 0.1.0 home --------------------------------------------
+  # Install again, then replace the fresh home with the committed 0.1.0 fixtures (a
+  # config without configVersion, a seeded checker.db): the next commands must migrate
+  # both, keep a mode-600 backup, name it on stderr, and run offline.
+  id=V20 label=upgrade-from-0.1.0-home
+  cr /bin/bash "$bundle/install.sh" >"$T/reinstall5.log" 2>&1 || fail $id $label "install.sh for the upgrade check exited non-zero" "$T/reinstall5.log"
+  fixtures="$root/tests/fixtures/v0.1.0"
+  [ -f "$fixtures/checker.config.json" ] && [ -f "$fixtures/seed-checker-db.mjs" ] || fail $id $label "0.1.0 fixtures missing under tests/fixtures/v0.1.0"
+  cp "$fixtures/checker.config.json" "$data_home/checker.config.json" || fail $id $label "cannot seed the 0.1.0 config"
+  chmod 600 "$data_home/checker.config.json"
+  mkdir -p "$data_home/data"
+  chmod 700 "$data_home/data"
+  # install's bootstrap doctor already created a fresh database: replace it with the 0.1.0 fixture.
+  rm -f "$data_home/data/checker.db" "$data_home/data/checker.db-wal" "$data_home/data/checker.db-shm" "$data_home/data/checker.db-journal"
+  # The seeded database is generated by the bundle's own runtime: nothing else may be on PATH.
+  cr "$installed/runtime/bin/node" "$fixtures/seed-checker-db.mjs" "$data_home/data/checker.db" >"$log" 2>&1 || fail $id $label "seeding the 0.1.0 checker.db failed" "$log"
+  chmod 600 "$data_home/data/checker.db"
+  crp phone-app-checker doctor --deep >"$T/doctor-upgrade.out" 2>"$T/doctor-upgrade.err" || fail $id $label "doctor --deep on an upgraded home exited non-zero" "$T/doctor-upgrade.err"
+  backup="$data_home/checker.config.json.v1.bak"
+  [ -f "$backup" ] || fail $id $label "config backup $backup was not created" "$T/doctor-upgrade.err"
+  [ "$(mode_of "$backup")" = "600" ] || fail $id $label "config backup mode is $(mode_of "$backup"), expected 600"
+  grep -qF 'checker.config.json.v1.bak' "$T/doctor-upgrade.err" || fail $id $label "stderr did not name the backup file" "$T/doctor-upgrade.err"
+  [ "$(/usr/bin/plutil -extract configVersion raw -o - "$data_home/checker.config.json" 2>"$log")" = "2" ] || fail $id $label "configVersion is not 2 after the upgrade" "$log"
+  if awk '$1 == "FAIL" { bad = 1 } END { exit bad ? 0 : 1 }' "$T/doctor-upgrade.out"; then fail $id $label "doctor reports a FAIL row on the upgraded home" "$T/doctor-upgrade.out"; fi
+  (cd "$T/work" && crp phone-app-checker report numbers.csv --apps telegram,zalo) >"$log" 2>&1 || fail $id $label "report on the upgraded home exited non-zero" "$log"
+  [ -f "$T/work/report.csv" ] || fail $id $label "report.csv not written on the upgraded home" "$log"
+  # The expected schema is whatever the bundle's own migration ladder ends at (a fresh Store runs it in memory), so a
+  # schema bump needs no edit here. The seeded 0.1.0 fixture must have been upgraded to exactly that version.
+  db_check="$(cr "$installed/runtime/bin/node" -e 'const { DatabaseSync } = require("node:sqlite"); const { Store } = require(process.argv[2] + "/src/store.js"); const fresh = new Store(":memory:"); const want = fresh.db.prepare("PRAGMA user_version").get().user_version; fresh.close(); const db = new DatabaseSync(process.argv[1]); const uv = db.prepare("PRAGMA user_version").get().user_version; const r = db.prepare("SELECT COUNT(*) AS n FROM results").get().n; const a = db.prepare("SELECT COUNT(*) AS n FROM accounts").get().n; db.close(); process.stdout.write(`${uv} ${want} ${r} ${a}`);' "$data_home/data/checker.db" "$installed/app" 2>"$log")" \
+    || fail $id $label "could not read the upgraded checker.db" "$log"
+  read -r db_version db_want db_results db_accounts <<<"$db_check"
+  [ "$db_version" = "$db_want" ] && [ "$db_results $db_accounts" = "3 1" ] \
+    || fail $id $label "unexpected database state after the upgrade: '$db_check' (expected 'schema schema 3 1': the bundle's own schema version with 3 results and 1 account kept)"
+  [ ! -e "$data_home/checker.config.json.v1-2.bak" ] || fail $id $label "a second config load created another backup (migration is not idempotent)"
+  cr /bin/bash "$base/current/uninstall.sh" --purge-data --yes >"$T/purge4.log" 2>&1 || fail $id $label "uninstall.sh --purge-data --yes after the upgrade exited non-zero" "$T/purge4.log"
+  [ ! -e "$data_home" ] || fail $id $label "$data_home still exists after the upgrade check"
+  pass $id $label
+
+  printf '\nAll checks passed (V1-V20) for %s\n' "$archive_file"
 }
 
 main "$@"

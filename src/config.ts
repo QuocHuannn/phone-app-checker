@@ -1,12 +1,19 @@
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
-import { isSupportedCountry } from 'libphonenumber-js/max';
+import { chmodSync, closeSync, constants, existsSync, fchmodSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, unlinkSync, writeSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import type { isSupportedCountry } from 'libphonenumber-js/max';
 import { join, resolve } from 'node:path';
+import { writePrivateFileAtomic } from './private-file.ts';
 import type { App, PacingSettings } from './types.ts';
-import { APPS } from './types.ts';
+import { APPS, terminalSafe } from './types.ts';
 
 export interface AppConfig extends PacingSettings {
   /** App-specific options (e.g. Telegram apiId/apiHash, Viber adb serial). */
   options: Record<string, unknown>;
+  /**
+   * Accounts of this app that may run a batch at the same time (opt-in, default 1). Viber is
+   * always 1: its accounts share the one Android device the adapter drives.
+   */
+  maxParallelAccounts: number;
 }
 
 export interface Config {
@@ -35,6 +42,7 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     rateLimitCooldownMs: 6 * HOUR,
     errorCooldownMs: 10 * MINUTE,
     options: {},
+    maxParallelAccounts: 1,
   },
   whatsapp: {
     enabled: true,
@@ -45,6 +53,7 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     rateLimitCooldownMs: 6 * HOUR,
     errorCooldownMs: 10 * MINUTE,
     options: {},
+    maxParallelAccounts: 1,
   },
   zalo: {
     enabled: true,
@@ -55,6 +64,7 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     rateLimitCooldownMs: 24 * HOUR,
     errorCooldownMs: 10 * MINUTE,
     options: {},
+    maxParallelAccounts: 1,
   },
   viber: {
     enabled: false,
@@ -65,6 +75,7 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     rateLimitCooldownMs: 12 * HOUR,
     errorCooldownMs: 10 * MINUTE,
     options: {},
+    maxParallelAccounts: 1,
   },
   line: {
     enabled: false,
@@ -75,6 +86,31 @@ export const DEFAULT_APPS: Record<App, AppConfig> = {
     rateLimitCooldownMs: 24 * HOUR,
     errorCooldownMs: 10 * MINUTE,
     options: {},
+    maxParallelAccounts: 1,
+  },
+  // Threema Gateway publishes no lookup limit: these are conservative guesses (docs/threema-setup.md).
+  threema: {
+    enabled: false,
+    batchSize: 1,
+    dailyCap: 100,
+    minIntervalMs: 5_000,
+    jitterMs: 5_000,
+    rateLimitCooldownMs: HOUR,
+    errorCooldownMs: 10 * MINUTE,
+    options: {},
+    maxParallelAccounts: 1,
+  },
+  // The Matrix identity-server lookup publishes no rate limit: these are conservative guesses (docs/matrix-setup.md).
+  matrix: {
+    enabled: false,
+    batchSize: 1,
+    dailyCap: 100,
+    minIntervalMs: 5_000,
+    jitterMs: 5_000,
+    rateLimitCooldownMs: 6 * HOUR,
+    errorCooldownMs: 10 * MINUTE,
+    options: { homeserver: 'https://matrix.org', identityServer: 'https://vector.im' },
+    maxParallelAccounts: 1,
   },
 };
 
@@ -82,6 +118,14 @@ export const DEFAULT_CONFIG_FILE = 'checker.config.json';
 
 /** Environment variable that switches the CLI to release mode: config and data live in this directory. */
 export const HOME_ENV = 'PHONE_APP_CHECKER_HOME';
+
+/**
+ * libphonenumber is only needed to validate `defaultRegion` when a config file is loaded; keep it
+ * off the `--help` / `-V` path (r2 §4.9; same pattern as src/phone.ts). CJS entry keeps this sync.
+ */
+type Lib = { isSupportedCountry: typeof isSupportedCountry };
+let lib: Lib | undefined;
+const lp = (): Lib => (lib ??= createRequire(import.meta.url)('libphonenumber-js/max') as Lib);
 
 const PACING_KEYS = [
   'batchSize',
@@ -98,7 +142,86 @@ const WHOLE_NUMBER_KEYS: readonly string[] = ['batchSize', 'dailyCap'];
 /** A wait longer than a year is a typo (an extra zero, microseconds for milliseconds) and would hang a run. */
 const MAX_DURATION_MS = 365 * 24 * 60 * MINUTE;
 
-const TOP_LEVEL_KEYS = ['defaultRegion', 'dataDir', 'maxAgeDays', 'apps'];
+const TOP_LEVEL_KEYS = ['configVersion', 'defaultRegion', 'dataDir', 'maxAgeDays', 'apps'];
+
+/** `configVersion` the binary writes and loads: a file without one predates versioning, so it is 1. */
+export const CURRENT_CONFIG_VERSION = 2;
+
+/** Open flag that refuses to follow a symlink in the last path component (POSIX only). */
+const NOFOLLOW = constants.O_NOFOLLOW ?? 0;
+
+/**
+ * Ordered, pure migrations: `CONFIG_STEPS[v - 1]` upgrades a version-`v` document to `v + 1`.
+ * To add a migration: bump `CURRENT_CONFIG_VERSION`, append a step returning a new object
+ * (rename/remove keys here; new optional keys need no step), and extend `TOP_LEVEL_KEYS` with
+ * any new top-level name. Side effects stay in `loadConfig`, which backs up, writes and reports.
+ */
+const CONFIG_STEPS: readonly ((config: Record<string, unknown>) => Record<string, unknown>)[] = [
+  // v1 (0.1.0) -> v2: declare the format version; every key keeps its meaning.
+  (config) => ({ configVersion: 2, ...config }),
+];
+
+function configVersionOf(config: Record<string, unknown>): number {
+  const version = config.configVersion;
+  if (version === undefined) return 1;
+  if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+    throw new Error('configVersion must be a whole number (1, 2, ...)');
+  }
+  return version;
+}
+
+/**
+ * Pure config upgrade shared by `loadConfig` and the config writers: applies the steps the
+ * document needs and stamps `configVersion`. Throws (plain, no prefix) when the file is newer
+ * than this binary: the unknown keys could be credentials, so they are never silently dropped.
+ */
+export function migrateConfigObject(config: Record<string, unknown>): Record<string, unknown> {
+  const version = configVersionOf(config);
+  if (version > CURRENT_CONFIG_VERSION) {
+    throw new Error(
+      `the config file needs a newer version of this program (configVersion ${version}, supported ${CURRENT_CONFIG_VERSION}); upgrade instead of editing it`,
+    );
+  }
+  let migrated = config;
+  for (const step of CONFIG_STEPS.slice(version - 1)) migrated = step(migrated);
+  return migrated;
+}
+
+/** Older backups a single file can accumulate; past that, the names belong to something else. */
+const MAX_CONFIG_BACKUPS = 99;
+
+/**
+ * First-free `file.v<version>.bak` copy of `text`, mode 0600, created exclusively: an existing
+ * backup is never overwritten (later runs get `-2`, `-3`, ... up to `MAX_CONFIG_BACKUPS`), and a
+ * symlink is never followed.
+ */
+function writeConfigBackup(file: string, version: number, text: string): string {
+  for (let suffix = 1; suffix <= MAX_CONFIG_BACKUPS; suffix += 1) {
+    const backup = suffix === 1 ? `${file}.v${version}.bak` : `${file}.v${version}-${suffix}.bak`;
+    try {
+      const fd = openSync(backup, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NOFOLLOW, 0o600);
+      try {
+        const data = Buffer.from(text);
+        let written = 0;
+        while (written < data.length) written += writeSync(fd, data, written);
+        fchmodSync(fd, 0o600);
+        fsyncSync(fd);
+      } finally {
+        closeSync(fd);
+      }
+      return backup;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') continue;
+      try {
+        unlinkSync(backup);
+      } catch {
+        // Nothing or only part of it was created; the real error is the one to report.
+      }
+      throw error;
+    }
+  }
+  throw new Error(`${MAX_CONFIG_BACKUPS} backups of this config already exist; remove some before it can be upgraded`);
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -138,7 +261,7 @@ function mergeApp(app: App, base: AppConfig, raw: unknown): AppConfig {
   if (!isPlainObject(raw)) fail(`apps.${app} must be an object`);
   const input = raw;
   for (const key of Object.keys(input)) {
-    if (key !== 'enabled' && key !== 'options' && !(PACING_KEYS as readonly string[]).includes(key)) {
+    if (key !== 'enabled' && key !== 'options' && key !== 'maxParallelAccounts' && !(PACING_KEYS as readonly string[]).includes(key)) {
       fail(`unknown setting "${key}" in apps.${app}`);
     }
   }
@@ -162,6 +285,16 @@ function mergeApp(app: App, base: AppConfig, raw: unknown): AppConfig {
   if (merged.batchSize < 1) fail(`apps.${app}.batchSize must be >= 1`);
   if (merged.dailyCap < 1) fail(`apps.${app}.dailyCap must be >= 1`);
   if (merged.rateLimitCooldownMs < 1) fail(`apps.${app}.rateLimitCooldownMs must be >= 1`);
+  const maxParallelAccounts = input.maxParallelAccounts;
+  if (maxParallelAccounts !== undefined) {
+    if (typeof maxParallelAccounts !== 'number' || !Number.isInteger(maxParallelAccounts) || maxParallelAccounts < 1) {
+      fail(`apps.${app}.maxParallelAccounts must be a whole number >= 1`);
+    }
+    if (app === 'viber' && maxParallelAccounts > 1) {
+      fail('apps.viber.maxParallelAccounts must be 1: all Viber accounts share the one Android device');
+    }
+    merged.maxParallelAccounts = maxParallelAccounts;
+  }
   if (input.options !== undefined) {
     if (!isPlainObject(input.options)) fail(`apps.${app}.options must be an object`);
     Object.assign(merged.options, input.options);
@@ -180,13 +313,17 @@ export function configFilePath(path?: string, home?: string): string {
  * `home` undefined = source mode: the default file and a relative `dataDir` resolve against cwd.
  * `home` set = release mode: the default file is `<home>/checker.config.json` and a relative
  * `dataDir` is anchored at `<home>`. An explicit `path` is always cwd-relative.
+ *
+ * A file with an older `configVersion` (absent = 1) is upgraded in place: the original is kept
+ * as `checker.config.json.v<old>.bak` (mode 0600, never overwritten) and one stderr line names
+ * the backup, so menu users see it too. A newer `configVersion` fails instead of downgrading.
  */
 export function loadConfig(path?: string, home?: string): Config {
   const base = home === undefined ? process.cwd() : resolve(home);
   const file = configFilePath(path, home);
   let raw: Record<string, unknown> = {};
+  let text: string | undefined;
   if (existsSync(file)) {
-    let text: string;
     try {
       text = readFileSync(file, 'utf8');
     } catch (error) {
@@ -203,6 +340,18 @@ export function loadConfig(path?: string, home?: string): Config {
   }
 
   if (!isPlainObject(raw)) fail(`${file} must contain a JSON object`);
+  // An older file upgrades in memory first; it is only replaced once the result validates below,
+  // so a bad setting never turns a readable file into a rewritten broken one.
+  let upgrade: { version: number; text: string } | undefined;
+  if (text !== undefined) {
+    try {
+      const version = configVersionOf(raw);
+      if (version < CURRENT_CONFIG_VERSION) upgrade = { version, text };
+      raw = migrateConfigObject(raw);
+    } catch (error) {
+      fail(`${file}: ${(error as Error).message}`);
+    }
+  }
   for (const key of Object.keys(raw)) {
     if (!TOP_LEVEL_KEYS.includes(key)) fail(`unknown setting "${key}"`);
   }
@@ -212,7 +361,7 @@ export function loadConfig(path?: string, home?: string): Config {
   }
   // "UK" is not ISO (the United Kingdom is "GB"): an unknown code would silently mark every
   // national number in the CSV invalid.
-  if (!isSupportedCountry(defaultRegion)) fail(`defaultRegion "${defaultRegion}" is not a known country code (for example VN, SG, US, GB)`);
+  if (!lp().isSupportedCountry(defaultRegion)) fail(`defaultRegion "${defaultRegion}" is not a known country code (for example VN, SG, US, GB)`);
   const dataDir = raw.dataDir ?? './data';
   if (typeof dataDir !== 'string' || dataDir.trim() === '') fail('dataDir must be a non-empty string');
   const maxAgeDays = raw.maxAgeDays ?? 30;
@@ -227,6 +376,20 @@ export function loadConfig(path?: string, home?: string): Config {
   }
   const apps = {} as Record<App, AppConfig>;
   for (const app of APPS) apps[app] = mergeApp(app, DEFAULT_APPS[app], rawApps[app]);
+
+  if (upgrade !== undefined) {
+    let backup: string;
+    try {
+      backup = writeConfigBackup(file, upgrade.version, upgrade.text);
+      writePrivateFileAtomic(file, `${JSON.stringify(raw, null, 2)}\n`);
+    } catch (error) {
+      fail(`${file}: cannot save the upgraded config (${(error as NodeJS.ErrnoException).code ?? 'write error'})`);
+    }
+    // A path from the user's disk can carry ESC/CR/LF/bidi: print a bounded, stripped copy.
+    process.stderr.write(
+      `Config migrated to format version ${CURRENT_CONFIG_VERSION}. The previous file was kept at ${terminalSafe(backup, 512)}\n`,
+    );
+  }
 
   return { defaultRegion, dataDir: resolve(base, dataDir), maxAgeDays, apps };
 }

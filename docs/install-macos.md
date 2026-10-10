@@ -2,24 +2,24 @@
 
 Vietnamese version: install-macos.vi.md
 
-> **Use responsibly.** phone-app-checker checks a list of phone numbers to see whether each one has a Telegram, WhatsApp, Zalo, Viber or LINE account, using *unofficial* methods. This may **violate each platform's terms of service**, and the accounts used for checks can be restricted or banned. Use only **dedicated SIMs/accounts you can afford to lose**; never a personal number or a number that serves your business. Only check numbers of people who have agreed to be contacted. The tool does **not** verify that consent. The project is not affiliated with Telegram, WhatsApp, Zalo, Viber or LINE. Results are observations, not proof: `not_found` can mean the person hides their number from search; LINE is only meaningful for HK/JP/KR/TW/TH; Zalo checks only `+84` numbers. Check the privacy law where you live (this is not legal advice). Read [responsible-use.md](responsible-use.md) before you run anything.
+> **Use responsibly.** phone-app-checker checks a list of phone numbers to see whether each one has a Telegram, WhatsApp, Zalo, Viber, LINE, Threema or Matrix account. Telegram, WhatsApp, Zalo, LINE and Viber are reached with *unofficial* methods, which may **violate each platform's terms of service**, and the accounts used for checks can be restricted or banned. Threema and Matrix use official lookup interfaces, but a lookup sends a hash of the number to Threema or to a Matrix identity server. Use only **dedicated SIMs/accounts you can afford to lose**; never a personal number or a number that serves your business. Only check numbers of people who have agreed to be contacted. The tool does **not** verify that consent. The project is not affiliated with Telegram, WhatsApp, Zalo, Viber, LINE, Threema or Matrix. Results are observations, not proof: `not_found` can mean the person hides their number from search (or, for Threema and Matrix, never linked it); LINE is only meaningful for HK/JP/KR/TW/TH; Zalo checks only `+84` numbers. Check the privacy law where you live (this is not legal advice). Read [responsible-use.md](responsible-use.md) before you run anything.
 >
-> This build has only been tested automatically on a development Mac (macOS 27, Apple Silicon). **Only WhatsApp has been tried against the real service (one account, a few lookups). Telegram, Zalo, Viber and LINE have not been verified on the live platforms, and the archive has not been tested on your Mac or on macOS 13.5.** A `yes` or `not_found` result is an observation at one point in time. It does not confirm who the person is, whether the account is still active, or that the answer stays the same. Cross-check manually as described in section 12 before you trust any result.
+> This build has only been tested automatically on a development Mac (macOS 27, Apple Silicon). **Only WhatsApp has been tried against the real service (one account, a few lookups). Telegram, Zalo, Viber, LINE, Threema and Matrix have not been verified on the live platforms, and the archive has not been tested on your Mac or on macOS 13.5.** A `yes` or `not_found` result is an observation at one point in time. It does not confirm who the person is, whether the account is still active, or that the answer stays the same. Cross-check manually as described in section 12 before you trust any result.
 
 ## Quick start: install once, then just type `phone-app-checker`
 
-1. Install (section 4): `bash ~/Downloads/phone-app-checker-0.1.0-macos-arm64/install.sh`.
+1. Install (section 4): `bash ~/Downloads/phone-app-checker-0.2.0-macos-arm64/install.sh`.
 2. Open a **new** Terminal window, type exactly this command and nothing else, then press Enter:
 
    ```sh
    phone-app-checker
    ```
 
-3. A **menu** appears: a title box with the version, an `Accounts ready:` line showing which apps have an account, and a coloured list. The menu is in **English** by default. To switch to Vietnamese, press `L`, then `2` (Tiếng Việt). The choice is remembered (see "Menu language" below). **Use the arrow keys ↑ ↓ and Enter**, or press a menu number (`1`–`6`, `L`, `0`) directly, without Enter. Press `q` or `Esc` to quit (or to go back from a sub-list). After each task the menu returns to the list. Ctrl-C or Ctrl-D also quit cleanly. If the Terminal does not support this (for example `NO_COLOR` is set or `TERM=dumb`), the menu falls back to the classic style: type a number and press Enter.
+3. A **menu** appears: a title box with the version, an `Accounts ready:` line showing which apps have an account, and a list. The menu is in **English** by default. To switch to Vietnamese, press `L`, then `2` (Tiếng Việt). The choice is remembered (see "Menu language" below). **Use the arrow keys ↑ ↓ and Enter**, or press a menu number (`1`–`6`, `L`, `0`) directly, without Enter. **`b` goes back** on every question (`q` and `Esc` do the same in lists), and pressing Enter takes the answer shown in the prompt. After each task the menu returns to the list. Ctrl-C or Ctrl-D also quit cleanly. If the Terminal does not support colours or arrow keys (for example `NO_COLOR` is set or `TERM=dumb`), or you start the program with `--plain`, the menu falls back to the classic style: type a number and press Enter.
 
    | Key | Menu item (English label) | What it does |
    | --- | --- | --- |
-   | 1 | `Check a CSV file` | **Drag the CSV file from Finder into the Terminal window**, press Enter, choose the app, then choose where to save the report (by default `report.csv` next to the CSV file). If a file with that name exists, the menu asks before overwriting it. If no account is logged in yet, the menu says so and offers to log in now. |
+   | 1 | `Check a CSV file` | **Drag the CSV file from Finder into the Terminal window**, or pick one of the **last 5 files** you used, then press Enter. The menu shows a **preview** (which column it will read, how many numbers are usable, which countries) and asks you to confirm. Then tick the apps with the **space bar** and press Enter, and choose where to save the report (by default `report.csv` next to the CSV file; the menu asks before overwriting). If no account is logged in yet, the menu says so and offers to log in now. In the file list, `c` clears the list and stops remembering files. |
    | 2 | `Log in an app account` | Choose an app and name the account (Enter = `default`). WhatsApp and Telegram also ask how to log in (QR code, or pairing code / phone number + code). Telegram asks for `api_id` and `api_hash` once and saves them to the config file (section 6.1). The QR code appears directly in the window (section 6.0). |
    | 3 | `View logged-in accounts` | Runs `accounts` (section 8). |
    | 4 | `Rebuild the latest report` | Runs `report`: rebuilds the report from saved results, without checking anything new. |
@@ -36,17 +36,19 @@ Vietnamese version: install-macos.vi.md
 
    **What you will see on each screen.** These are text captures from an automated test run in an 80x24 window. They are illustrations only and were **not** run with real accounts. Colours and icons look different in a real Terminal.
 
-   - *Main menu*: title box with the version, the status of each app (`✅` account present and the count, `⬜` none yet), a list with icons, and a key-hint line at the bottom.
+   - *Main menu*: title box with the version, the status of each app (`✔` account present and the count, `○` none yet), a list, and a key-hint line at the bottom.
 
      ```text
-     ╭─ Phone App Checker 0.1.0 ──────────────────────────────────────────
+     ╭─ Phone App Checker 0.2.0 ─────────────────────────────────────────────
      │ Accounts ready:
-     │ ⬜ telegram – · ✅ whatsapp 1 · ⬜ zalo – · ⬜ viber – · ⬜ line –
-     ╰────────────────────────────────────────────────────────────────────
-     ❯ 1 🔍 Check a CSV file
-       2 🔑 Log in an app account
+     │ ✔ telegram 1 account · ✔ whatsapp 1 account · ○ zalo none
+     │ ○ viber none · ○ line none · ○ threema none · ○ matrix none
+     ╰───────────────────────────────────────────────────────────────────────
+
+     ❯ 1 Check a CSV file
+       2 Log in an app account
        ...
-       0 🚪 Quit
+       0 Quit
      ↑↓ move · Enter select · q quit
      ```
 
@@ -61,18 +63,31 @@ Vietnamese version: install-macos.vi.md
      Account name (Enter = default):
      ```
 
-     Step 1 prints <https://my.telegram.org/apps>, explains what to fill in the form (`App title` and `Short name` can be anything, `Platform: Other`), and asks `Open https://my.telegram.org/apps in your browser now? (Y/n …)`. The Mac only opens the browser if you answer **y**. Step 2 asks for `api_id` (digits only), then `api_hash` (32 characters, `0-9` and `a-f`). While you type or paste the hash, only `••••` is shown, never the value. Mistakes get a clear message, for example pasting the `api_hash` into the `api_id` field, or a wrong length. Type `b` or press Enter in these fields to go back. Step 3: choose the QR code or phone number + code. When the scan is done, the screen shows the linked account name and the phone number **partly masked**. The session itself is never shown.
+     Step 1 prints <https://my.telegram.org/apps>, explains what to fill in the form (`App title` and `Short name` can be anything, `Platform: Other`), and asks `Open https://my.telegram.org/apps in your browser now? [y/N]`. The Mac only opens the browser if you answer **y**. Step 2 asks for `api_id` (digits only), then `api_hash` (32 characters, `0-9` and `a-f`). While you type or paste the hash, only `••••` is shown, never the value. Mistakes get a clear message, for example pasting the `api_hash` into the `api_id` field, or a wrong length. Type `b` in these fields to go back. Step 3: choose the QR code or phone number + code. When the scan is done, the screen shows the linked account name and the phone number **partly masked**. The session itself is never shown.
 
    - *Waiting for QR scan / connecting*: a spinner shows `⠋ Connecting to Telegram...` and `⠋ Waiting for you to scan the code...`. These only appear in an interactive Terminal; through a pipe or a log file nothing extra is printed.
    - *Telegram rejects something*: each error is one clear sentence, for example `Telegram rejected the api_id / api_hash (API_ID_INVALID). Copy both values again from https://my.telegram.org/apps, …`. `FLOOD_WAIT` tells you how long to wait.
-   - *Checking in progress* (menu `1`): one progress line that redraws in place:
+   - *QR window check*: before a QR login starts, the menu checks that the Terminal window is big enough. If not, it says how many columns x rows the code needs (for example `This window is 80 x 24; the code needs 68 x 39.`) and waits: enlarge the window (or press Cmd+minus to shrink the text) and press Enter, type `c` to use the pairing code instead (where the app has one), or `b` to go back.
+   - *Checking in progress* (menu `1`): a live panel with one row per account (state, how many numbers done, results so far, time of the last batch), the speed, the estimated finish time and the path of the run log. It redraws about once a second:
 
      ```text
-     ⠹ ████████░░░░░░░░░░░░░░░░░░░░  27% 30/108  telegram 12/36 · whatsapp 12/36 · zalo 6/36
+     ╭─ Checking customers.csv · 4 numbers ────────────────────────────────────────
+     │ Elapsed 3 s · 149/min
+     │
+     │ APP       ACCOUNT  STATE   DONE  RESULTS    LAST
+     │ telegram  a        ✔ done  4/4   0y 4nf 0u  0.7s
+     │ zalo      z        ✔ done  3/3   0y 3nf 0u  0.7s
+     │
+     │ ████████████████████████████  100%  7 of 7 checks (4 numbers x 2 apps)
+     │ yes 0 · not_found 7 · unknown 0
+     │ Ctrl+C finishes this batch and saves the report.
+     │ Log: <data folder>/check-<timestamp>.log
+     ╰──────────────────────────────────────────────────────────────────────────────
      ```
 
-     It shows the percentage, done/total, the count for each app, an estimated remaining time (`ETA`, shown after a few seconds), and when an account is resting, `pacing 4 s` or `resting until 14:05`. Press Ctrl-C once: the run stops cleanly and the report is saved.
-   - *Result*: a coloured summary table (`yes` green, `not_found` yellow, `invalid` red, `unknown`/`skipped` dimmed), then a final box:
+     `0y 4nf 0u` means 0 yes, 4 not_found, 0 unknown. An account that is resting shows the local time it resumes (for example `resting until 14:05`). The panel shrinks on a short window. In a plain Terminal (`--plain`, `NO_COLOR`) the same facts are printed as timestamped lines instead, for example `05:54 progress 100% 7/7 | telegram 4/4, zalo 3/3`. Press Ctrl-C once: the run stops cleanly and the report is saved. The run log (`check-<timestamp>.log` in the data folder, the last 5 are kept) holds the per-batch lines.
+   - *Summary*: `Done in 3 s · 4 numbers · 0 unfinished`, a coloured table (`yes` green, `not_found` yellow, `invalid` red, `unknown`/`skipped` dimmed), `Accounts used: telegram a · zalo z`, then a final box. After it, press Enter to return to the menu, or `o` to show the report in Finder.
+   - *Result box* (the last thing printed):
 
      ```text
      ╭─ Report saved to /tmp/ux/report.csv ──────────────────────────────
@@ -122,20 +137,20 @@ Vietnamese version: install-macos.vi.md
 
 Download both files from the project's GitHub Releases page, <https://github.com/QuocHuannn/phone-app-checker/releases>, into the same folder (for example *Downloads*):
 
-- `phone-app-checker-0.1.0-macos-arm64.tar.gz`
-- `phone-app-checker-0.1.0-macos-arm64.tar.gz.sha256`
+- `phone-app-checker-0.2.0-macos-arm64.tar.gz`
+- `phone-app-checker-0.2.0-macos-arm64.tar.gz.sha256`
 
 Check that the file was not corrupted or changed in transit:
 
 ```sh
 cd ~/Downloads
-shasum -a 256 -c phone-app-checker-0.1.0-macos-arm64.tar.gz.sha256
+shasum -a 256 -c phone-app-checker-0.2.0-macos-arm64.tar.gz.sha256
 ```
 
 Correct result:
 
 ```
-phone-app-checker-0.1.0-macos-arm64.tar.gz: OK
+phone-app-checker-0.2.0-macos-arm64.tar.gz: OK
 ```
 
 If you see `FAILED` or `No such file`: **stop**. Do not unpack the archive. Download both files again, or make sure you are in the folder that contains them (the `cd` command above).
@@ -146,13 +161,13 @@ If you see `FAILED` or `No such file`: **stop**. Do not unpack the archive. Down
 
 ## 3. Unpack the archive
 
-Option 1 (Finder): double-click the `.tar.gz` file in *Downloads*. A folder `phone-app-checker-0.1.0-macos-arm64` appears.
+Option 1 (Finder): double-click the `.tar.gz` file in *Downloads*. A folder `phone-app-checker-0.2.0-macos-arm64` appears.
 
 Option 2 (Terminal):
 
 ```sh
 cd ~/Downloads
-tar -xzf phone-app-checker-0.1.0-macos-arm64.tar.gz
+tar -xzf phone-app-checker-0.2.0-macos-arm64.tar.gz
 ```
 
 The folder contains: `install.sh`, `uninstall.sh`, `INSTALL.md` (English guide), `INSTALL.vi.md` (Vietnamese guide), `LICENSE`, `THIRD_PARTY_LICENSES.md`, `VERSION`, `phone-app-checker`, `runtime/` (bundled Node.js) and `app/`.
@@ -160,7 +175,7 @@ The folder contains: `install.sh`, `uninstall.sh`, `INSTALL.md` (English guide),
 ## 4. Install
 
 ```sh
-bash ~/Downloads/phone-app-checker-0.1.0-macos-arm64/install.sh
+bash ~/Downloads/phone-app-checker-0.2.0-macos-arm64/install.sh
 ```
 
 > Run it with `bash …` as shown. **Do not double-click `install.sh`** in Finder: macOS may block it or open it with another app.
@@ -169,15 +184,15 @@ The installer does not need an administrator password (it does not use `sudo`):
 
 1. Checks the Mac: Apple Silicon chip (not a Rosetta Terminal), macOS ≥ 13.5. If a check fails, it prints the reason and stops, without changing anything.
 2. Holds a "maintenance lock" until installation finishes. While it is held, no `phone-app-checker` command can run or open the data. If a command is already running, the installer waits about 3 seconds and then **refuses** (section 14).
-3. Copies the program into a temporary folder next to the install location, then swaps it into `~/Applications/phone-app-checker/0.1.0`. An older copy with the same version number (if any) is **kept until the new copy runs `phone-app-checker --version` successfully**. On error or interruption it goes back to the old copy.
+3. Copies the program into a temporary folder next to the install location, then swaps it into `~/Applications/phone-app-checker/0.2.0`. An older copy with the same version number (if any) is **kept until the new copy runs `phone-app-checker --version` successfully**. On error or interruption it goes back to the old copy.
 4. Removes macOS's "downloaded from the Internet" mark (quarantine) from the installed copy, so Gatekeeper does not block it.
 5. Creates the `phone-app-checker` command in `~/.local/bin` and, if needed, adds a small block to `~/.zprofile` (or `~/.bash_profile`) so Terminal can find it. The shell file is written to a temporary file in the same folder, then renamed over the original (permissions kept; never left half-written). The block sits between `# >>> phone-app-checker >>>` and `# <<< phone-app-checker <<<` and is removed when you uninstall.
 6. Runs `phone-app-checker --version` and `phone-app-checker doctor` (see section 5).
 
 At the end, the installer prints the install path, the config file path, and how to delete older copies if there are any. **The first summary line never says "done" by itself**:
 
-- If `doctor` has no `FAIL`, it prints `Đã chép file / Files installed: phone-app-checker 0.1.0 (doctor: không có FAIL / no FAIL)` (*Files copied; doctor: no FAIL*), followed by `NOT yet trustworthy: doctor checks offline readiness only. Run login, then a small trial with known-truth numbers.` This means the files are copied. It does **not** mean you have logged in, and it does **not** mean the tool has been tested against known answers (sections 6 and 12).
-- If `doctor` reports `FAIL`, it prints `CHƯA SẴN SÀNG / NOT READY: phone-app-checker 0.1.0 đã được chép vào máy nhưng doctor báo FAIL (mã / exit 1).` (*Not ready: copied, but doctor reports FAIL*). The files stay on the Mac, so `install.sh` exits with code `0`. **Do not** treat that exit code as "it works". Fix every `FAIL` line above, then run `phone-app-checker doctor` again until no `FAIL` remains.
+- If `doctor` has no `FAIL`, it prints `Đã chép file / Files installed: phone-app-checker 0.2.0 (doctor: không có FAIL / no FAIL)` (*Files copied; doctor: no FAIL*), followed by `NOT yet trustworthy: doctor checks offline readiness only. Run login, then a small trial with known-truth numbers.` This means the files are copied. It does **not** mean you have logged in, and it does **not** mean the tool has been tested against known answers (sections 6 and 12).
+- If `doctor` reports `FAIL`, it prints `CHƯA SẴN SÀNG / NOT READY: phone-app-checker 0.2.0 đã được chép vào máy nhưng doctor báo FAIL (mã / exit 1).` (*Not ready: copied, but doctor reports FAIL*). The files stay on the Mac, so `install.sh` exits with code `0`. **Do not** treat that exit code as "it works". Fix every `FAIL` line above, then run `phone-app-checker doctor` again until no `FAIL` remains.
 
 When you uninstall, the PATH block in `~/.zprofile`/`~/.bash_profile` is only removed if its two marker lines are **still exactly as written** (no extra spaces or comments at the end of the line) and come in matching pairs. If you have edited them, the uninstaller **does not touch** the file and prints instructions instead: delete the lines from `# >>> phone-app-checker >>>` to `# <<< phone-app-checker <<<` yourself. If `~/.zprofile` (or `~/.bash_profile`) **was created by the installer** (it did not exist before) and becomes empty after the PATH block is removed, the empty file is deleted too. A file that existed before, including an empty one, or that still has other content, is **always kept**. The record of "files created by the installer" is in `~/Applications/phone-app-checker/.created-profiles` (deleted with the install folder).
 
@@ -187,7 +202,7 @@ When you uninstall, the PATH block in `~/.zprofile`/`~/.bash_profile` is only re
 phone-app-checker --version
 ```
 
-It must print `0.1.0`. If it says `command not found`, see section 14.
+It must print `0.2.0`. If it says `command not found`, see section 14.
 
 Then type `phone-app-checker` on its own to open the menu (see "Quick start" at the top). Sections 5 to 8 describe the same tasks as typed commands, and work alongside the menu.
 
@@ -247,7 +262,7 @@ phone-app-checker doctor
 | `WARN` | A setup step is not finished (for example `apiId`/`apiHash` not entered, no account logged in, no Android device seen for Viber). **It still runs**, but that app cannot be used yet. | Follow the hint at the end of the row. On the first install, `WARN` rows are normal. |
 | `FAIL` | The program cannot run (bad config file, wrong permissions on the data folder, `adb` missing while Viber is enabled, …). | Fix what the row describes, then run `doctor` again. |
 
-`doctor` exits with an error code only if there is a `FAIL`. Repeat until there is **no `FAIL`**. Rows for all five apps (telegram, whatsapp, zalo, viber, line) are always present, including disabled apps. `OK … disabled (module loads)` means the program could load that app's module.
+`doctor` exits with an error code only if there is a `FAIL`. Repeat until there is **no `FAIL`**. Rows for every app (telegram, whatsapp, zalo, viber, line, threema, matrix) are always present, including disabled apps. `OK … disabled (adapter package installed)` means the program found that app's package; it did not load it. To also load every app's module (slower, about half a second), run `phone-app-checker doctor --deep`: the installer does that once after copying the files.
 
 **`doctor` only tells you the Mac is ready *offline*** (the Mac, the config, the data folder, that modules load, that the accounts folder exists). `OK` does **not** mean an account is still logged in or that an app still answers correctly. You only learn that after you `login` and run a trial on about 20 numbers whose answers you already know (section 12). `doctor` reads no phone numbers and does not connect to any messaging app. For that reason `doctor` **always** ends with these three lines, whether or not there is a `FAIL`:
 
@@ -476,7 +491,9 @@ This means: **the report is not complete. Do not use it as a final result.** Com
 
 The data folder and `dataDir` must be a dedicated folder, **not synced**, and **outside** `~/Applications/phone-app-checker`: customer data and login sessions **must not be in a synced folder**. The program refuses (even with a marker file present) when `PHONE_APP_CHECKER_HOME` or `dataDir` is `Documents`, `Desktop`, `Downloads`, `Library`, `Applications`, `Movies`, `Music`, `Pictures`, `Public`, `.local`, `.config`, `Library/Application Support`, `.local/bin`, the home folder or one of its parents, or equal to or containing the install folder. Use a dedicated subfolder. It also refuses **synced folders and anything inside them**: iCloud Drive (`~/Library/Mobile Documents`, `~/iCloud Drive`), `~/Library/CloudStorage/*` (Dropbox, Google Drive, OneDrive, Box managed by macOS), and `~/Dropbox*`, `~/Google Drive*` (`~/GoogleDrive*`), `~/OneDrive*`, `~/Box`, `~/Box Sync`, `~/Box Drive` (even when they are symlinks to another disk). Good choices: `~/phone-checks`, or keep the default. Desktop and Documents may sync to iCloud without the program detecting it, so do not put data there.
 
-The database `checker.db` now uses **schema version 2** (it adds a `failed_checks` table that remembers numbers in failed batches, and upgrades automatically from version 1 when opened). After a newer build has opened it, **older builds cannot open it** (`Database was written by a newer version`). Do not go back to an older build on the same data folder unless you have backed up `checker.db` first.
+The database `checker.db` now uses **schema version 3** (version 2 added a `failed_checks` table that remembers numbers in failed batches; version 3 adds per-account batch times). It upgrades automatically from older versions when opened, and your results are kept. After a newer build has opened it, **older builds cannot open it** (`Database was written by a newer version`), so **0.1.0 cannot open a database that 0.2.0 has upgraded**. Do not go back to an older build on the same data folder unless you have backed up `checker.db` first.
+
+**Upgrading from 0.1.0.** The first time 0.2.0 reads your `checker.config.json` it adds `"configVersion": 2` and keeps your old file next to it as `checker.config.json.v1.bak` (only you can read it; it can hold your `apiHash`, so treat it like the config). One line in the Terminal names the backup. Running again changes nothing. If you ever install 0.1.0 again, copy that backup over `checker.config.json` and restore a copy of `checker.db` you made **before** upgrading.
 
 Open the data folder: `open ~/Library/Application\ Support/phone-app-checker`. The `Library` folder is hidden in Finder. Use the command above, or in Finder choose *Go → Go to Folder…* and paste `~/Library/Application Support/phone-app-checker`.
 
@@ -547,7 +564,7 @@ If you can, also say: the chip (About This Mac), the **macOS version** (especial
 bash ~/Downloads/phone-app-checker-<new version>-macos-arm64/install.sh
 ```
 
-The new program is copied into its own folder, and `current` switches to it. **Configuration, login sessions and results are kept.** The old copy is kept too; the installer prints an `rm -rf` command you can run to delete it. Note the database schema point (section 10): the new version may upgrade `checker.db`, and then the older version can no longer open it.
+The new program is copied into its own folder, and `current` switches to it. **Configuration, login sessions and results are kept.** The old copy is kept too; the installer prints an `rm -rf` command you can run to delete it. Upgrading from 0.1.0 also upgrades your config and your results database the first time the new version runs (section 10). **Make a copy of `checker.db` first if you may want to go back.**
 
 **Roll back to an older version** (for example `0.1.0`):
 
@@ -555,7 +572,7 @@ The new program is copied into its own folder, and `current` switches to it. **C
 bash ~/Applications/phone-app-checker/0.1.0/install.sh
 ```
 
-This only switches the `current` link back; the data does not change (read the schema note in section 10 before going back to an older build).
+This only switches the `current` link back. It does **not** undo the data upgrade: an older version cannot read a config or a database that a newer version has upgraded. To go back to 0.1.0 you also need the backups: copy `checker.config.json.v1.bak` over `checker.config.json`, and put back the copy of `checker.db` you made before upgrading (without that copy, the older version cannot open the results; see section 10).
 
 **Uninstall** (removes the program, the command and the PATH block; **keeps** configuration, login sessions and results):
 
@@ -569,7 +586,7 @@ bash ~/Applications/phone-app-checker/current/uninstall.sh
 bash ~/Applications/phone-app-checker/current/uninstall.sh --purge-data
 ```
 
-The program asks again. Type exactly `DELETE` (in capitals) to confirm. **If you type something else or leave it empty, the program still uninstalls** (command, PATH block, install folder), and only the data is kept. In that case the command `~/Applications/phone-app-checker/current/uninstall.sh` above **no longer exists**. To delete the data later, run `uninstall.sh` **from the downloaded and unpacked package** (for example `bash ~/Downloads/phone-app-checker-0.1.0-macos-arm64/uninstall.sh --purge-data`). It still reads `dataDir` from `checker.config.json` **before** deleting anything, and reports if `dataDir` is outside the normal folder (in that case it is **not** deleted). If it cannot be sure what `dataDir` is, it refuses to delete data and keeps the configuration; check `dataDir` in that file and delete that folder yourself. Before deleting, log out the linked devices on your phone (WhatsApp → Linked devices; Zalo and LINE are similar) if you will not use those accounts again. Deleting data **only removes files on this Mac. It does not log out remotely, and it is not a secure erase** (backups and Time Machine may still contain copies). CSV files and `report.csv` in the working folder **are not touched**; delete them yourself if you do not need them.
+The program asks again. Type exactly `DELETE` (in capitals) to confirm. **If you type something else or leave it empty, the program still uninstalls** (command, PATH block, install folder), and only the data is kept. In that case the command `~/Applications/phone-app-checker/current/uninstall.sh` above **no longer exists**. To delete the data later, run `uninstall.sh` **from the downloaded and unpacked package** (for example `bash ~/Downloads/phone-app-checker-0.2.0-macos-arm64/uninstall.sh --purge-data`). It still reads `dataDir` from `checker.config.json` **before** deleting anything, and reports if `dataDir` is outside the normal folder (in that case it is **not** deleted). If it cannot be sure what `dataDir` is, it refuses to delete data and keeps the configuration; check `dataDir` in that file and delete that folder yourself. Before deleting, log out the linked devices on your phone (WhatsApp → Linked devices; Zalo and LINE are similar) if you will not use those accounts again. Deleting data **only removes files on this Mac. It does not log out remotely, and it is not a secure erase** (backups and Time Machine may still contain copies). CSV files and `report.csv` in the working folder **are not touched**; delete them yourself if you do not need them.
 
 After the program has been removed, `uninstall.sh` reads `checker.config.json` with a **real JSON parser** (Node bundled in the package, or the macOS `osascript` tool), the same way the program reads it, so a key written as `"\u0064ataDir"` is still recognised. It **never** concludes "there is no `dataDir`" by searching the text. If no parser is available, the file cannot be read, or it is not valid JSON, `--purge-data` refuses (nothing is deleted, the configuration is kept). Uninstalling without `--purge-data` still runs and notes that `dataDir` could not be read with certainty.
 
@@ -596,7 +613,7 @@ macOS marks files downloaded from the Internet. The installer removed this mark 
 
 ```sh
 xattr -dr com.apple.quarantine ~/Applications/phone-app-checker
-xattr -dr com.apple.quarantine ~/Downloads/phone-app-checker-0.1.0-macos-arm64
+xattr -dr com.apple.quarantine ~/Downloads/phone-app-checker-0.2.0-macos-arm64
 ```
 
 If it is still blocked: *System Settings → Privacy & Security* → scroll down to the message about `node` or `phone-app-checker` → **Open Anyway**, then run again. If the Mac is managed by an organisation (MDM), it may block programs that are not signed or approved: tell your IT administrator or whoever gave you the package, and include the message text.
@@ -631,7 +648,7 @@ An earlier install or uninstall was interrupted while it held the maintenance lo
 **`… is your Documents folder (or Desktop, …), which holds your own files; refusing to use it …` / `… is, or lies inside, the synced folder …` / `… overlaps the installation folder …`**
 `PHONE_APP_CHECKER_HOME` or `dataDir` points at one of your personal folders, a synced folder (iCloud Drive, `~/Library/CloudStorage/*`, Dropbox, Google Drive, OneDrive, Box), or a folder that contains or is inside `~/Applications/phone-app-checker`. Do not try to work around this: customer data and login sessions must not be in a synced folder. Use a dedicated subfolder outside those places (the message suggests a name), or remove the custom setting to use the default.
 
-**`Database was written by a newer version (schema 2, supported 1)`**
+**`Database was written by a newer version (schema 3, supported 2)`**
 You are running an older build on data that a newer build has already upgraded (section 10). Install the newer build again. Only rename `checker.db` (and `-wal`/`-shm`) so the older build can create a new one if you accept losing the saved results.
 
 **`no valid phone numbers (N invalid)` / `Cannot find a phone column` / `Cannot tell how the columns are separated`**

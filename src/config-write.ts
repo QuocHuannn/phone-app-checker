@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { migrateConfigObject } from './config.ts';
 import { writePrivateFileAtomic } from './private-file.ts';
 
 /** Telegram `api_id`: digits only, a positive number that is still exact as a JSON number. */
@@ -42,7 +43,13 @@ export function saveTelegramCredentials(file: string, apiId: number, apiHash: st
       throw new Error('the config file is not valid JSON; fix it first');
     }
     if (!isObject(parsed)) throw new Error('the config file must contain a JSON object');
-    root = parsed;
+    try {
+      root = migrateConfigObject(parsed);
+    } catch (error) {
+      throw new Error(`${(error as Error).message}; not writing`);
+    }
+  } else {
+    root = migrateConfigObject(root);
   }
   const apps = root.apps ?? {};
   if (!isObject(apps)) throw new Error('"apps" in the config file must be an object');

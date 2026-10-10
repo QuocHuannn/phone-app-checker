@@ -174,7 +174,7 @@ describe.skipIf(process.platform !== 'darwin')('release scripts', () => {
       expect(profile).toContain('export PATH="$HOME/.local/bin:$PATH"');
 
       const calls = logged();
-      expect(calls.map((c) => c.argv)).toEqual([['--version'], ['doctor']]);
+      expect(calls.map((c) => c.argv)).toEqual([['--version'], ['doctor', '--deep']]);
       expect(result.stdout).toContain(join(defaultHome, 'checker.config.json'));
       expect(result.stdout).toContain('0.1.0');
       // A clean doctor is still only an offline check: the summary says so and never claims readiness.
@@ -469,7 +469,7 @@ describe.skipIf(process.platform !== 'darwin')('release scripts', () => {
       const file = join(defaultHome, 'data', 'sessions', 'telegram', 'acct', 'session');
       mkdirSync(join(defaultHome, 'data', 'sessions', 'telegram', 'acct'), { recursive: true });
       writeFileSync(file, 'secret');
-      writeFileSync(join(defaultHome, 'checker.config.json'), '{}');
+      writeFileSync(join(defaultHome, 'checker.config.json'), '{"configVersion": 2}');
       return file;
     }
 
@@ -1110,7 +1110,9 @@ describe.skipIf(process.platform !== 'darwin')('lifecycle exclusion: maintenance
     const file = join(defaultHome, 'data', 'sessions', 'telegram', 'acct', 'session');
     mkdirSync(join(defaultHome, 'data', 'sessions', 'telegram', 'acct'), { recursive: true });
     writeFileSync(file, 'secret');
-    writeFileSync(join(defaultHome, 'checker.config.json'), '{}');
+    // A current-version config: `data-dir` (exempt from the barrier) must not migrate anything
+    // while the purge waits, or the snapshot below sees a .bak the test never created.
+    writeFileSync(join(defaultHome, 'checker.config.json'), '{"configVersion": 2}');
     return file;
   }
 

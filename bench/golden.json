@@ -1,0 +1,4 @@
+{
+  "params": { "seed": 1, "rows": 20000, "latencyMs": 0, "accounts": 2, "apps": ["telegram", "whatsapp", "zalo", "viber", "line"] },
+  "reportSha256": "be17c53492b5ac2f2c0ada6b44ced2d5f790ea34d266be70d7a8379b117639ae"
+}

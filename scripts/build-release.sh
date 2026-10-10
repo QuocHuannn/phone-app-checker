@@ -41,7 +41,7 @@ main() {
   done
   [ -f package.json ] && [ -f package-lock.json ] || die "package.json / package-lock.json missing in $root."
   for f in release/phone-app-checker release/install.sh release/uninstall.sh docs/install-macos.md docs/install-macos.vi.md \
-    LICENSE THIRD_PARTY_LICENSES.md checker.config.example.json .npmrc README.md scripts/viber-discover-schema.sh bin/phone-app-checker.js; do
+    LICENSE THIRD_PARTY_LICENSES.md checker.config.example.json .npmrc README.md scripts/viber-discover-schema.sh bin/phone-app-checker.js tsconfig.build.json; do
     [ -f "$f" ] || die "required source file missing: $f"
   done
 
@@ -87,6 +87,17 @@ main() {
   name="phone-app-checker-${version}-macos-arm64"
   printf 'Building %s\n' "$name"
 
+  # --- 2b. compile TypeScript (the bundle ships JS, not sources) ----------------
+  # Built with the pinned Node so the compiler toolchain matches the shipped runtime; tsc itself
+  # comes from the repo's dev dependencies (npm ci must have run, as in CI).
+  step "Compile TypeScript (tsc -p tsconfig.build.json)"
+  [ -f node_modules/typescript/bin/tsc ] || die "typescript is not installed in $root (run npm ci first)."
+  rm -rf "$root/build"
+  "$node_home/bin/node" node_modules/typescript/bin/tsc -p tsconfig.build.json || die "tsc -p tsconfig.build.json failed."
+  [ -f build/js/bin/phone-app-checker.js ] && [ -f build/js/src/cli.js ] || die "compiled layout missing build/js/bin or build/js/src."
+  ts_left="$(find build/js -name '*.ts' -print | head -n 1)"
+  [ -z "$ts_left" ] || die "a TypeScript file leaked into build/js: $ts_left"
+
   # --- 3. stage allowlisted files --------------------------------------------
   step "Stage dist/stage/$name"
   stage_parent="$root/dist/stage"
@@ -97,9 +108,10 @@ main() {
   fi
   mkdir -p "$stage/app/scripts" "$stage/runtime/bin"
   copy() { ditto --norsrc --noextattr --noqtn "$1" "$2"; }
-  for entry in bin src docs; do
-    copy "$root/$entry" "$stage/app/$entry"
-  done
+  copy "$root/docs" "$stage/app/docs"
+  # app/bin and app/src ship compiled JavaScript (build/js); TypeScript sources stay in the repo.
+  copy "$root/build/js/bin" "$stage/app/bin"
+  copy "$root/build/js/src" "$stage/app/src"
   for entry in package.json package-lock.json .npmrc README.md LICENSE THIRD_PARTY_LICENSES.md checker.config.example.json scripts/viber-discover-schema.sh; do
     copy "$root/$entry" "$stage/app/$entry"
   done
@@ -142,9 +154,9 @@ const db = new Database(":memory:");
 db.exec("create table t (x integer)");
 db.close();
 await import("sharp");
-const { APPS } = await import("./src/types.ts");
-const { loadAdapter } = await import("./src/adapters/index.ts");
-if (APPS.length !== 5) throw new Error("expected 5 apps, got " + APPS.length);
+const { APPS } = await import("./src/types.js");
+const { loadAdapter } = await import("./src/adapters/index.js");
+if (!Array.isArray(APPS) || APPS.length === 0) throw new Error("APPS is missing or empty");
 for (const app of APPS) {
   await loadAdapter(app);
   console.log("loaded adapter " + app);
@@ -223,6 +235,9 @@ $bad"
   for forbidden in "$stage/data" "$stage/app/data" "$stage/app/tests" "$stage/app/node_modules/vitest" "$stage/app/node_modules/typescript"; do
     [ ! -e "$forbidden" ] || die "forbidden path in the bundle: ${forbidden#"$stage"/}"
   done
+  # The bundle runs compiled JavaScript: no TypeScript source may reach app/bin or app/src.
+  ts_shipped="$(find "$stage/app/bin" "$stage/app/src" -name '*.ts' -print | head -n 1)"
+  [ -z "$ts_shipped" ] || die "TypeScript source shipped in the bundle: ${ts_shipped#"$stage"/}"
   printf 'clean\n'
 
   # --- 9. metadata ------------------------------------------------------------

@@ -5,8 +5,9 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { LOCK_FILE, RECLAIM_FILE } from '../src/lock.ts';
 import { Store } from '../src/store.ts';
-import type { App } from '../src/types.ts';
+import { APPS, type App } from '../src/types.ts';
 import { Prng } from './helpers/prng.ts';
+import { COLS, REPORT_HEADER } from './helpers/report-rows.ts';
 import { truth } from './helpers/truth.ts';
 
 /*
@@ -17,10 +18,7 @@ import { truth } from './helpers/truth.ts';
 
 const FIXTURE = join(import.meta.dirname, 'fixtures', 'cli-child.ts');
 const APPS_UNDER_TEST: App[] = ['telegram', 'whatsapp', 'zalo'];
-const HEADER =
-  'input,e164,country,telegram,whatsapp,zalo,viber,line,last_checked_at,' +
-  'telegram_checked_at,whatsapp_checked_at,zalo_checked_at,viber_checked_at,line_checked_at,' +
-  'telegram_stale,whatsapp_stale,zalo_stale,viber_stale,line_stale';
+const HEADER = REPORT_HEADER;
 
 interface Running {
   child: ChildProcess;
@@ -133,7 +131,7 @@ function committed(ws: Workspace): Record<App, Map<string, string>> {
     const integrity = store.db.prepare('PRAGMA integrity_check').get() as { integrity_check: string };
     expect(integrity.integrity_check).toBe('ok');
     const out = {} as Record<App, Map<string, string>>;
-    for (const app of ['telegram', 'whatsapp', 'zalo', 'viber', 'line'] as const) {
+    for (const app of APPS) {
       out[app] = new Map([...store.allResults(app)].map(([e164, result]) => [e164, result.status]));
     }
     return out;
@@ -153,8 +151,8 @@ function strayFiles(ws: Workspace): string[] {
 
 function expectedRows(ws: Workspace): string[] {
   return ws.numbers.map((e164) => {
-    const cells = APPS_UNDER_TEST.map((app) => truth(app, e164));
-    return `${e164},VN,${cells.join(',')},skipped,skipped`;
+    const cells = APPS.map((app) => (APPS_UNDER_TEST.includes(app) ? truth(app, e164) : 'skipped'));
+    return `${e164},VN,${cells.join(',')}`;
   });
 }
 
@@ -164,10 +162,10 @@ function reportBody(path: string): string[] {
   expect(lines[0]).toBe(HEADER);
   return lines.slice(1).map((line) => {
     const cells = line.split(',');
-    // Column 8 is last_checked_at; the per-app observation columns follow it.
-    expect(cells[8]).toMatch(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/);
-    expect(cells).toHaveLength(19);
-    return cells.slice(1, 8).join(',');
+    // The per-app observation columns follow last_checked_at.
+    expect(cells[COLS.lastChecked]).toMatch(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/);
+    expect(cells).toHaveLength(COLS.total);
+    return cells.slice(1, COLS.lastChecked).join(',');
   });
 }
 

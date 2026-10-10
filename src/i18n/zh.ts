@@ -9,7 +9,7 @@ export const zh = {
   menuDoctor: '检查这台 Mac 是否就绪 (doctor)',
   menuGuide: '指南 / 警告',
   menuQuit: '退出',
-  menuPrompt: '请选择 (0-6 或 L) 然后按 Enter: ',
+  menuPrompt: '请选择 0-6 或 L，然后按 Enter: ',
   menuInvalid: ({ choice }) => `无效的选择: "${choice}"。请输入 0 到 6 的数字或 L，然后按 Enter。`,
   goodbye: '再见。',
 
@@ -32,8 +32,8 @@ export const zh = {
 
   askCsvIntro: '请把 CSV 文件从 Finder 拖到此窗口 (或输入路径)，然后按 Enter。',
   askCsvPrompt: ({ hint }) => `CSV 文件 (${hint}): `,
-  askCsvHintBack: 'Enter 返回',
-  askCsvHintDefault: ({ path }) => `Enter = ${path}`,
+  askCsvHintBack: 'b = 返回',
+  askCsvHintDefault: ({ path }) => `b = 返回 · Enter = ${path}`,
   askReportPrompt: ({ path }) => `报告文件 (Enter = ${path}): `,
   reportExists: ({ path }) => `文件 ${path} 已存在。是否覆盖`,
 
@@ -56,9 +56,9 @@ export const zh = {
   appNotSetUp: '尚未设置',
   appLoggedIn: ({ count, names }) => `已登录: ${count} 个账号 (${names})`,
   loginAppsHeader: '应用:',
-  loginAppPrompt: ({ max }) => `登录哪个应用? (编号 1-${max}，Enter 返回): `,
+  loginAppPrompt: ({ max }) => `登录哪个应用? (编号 1-${max}, b = 返回): `,
   loginUnknown: ({ input, max }) => `无法识别 "${input}"。请输入 1 到 ${max} 的数字。`,
-  askAccountPrompt: ({ name }) => `账号名称 (Enter = ${name}): `,
+  askAccountPrompt: ({ name }) => `账号名称 (Enter = ${name}, b = 返回): `,
   accountNameInvalid: '只能使用不带音调符号的字母、数字、"-" 或 "_" (最多 32 个字符，以字母或数字开头)。',
   accountExists: ({ account, app }) => `${app} 的账号 "${account}" 已存在。重新登录会替换旧的登录会话。`,
   loginAgainConfirm: '仍要重新登录吗?',
@@ -67,18 +67,22 @@ export const zh = {
   hintTelegram: 'Telegram 会询问: 手机号码 (+84...)、登录验证码 (输入时不显示)，如果设置了两步验证还会要求输入密码。',
   hintViber: 'Viber 需要通过 USB 数据线连接的 Android 手机 (见 docs/viber-setup.md)。',
   hintLine: 'LINE 会在屏幕上给出指引 (见 docs/line-setup.md)。',
+  hintThreema: 'Threema 会询问: Gateway ID (以 * 开头，共 8 个字符) 和它的密钥 (输入时不显示)。见 docs/threema-setup.md。',
+  hintMatrix: 'Matrix 会询问: 主服务器 (Enter = matrix.org)、用户名和密码 (输入时不显示)。密码只使用一次，不会保存。见 docs/matrix-setup.md。',
 
   loginMethodPrompt: ({ max }) => `请选择 1-${max} (Enter = 1): `,
   loginMethodInvalid: ({ max }) => `请输入 1 到 ${max} 之间的数字。`,
   loginFailed: ({ app, account }) => `${app} (账号 ${account}) 的登录没有完成，也没有保存任何内容。已返回菜单: 选择 2 重试。`,
   whatsappMethodIntro: '你想怎样关联 WhatsApp?',
-  whatsappMethodCode: '1) 用手机号码关联: 在手机上输入 8 位配对码 (推荐)',
-  whatsappMethodQr: '2) 用手机扫描二维码',
-  whatsappPhonePrompt: '要关联的 WhatsApp 账号的手机号码，含国家区号 (例如 +84901234567; 按 Enter 返回): ',
+  whatsappMethodCode: '用手机号码关联: 在手机上输入 8 位配对码 (推荐)',
+  whatsappMethodQr: '用手机扫描二维码',
+  whatsappMethodCodeDetail: '在手机上: WhatsApp > 设置 > 已关联的设备 > 使用手机号码关联',
+  whatsappMethodQrDetail: ({ need }) => `需要至少 ${need} 大小的窗口`,
+  whatsappPhonePrompt: '要关联的 WhatsApp 账号的手机号码，含国家区号 (例如 +84901234567; b = 返回): ',
   whatsappPhoneInvalid: '这不是有效的手机号码。请包含国家区号，例如 +84901234567。',
   telegramMethodIntro: '你想怎样登录 Telegram?',
-  telegramMethodQr: '1) 用手机上的 Telegram 应用扫描二维码 (默认)',
-  telegramMethodCode: '2) 使用手机号码，输入 Telegram 发送的登录验证码',
+  telegramMethodQr: '用手机上的 Telegram 应用扫描二维码 (默认)',
+  telegramMethodCode: '使用手机号码，输入 Telegram 发送的登录验证码',
   hintTelegramQr:
     'Telegram 会显示二维码: 在手机上打开 Telegram > 设置 > 设备 > 关联桌面设备，然后扫描。如果设置了两步验证密码，扫描后会询问 (输入时不显示)。',
 
@@ -125,11 +129,10 @@ export const zh = {
   spinConnecting: '正在连接 Telegram...',
   spinWaitingScan: '正在等待你扫描二维码...',
   hintMenu: '↑↓ 移动 · Enter 选择 · q 退出',
-  hintBack: '↑↓ 移动 · Enter 选择 · Esc 或 q 返回',
+  hintBack: '↑↓ 移动 · Enter 选择 · Esc, q 或 b 返回',
   bannerAccounts: '可用账号:',
   emptyAccounts: '还没有已登录的账号。请先选择"登录应用账号"，然后再回到这里。',
   loginPickApp: '登录哪个应用?',
-  loginPickMethod: '你想怎样登录?',
   reportSavedTo: ({ path }) => `报告已保存到 ${path}`,
   finalNextOpen: '下一步: 用 Excel 或 Numbers 打开文件 (双击即可)。',
   finalNextFinder: ({ command }) => `要在 Finder 中显示，请输入: ${command}`,
@@ -157,6 +160,16 @@ export const zh = {
   zaloQrExpired: ({ attempt, max }) => `二维码已过期。正在生成新的二维码 (${attempt}/${max})。`,
   zaloQrGaveUp: '二维码过期次数过多。请重新登录。',
   zaloQrDeclined: 'Zalo 登录在手机上被拒绝。',
+  threemaIdPrompt: 'Threema Gateway ID (8 个字符，以 * 开头，例如 *ABCDEFG): ',
+  threemaSecretPrompt: 'Threema Gateway API 密钥 (输入时不显示): ',
+  threemaIdInvalid: 'Gateway ID 是 "*" 加 7 个大写字母或数字，例如 *ABCDEFG。请重试。',
+  matrixHomeserverPrompt: ({ url }) => `Matrix 主服务器地址 (Enter = ${url}): `,
+  matrixHomeserverInvalid: '请输入以 https:// 开头的地址，例如 https://matrix.org。请重试。',
+  matrixUserPrompt: 'Matrix 用户名 (例如 alice，或 @alice:matrix.org): ',
+  matrixPasswordPrompt: 'Matrix 密码 (输入时不显示; 只使用一次，不会保存): ',
+  matrixTermsIntro: ({ server }) => `身份服务器 ${server} 要求你先接受它的条款，才会回答查询。请在此阅读:`,
+  matrixTermsPrompt: '你接受这些条款吗? (y/n): ',
+  matrixTermsDeclined: '条款未被接受; 没有保存任何内容。',
   telegramPhonePrompt: 'Telegram 手机号码 (国际格式，例如 +84901234567): ',
   telegramCodePrompt: 'Telegram 发送的登录验证码 (输入时不显示): ',
   telegramPasswordPrompt: '两步验证密码 (输入时不显示): ',
@@ -181,4 +194,179 @@ export const zh = {
   guideBan: '- 请使用公司专用、可以舍弃的 SIM 卡 / 账号: 账号可能被限制或封禁 (ban)。',
   guideEvidence: '- 结果只是检查当时的观察，不是证据。',
   guideDetails: '- 详情: README.md 和 docs/install-macos.md。',
+
+  // v0.2.0: 最近文件、CSV 预览、清单、二维码门槛、账号操作、指南分页。
+  accountsWord: ({ count }) => (count === 1 ? '1 个账号' : `${count} 个账号`),
+  accountsNone: '无',
+  pickCsvTitle: '选择电话号码列表 (CSV)',
+  pickCsvDrag: '把 CSV 文件从 Finder 拖到此窗口，或选择一个以前用过的文件。',
+  pickCsvType: '输入或粘贴路径',
+  pickCsvRecentHint: '列表中的编号，或 b = 返回',
+  recentClear: '清空列表并停止记住文件',
+  recentConfirm: '清空最近文件并停止记住它们吗?',
+  recentCleared: '最近文件已清空；现已停止记住。',
+  recentMissing: '不存在',
+  recentWhenJustNow: '刚刚',
+  recentWhenMinutes: ({ count }) => `${count} 分钟前`,
+  recentWhenHours: ({ count }) => `${count} 小时前`,
+  recentWhenYesterday: '昨天',
+  previewTitle: ({ name, column }) => `${name} · 电话号码列 "${column}"`,
+  previewCounts: ({ rows, usable, unusable }) =>
+    `${rows} 行 · ${usable} 个可用号码 · ${unusable} 个不可用`,
+  previewUnusable: ({ examples }) => `不可用，例如: ${examples} (仍会保留在报告中)`,
+  previewCountries: ({ list }) => `国家/地区: ${list}`,
+  previewPrompt: '使用这个文件吗? (Enter = 继续, b = 选择其他文件): ',
+  appsTitle: '哪些应用?',
+  appsHint: '↑↓ 移动 · 空格勾选 · Enter 开始 · b 返回',
+  appsPickNone: '请用空格键至少勾选一个应用。',
+  accountsTitle: '账号',
+  accountsActionHint: '↑↓ 移动 · r 重置冷却 · l 重新登录 · b 返回',
+  pressEnterForMenu: '按 Enter 返回菜单。',
+  guidePage: ({ n, m }) => `指南和警告 · 第 ${n} 页，共 ${m} 页`,
+  guideNext: 'Enter = 下一页 · b 返回',
+  qrGateTooSmall: ({ cols, rows, needCols, needRows }) =>
+    `当前窗口为 ${cols} x ${rows}; 二维码需要 ${needCols} x ${needRows}。`,
+  qrGateEnlarge: '请放大窗口 (拖动边角)，或按一次 Cmd+减号 缩小文字。',
+  qrGateAltWhatsapp: '改用配对码',
+  qrGateAltTelegram: '改用短信验证码',
+  qrGatePrompt: ({ alt }) =>
+    `请放大窗口，然后按 Enter 重试${alt === '' ? '' : `，或输入 c 来${alt}`} (b = 返回): `,
+  tgLoginTitle: '登录 Telegram',
+
+  // v0.2.0: live run dashboard, run log, summary, --plain flag.
+  dashTitle: ({ file, numbers }) => `正在检查 ${file} · ${numbers} 个号码`,
+  dashElapsed: ({ time }) => `已用时 ${time}`,
+  dashSpeed: ({ rate }) => `${rate}/分钟`,
+  dashEta: ({ left, clock }) => `约剩 ${left} · 预计 ${clock} 完成`,
+  dashColApp: '应用',
+  dashColAccount: '账号',
+  dashColState: '状态',
+  dashColDone: '已完成',
+  dashColStatus: '结果',
+  dashColLast: '最近',
+  dashWorking: '进行中',
+  dashWaiting: '等待中',
+  dashResting: ({ clock, left }) => `休息中 · ${clock} 恢复 (${left} 后)`,
+  dashDisabled: '已禁用',
+  dashDone: '完成',
+  dashStatusCounts: ({ yes, notFound, unknown }) =>
+    `${yes}y ${notFound}nf ${unknown}u`,
+  dashChecks: ({ done, total, numbers, apps }) =>
+    `${done}/${total} 项检查 (${numbers} 个号码 x ${apps} ${apps === 1 ? '个应用' : '个应用'})`,
+  dashCounts: ({ yes, notFound, unknown }) =>
+    `yes ${yes} · not_found ${notFound} · unknown ${unknown}`,
+  dashHintStop: 'Ctrl+C 会完成当前批次并保存报告。',
+  dashDetailsFile: ({ path }) => `日志: ${path}`,
+  progressPercent: ({ percent, done, total }) =>
+    `进度 ${percent}% ${done}/${total}`,
+  progressEta: ({ time }) => `预计完成 ${time}`,
+  progressPacing: ({ time }) => `节奏 ${time}`,
+  progressRestingUntil: ({ clock }) => `休息至 ${clock}`,
+  summaryDone: ({ time, numbers, unfinished }) =>
+    `用时 ${time} · ${numbers} 个号码 · ${unfinished} 个未完成`,
+  summaryNumbers: ({ total, valid, invalid }) =>
+    `号码: ${total} 个去重 (${valid} 个有效，${invalid} 个无效)`,
+  summaryAccountsUsed: ({ list }) => `使用的账号: ${list}`,
+  summaryColApp: '应用',
+  summaryColYes: 'yes',
+  summaryColNotFound: 'not_found',
+  summaryColUnknown: 'unknown',
+  summaryColSkipped: 'skipped',
+  summaryColInvalid: 'invalid',
+  summaryColCountry: '国家/地区',
+  summaryYesByCountry: '各国家/地区已注册 (yes):',
+  summaryStale: ({ apps, count }) =>
+    `STALE: ${apps} — ${count} 条 yes/not_found ${count === 1 ? '结果' : '结果'}已超过最大保留期或日期在未来 ` +
+    '(见报告中的 <app>_checked_at / <app>_stale): 已保留，未重新确认。',
+  summaryFootnote:
+    '`not_found` 也可能表示对方隐藏了号码、不允许被搜索；`unknown` = 尚未检查或被限流。',
+  cliNoValidNumbers: ({ invalid }) =>
+    `没有有效的电话号码 (${invalid} 个无效)；请检查 --column 以及文件中的号码列和国家代码`,
+  cliCsvColumn: ({ name }) => `列 "${name}"`,
+  cliCsvColumnIndex: ({ index }) => `第 ${index} 列 (无表头行)`,
+  cliCsvRead: ({ file, labelled, rows, unique, invalid, duplicates }) =>
+    `${file}: 使用 ${labelled}; ${rows} ${rows === 1 ? '行' : '行'}，${unique} 个去重` +
+    `${duplicates === 0 ? '' : `，合并了 ${duplicates} ${duplicates === 1 ? '条重复' : '条重复'}`}，${invalid} 个无效`,
+  cliReportWritten: ({ path }) => `报告已写入 ${path}`,
+  cliInterruptOnce: '收到中断信号: 正在完成当前批次，然后写入报告 (再按一次 Ctrl-C 强制退出)...',
+  cliInterruptOnceParallel:
+    '收到中断信号: 正在等待进行中的批次，然后写入报告 (再按一次 Ctrl-C 强制退出)...',
+  cliInterruptTwice: '第二次中断，立即退出。',
+  cliWarnNoValid: ({ reason }) => `警告: ${reason}。上面的报告只列出了无效行。`,
+  cliColApp: '应用',
+  cliColAccount: '账号',
+  cliColState: '状态',
+  cliColUsedToday: '今日已用',
+  cliColBatchTime: '批次耗时 (平均 / 最近)',
+  cliAccountReady: '就绪',
+  cliAccountDisabled: ({ reason }) => `已禁用: ${reason}`,
+  cliAccountCooling: ({ time }) => `冷却中，至 ${time}`,
+  cliNoAccounts: '还没有账号。请先登录 (菜单第 2 项，或运行: phone-app-checker login <app> --account <name>)。',
+  cliNoResetState: ({ app, account }) =>
+    `没有 ${app} 账号 "${account}" 的已记录状态；无需重置。`,
+  cliResetDone: ({ app, account }) =>
+    `已清除 ${app} 账号 "${account}" 的冷却和禁用标记。`,
+  revealPrompt: 'o = 在 Finder 中显示 · Enter = 菜单',
+  revealDone: '报告已在 Finder 中显示。',
+  revealFailed: '无法打开 Finder；路径见上方。',
+  schNoAccounts: ({ numbers, app }) =>
+    `没有账号，${numbers} ${numbers === 1 ? '个号码' : '个号码'}未检查。运行: login ${app} --account <name>`,
+  schToCheck: ({ numbers, accounts }) =>
+    `将用 ${accounts} ${accounts === 1 ? '个账号' : '个账号'}检查 ${numbers} ${numbers === 1 ? '个号码' : '个号码'}`,
+  schFailedBefore: ({ count }) =>
+    `${count} ${count === 1 ? '个号码' : '个号码'}在之前的运行中失败: 放到最后逐个检查`,
+  schRateLimited: ({ account, time }) => `${account}: 被限流，休息至 ${time}`,
+  schBanned: ({ account, reason, app }) =>
+    `警告 ${account}: 账号已禁用 (${reason})。修复后运行: login ${app} --account ${account}`,
+  schBatchError: ({ account, errors, max, reason }) =>
+    `${account}: 错误 (${errors}/${max}): ${reason}`,
+  schParked: ({ count, failures }) =>
+    `${count} ${count === 1 ? '个号码' : '个号码'}在一次正常的运行中失败了 ${failures} 次；` +
+    '本次运行将它们留为 unknown (不会因此让任何账号进入冷却)',
+  schDropped: ({ account }) => `${account}: 因反复出错，本次运行剩余时间不再使用`,
+  schBatchTimeout: ({ account, count }) =>
+    `${account}: 一批 ${count} ${count === 1 ? '个号码' : '个号码'}未及时返回；这些号码保持 unknown 且计入今日上限`,
+  schNoUsable: ({ count }) =>
+    `没有可用账号 (已禁用或出错)，${count} ${count === 1 ? '个号码' : '个号码'}未检查`,
+  schAllBlockedNowait: ({ count }) =>
+    `所有账号都在冷却或已达每日上限，${count} ${count === 1 ? '个号码' : '个号码'}未检查 (--no-wait)`,
+  schAllResting: ({ time, count }) =>
+    `所有账号都在休息；${time} 恢复 (剩 ${count} 个)`,
+  schChecked: ({ account, count, left }) =>
+    `${account}: 已检查 ${count} 个，剩 ${left} 个`,
+  schCloseError: ({ account, reason }) =>
+    `${account}: 关闭会话时出错: ${reason}`,
+  schStoppedByError: ({ reason }) => `因意外错误停止: ${reason}`,
+  runComplete: '全部有结论',
+  runNotConclusive: '已结束，但无结论',
+  runStopDone: '已完成',
+  runStopAborted: '已中断',
+  runStopNoAccounts: '无可用账号',
+  runStopBlocked: '被阻止',
+  runStopAdapterError: '适配器无法加载',
+  runKept: ({ count }) => `，${count} 个保留旧结果`,
+  runLine: ({ app, needed, attempted, conclusive, inconclusive, kept, remaining, label }) =>
+    `${app}: 需要 ${needed}，已尝试 ${attempted}，有结论 ${conclusive}，` +
+    `无结论 ${inconclusive}${kept}，无应答 ${remaining} (${label})`,
+  runIncomplete: ({ inconclusive, needed }) =>
+    `不完整: ${needed} 项检查中有 ${inconclusive} ${needed === 1 ? '项' : '项'}没有新的 yes/not_found 结果。`,
+  runNotFinal:
+    '报告并非最终结果: 标记为 unknown 的单元格尚未检查，旧的 yes/not_found 可能已过期。',
+  runAppLine: ({ app, inconclusive, attempted, conclusive }) =>
+    `${app}: ${inconclusive} 项无结论 (已尝试 ${attempted}，有结论 ${conclusive})`,
+  runReasonNoAccounts: ({ app }) =>
+    `no_accounts: 没有可用的 ${app} 账号 (请登录，或修复被禁用的账号: login ${app} --account <name>)`,
+  runReasonAdapterError: ({ app }) => `adapter_error: 无法加载 ${app} 适配器`,
+  runReasonAborted: 'aborted: 运行被中断',
+  runReasonCooldown: 'cooldown: 所有账号都在限流或出错后休息',
+  runReasonDailyCap: 'daily cap: 所有可用账号都已达到每日上限',
+  runReasonErrors: ({ count }) => `errors: ${count} ${count === 1 ? '个批次' : '个批次'}失败`,
+  runReasonParked: ({ batches, numbers }) =>
+    `parked batches: ${batches} ${batches === 1 ? '个批次' : '个批次'}，${numbers} ${numbers === 1 ? '个号码' : '个号码'}，本次运行已放弃`,
+  runReasonUnknown: ({ count }) =>
+    `unknown answers: ${count} ${count === 1 ? '个号码' : '个号码'}返回了 unknown`,
+  runReasonNotReached: 'not_reached: 部分号码未被检查',
+  runResumeHint: '再次运行相同命令即可继续 (已完成的号码不会重复检查)。',
+  runResumeAt: ({ time }) =>
+    `下次恢复: ${time}。届时再次运行相同命令 (已完成的号码不会重复检查)。`,
 } satisfies Catalog;

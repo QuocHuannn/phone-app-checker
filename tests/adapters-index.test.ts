@@ -18,7 +18,7 @@ describe('APP_SCOPE', () => {
   it('limits Zalo to Vietnam and checks every other app for every country', () => {
     expect(APP_SCOPE.zalo(vn)).toBe(true);
     expect(APP_SCOPE.zalo(sg)).toBe(false);
-    for (const app of ['telegram', 'whatsapp', 'viber', 'line'] as const) {
+    for (const app of APPS.filter((candidate) => candidate !== 'zalo')) {
       expect(APP_SCOPE[app](vn)).toBe(true);
       expect(APP_SCOPE[app](sg)).toBe(true);
     }

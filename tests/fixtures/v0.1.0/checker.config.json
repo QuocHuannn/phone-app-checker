@@ -1,0 +1,68 @@
+{
+  "defaultRegion": "VN",
+  "dataDir": "./data",
+  "maxAgeDays": 30,
+  "apps": {
+    "telegram": {
+      "enabled": true,
+      "batchSize": 10,
+      "dailyCap": 200,
+      "minIntervalMs": 120000,
+      "jitterMs": 60000,
+      "rateLimitCooldownMs": 21600000,
+      "errorCooldownMs": 600000,
+      "options": {
+        "apiId": null,
+        "apiHash": null
+      }
+    },
+    "whatsapp": {
+      "enabled": true,
+      "batchSize": 20,
+      "dailyCap": 300,
+      "minIntervalMs": 120000,
+      "jitterMs": 60000,
+      "rateLimitCooldownMs": 21600000,
+      "errorCooldownMs": 600000,
+      "options": {
+        "loginTimeoutMs": 180000,
+        "connectTimeoutMs": 60000
+      }
+    },
+    "zalo": {
+      "enabled": true,
+      "batchSize": 1,
+      "dailyCap": 100,
+      "minIntervalMs": 30000,
+      "jitterMs": 30000,
+      "rateLimitCooldownMs": 86400000,
+      "errorCooldownMs": 600000,
+      "options": {}
+    },
+    "viber": {
+      "enabled": false,
+      "batchSize": 100,
+      "dailyCap": 1000,
+      "minIntervalMs": 1800000,
+      "jitterMs": 600000,
+      "rateLimitCooldownMs": 43200000,
+      "errorCooldownMs": 600000,
+      "options": {
+        "serial": "emulator-5554"
+      }
+    },
+    "line": {
+      "enabled": false,
+      "batchSize": 1,
+      "dailyCap": 50,
+      "minIntervalMs": 120000,
+      "jitterMs": 60000,
+      "rateLimitCooldownMs": 86400000,
+      "errorCooldownMs": 600000,
+      "options": {
+        "loginMode": "qr",
+        "device": "DESKTOPWIN"
+      }
+    }
+  }
+}

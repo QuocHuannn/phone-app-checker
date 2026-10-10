@@ -15,12 +15,14 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { stringify } from 'csv-stringify/sync';
+import { stringify as createCsvStringifier } from 'csv-stringify';
 import { APP_SCOPE } from './adapters/index.ts';
 import type { InputEntry } from './csv.ts';
 import { isFresh } from './scheduler.ts';
 import type { Store, StoredResult } from './store.ts';
 import { APPS, type App, type Status } from './types.ts';
-import { PLAIN_UI, type Paint, type Ui } from './ui.ts';
+import { PLAIN_UI, formatDuration, type Paint, type Ui } from './ui.ts';
+import { translator, type Translator } from './i18n/index.ts';
 
 export const STATUSES: readonly Status[] = ['yes', 'not_found', 'unknown', 'skipped', 'invalid'];
 
@@ -86,10 +88,12 @@ export function buildReport(
   entries: InputEntry[],
   apps: readonly App[],
   freshness: ReportFreshness,
+  /** Results already loaded per app; maps missing an app fall back to one `allResults` call. */
+  stored?: Partial<Record<App, Map<string, StoredResult>>>,
 ): ReportRow[] {
   const selected = new Set<App>(apps);
-  const stored = {} as Record<App, Map<string, StoredResult>>;
-  for (const app of APPS) stored[app] = selected.has(app) ? store.allResults(app) : new Map();
+  const results = {} as Record<App, Map<string, StoredResult>>;
+  for (const app of APPS) results[app] = stored?.[app] ?? (selected.has(app) ? store.allResults(app) : new Map());
 
   return entries.map((entry): ReportRow => {
     const statuses = {} as Record<App, Status>;
@@ -105,7 +109,7 @@ export function buildReport(
         statuses[app] = 'skipped';
         continue;
       }
-      const result = stored[app].get(phone.e164);
+      const result = results[app].get(phone.e164);
       statuses[app] = result?.status ?? 'unknown';
       if (result && (lastCheckedAt === undefined || result.checkedAt > lastCheckedAt)) lastCheckedAt = result.checkedAt;
       // Only a yes/not_found is an observation about the number; an `unknown` row only records an attempt.
@@ -130,26 +134,30 @@ export function neutralizeFormula(value: string): string {
   return FORMULA_START.test(value) ? `'${value}` : value;
 }
 
-/** Deterministic CSV text: fixed column order, `\n` line endings, ISO-8601 UTC timestamps. */
+/** One report row as CSV cells; shared by the buffered formatter and the streaming writer. */
+function reportCells(row: ReportRow): string[] {
+  return [
+    // The input cell is customer-supplied text: neutralize spreadsheet formulas unless it is a
+    // valid number written with only phone characters. e164/country/status cells are ours.
+    row.e164 !== '' && PLAIN_PHONE_TEXT.test(row.input) ? row.input : neutralizeFormula(row.input),
+    row.e164,
+    row.country,
+    ...APPS.map((app) => row.statuses[app]),
+    row.lastCheckedAt === undefined ? '' : new Date(row.lastCheckedAt).toISOString(),
+    ...APPS.map((app) => {
+      const at = row.observations[app]?.checkedAt;
+      return at === undefined || !Number.isFinite(at) ? '' : new Date(at).toISOString();
+    }),
+    ...APPS.map((app) => {
+      const observation = row.observations[app];
+      return observation === undefined ? '' : observation.stale ? 'yes' : 'no';
+    }),
+  ];
+}
+
 export function formatReportCsv(rows: ReportRow[]): string {
   return stringify(
-    rows.map((row) => [
-      // The input cell is customer-supplied text: neutralize spreadsheet formulas unless it is a
-      // valid number written with only phone characters. e164/country/status cells are ours.
-      row.e164 !== '' && PLAIN_PHONE_TEXT.test(row.input) ? row.input : neutralizeFormula(row.input),
-      row.e164,
-      row.country,
-      ...APPS.map((app) => row.statuses[app]),
-      row.lastCheckedAt === undefined ? '' : new Date(row.lastCheckedAt).toISOString(),
-      ...APPS.map((app) => {
-        const at = row.observations[app]?.checkedAt;
-        return at === undefined || !Number.isFinite(at) ? '' : new Date(at).toISOString();
-      }),
-      ...APPS.map((app) => {
-        const observation = row.observations[app];
-        return observation === undefined ? '' : observation.stale ? 'yes' : 'no';
-      }),
-    ]),
+    rows.map(reportCells),
     { header: true, columns: [...REPORT_COLUMNS] },
   );
 }
@@ -323,10 +331,15 @@ function removeStaleTemps(dest: string): void {
   }
 }
 
+/** Serialized CSV accumulates to this size before it is written to the file. */
+const WRITE_FLUSH_SIZE = 256 * 1024;
+
 /**
  * Write the report atomically: an exclusive, unpredictable mode-0600 temp file in the destination
- * directory, fsynced, then renamed over the destination. Never follows a symlink and never
- * touches a pre-existing temp path.
+ * directory, fsynced, then renamed over the destination. Never follows a symlink and never touches
+ * a pre-existing temp path. Rows are serialized one at a time through csv-stringify's incremental
+ * engine and flushed to the file, so the whole CSV string is never held in memory; the bytes are
+ * identical to `formatReportCsv(rows)`.
  */
 export function writeReport(path: string, rows: ReportRow[], target: ReportTarget = {}): void {
   const dest = checkReportTarget(path, target);
@@ -335,9 +348,42 @@ export function writeReport(path: string, rows: ReportRow[], target: ReportTarge
   const fd = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
   try {
     try {
-      const data = Buffer.from(formatReportCsv(rows), 'utf8');
-      let offset = 0;
-      while (offset < data.length) offset += writeSync(fd, data, offset, data.length - offset);
+      // The Stringifier's transform api is what its stream wrapper calls for every record; driving
+      // it directly keeps this writer synchronous like the rest of the store/report layer while a
+      // serialized row is written as soon as it exists, never buffered into one report string.
+      const stringifier = createCsvStringifier({ header: true, columns: [...REPORT_COLUMNS] }) as unknown as {
+        api: {
+          __transform: (record: string[], push: (chunk: string) => void) => Error | undefined;
+          bom: (push: (chunk: string) => void) => unknown;
+          headers: (push: (chunk: string) => void) => Error | undefined;
+        };
+      };
+      let pending = '';
+      const push = (chunk: string) => {
+        pending += chunk;
+        if (pending.length >= WRITE_FLUSH_SIZE) {
+          const data = Buffer.from(pending, 'utf8');
+          pending = '';
+          writeSync(fd, data, 0, data.length);
+        }
+      };
+      const flush = () => {
+        if (pending === '') return;
+        const data = Buffer.from(pending, 'utf8');
+        pending = '';
+        writeSync(fd, data, 0, data.length);
+      };
+      for (const row of rows) {
+        const error = stringifier.api.__transform(reportCells(row), push);
+        if (error !== undefined) throw error;
+      }
+      if (rows.length === 0) {
+        // An empty report is still the header line, which the engine emits from its flush step.
+        stringifier.api.bom(push);
+        const error = stringifier.api.headers(push);
+        if (error !== undefined) throw error;
+      }
+      flush();
       fsyncSync(fd);
     } finally {
       closeSync(fd);
@@ -360,7 +406,8 @@ export function summarize(rows: ReportRow[]): ReportSummary {
   }
   const yesByCountry = new Map<string, Record<App, number>>();
   let invalid = 0;
-  const stale: Record<App, number> = { telegram: 0, whatsapp: 0, zalo: 0, viber: 0, line: 0 };
+  const zeroCounts = (): Record<App, number> => Object.fromEntries(APPS.map((app) => [app, 0])) as Record<App, number>;
+  const stale = zeroCounts();
   for (const row of rows) {
     if (row.e164 === '') invalid += 1;
     for (const app of APPS) {
@@ -370,7 +417,7 @@ export function summarize(rows: ReportRow[]): ReportSummary {
       if (status !== 'yes') continue;
       let counts = yesByCountry.get(row.country);
       if (!counts) {
-        counts = { telegram: 0, whatsapp: 0, zalo: 0, viber: 0, line: 0 };
+        counts = zeroCounts();
         yesByCountry.set(row.country, counts);
       }
       counts[app] += 1;
@@ -395,42 +442,64 @@ function statusPaint(ui: Ui, status: Status | undefined): Paint {
   return ui.dim;
 }
 
-/** Human-readable summary: status counts per app, then `yes` counts per country. `ui` colours the status table (plain by default). */
-export function formatSummary(summary: ReportSummary, ui: Ui = PLAIN_UI): string {
+/** Extra run facts for `formatSummary` (the report command keeps the classic output). */
+export interface SummaryExtras {
+  /** Apps this run/report covered (default: all apps — the table then shows every column). */
+  apps?: readonly App[];
+  /** Wall time of the run; adds the `Done in …` header line. */
+  durationMs?: number;
+  /** Account names that answered at least one number, per app. */
+  accountsUsed?: Partial<Record<App, readonly string[]>>;
+  /** Message lookup (default: English). */
+  tr?: Translator;
+}
+
+/** Human-readable summary: status counts per requested app, then `yes` counts per country. `ui` colours the status table (plain by default). */
+export function formatSummary(summary: ReportSummary, ui: Ui = PLAIN_UI, options: SummaryExtras = {}): string {
+  const tr = options.tr ?? translator();
+  const shown = options.apps ?? APPS;
   const out: string[] = [];
-  out.push(`Numbers: ${summary.rows} unique (${summary.valid} valid, ${summary.invalid} invalid)`, '');
-  const perApp = APPS.map((app) => [app, ...STATUSES.map((status) => String(summary.perApp[app][status]))]);
+  if (options.durationMs !== undefined) {
+    const unfinished = shown.reduce((total, app) => total + summary.perApp[app].unknown, 0);
+    out.push(tr('summaryDone', { time: formatDuration(options.durationMs), numbers: summary.rows, unfinished }), '');
+  }
+  out.push(tr('summaryNumbers', { total: summary.rows, valid: summary.valid, invalid: summary.invalid }), '');
+  const perApp = shown.map((app) => [app, ...STATUSES.map((status) => String(summary.perApp[app][status]))]);
   out.push(
-    table(['app', ...STATUSES], perApp, (row, column, cell) => {
-      if (column === 0) return row < 0 ? ui.bold(cell) : cell;
-      const status = STATUSES[column - 1];
-      // Headers carry the colour of their column; a zero count is quiet (dim) whatever the column.
-      if (row < 0) return ui.bold(statusPaint(ui, status)(cell));
-      return (perApp[row]?.[column] ?? '0') === '0' ? ui.dim(cell) : statusPaint(ui, status)(cell);
-    }),
+    table(
+      [tr('summaryColApp'), tr('summaryColYes'), tr('summaryColNotFound'), tr('summaryColUnknown'), tr('summaryColSkipped'), tr('summaryColInvalid')],
+      perApp,
+      (row, column, cell) => {
+        if (column === 0) return row < 0 ? ui.bold(cell) : cell;
+        const status = STATUSES[column - 1];
+        // Headers carry the colour of their column; a zero count is quiet (dim) whatever the column.
+        if (row < 0) return ui.bold(statusPaint(ui, status)(cell));
+        return (perApp[row]?.[column] ?? '0') === '0' ? ui.dim(cell) : statusPaint(ui, status)(cell);
+      },
+    ),
   );
+  const accounts = shown
+    .flatMap((app) => (options.accountsUsed?.[app] ?? []).map((name) => ({ app, name })))
+    .map(({ app, name }) => `${app} ${name}`);
+  if (accounts.length > 0) out.push('', tr('summaryAccountsUsed', { list: accounts.join(' · ') }));
   if (summary.yesByCountry.size > 0) {
     const countries = [...summary.yesByCountry.entries()].sort((a, b) => {
-      const total = (counts: Record<App, number>) => APPS.reduce((sum, app) => sum + counts[app], 0);
+      const total = (counts: Record<App, number>) => shown.reduce((sum, app) => sum + counts[app], 0);
       return total(b[1]) - total(a[1]) || a[0].localeCompare(b[0]);
     });
-    out.push('', 'Registered (yes) by country:');
+    out.push('', tr('summaryYesByCountry'));
     out.push(
       table(
-        ['country', ...APPS],
-        countries.map(([country, counts]) => [country === '' ? '??' : country, ...APPS.map((app) => String(counts[app]))]),
+        [tr('summaryColCountry'), ...shown],
+        countries.map(([country, counts]) => [country === '' ? '??' : country, ...shown.map((app) => String(counts[app]))]),
       ),
     );
   }
-  const stale = APPS.filter((app) => summary.stale[app] > 0);
+  const stale = shown.filter((app) => summary.stale[app] > 0);
   if (stale.length > 0) {
     const staleTotal = stale.reduce((sum, app) => sum + summary.stale[app], 0);
-    out.push(
-      '',
-      `STALE: ${stale.map((app) => `${app} ${summary.stale[app]}`).join(', ')} yes/not_found ${staleTotal === 1 ? 'result is' : 'results are'} older than the max age or dated in the future ` +
-        '(see <app>_checked_at / <app>_stale in the report): they were kept, not re-confirmed.',
-    );
+    out.push('', tr('summaryStale', { apps: stale.map((app) => `${app} ${summary.stale[app]}`).join(', '), count: staleTotal }));
   }
-  out.push('', '`not_found` can also mean the person hides their number from search; `unknown` = not checked yet or throttled.');
+  out.push('', tr('summaryFootnote'));
   return out.join('\n');
 }

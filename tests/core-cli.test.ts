@@ -3,9 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createProgram, main, type CliDeps } from '../src/cli.ts';
+import { CURRENT_CONFIG_VERSION } from '../src/config.ts';
 import { DOCTOR_FOOTER } from '../src/doctor.ts';
 import { Store } from '../src/store.ts';
-import { AccountBanned, type Adapter, type App, type CheckStatus } from '../src/types.ts';
+import { APPS, AccountBanned, type Adapter, type App, type CheckStatus } from '../src/types.ts';
+import { COLS, REPORT_HEADER, reportLine } from './helpers/report-rows.ts';
 
 const NOW = Date.UTC(2026, 9, 8, 5, 0, 0);
 const ISO = '2026-10-08T05:00:00.000Z';
@@ -98,12 +100,28 @@ async function run(args: string[], adapters: Partial<Record<App, Adapter>> = {})
 }
 
 const REPORT = [
-  'input,e164,country,telegram,whatsapp,zalo,viber,line,last_checked_at,' +
-    'telegram_checked_at,whatsapp_checked_at,zalo_checked_at,viber_checked_at,line_checked_at,' +
-    'telegram_stale,whatsapp_stale,zalo_stale,viber_stale,line_stale',
-  `0901234567,+84901234567,VN,yes,skipped,yes,skipped,skipped,${ISO},${ISO},,${ISO},,,no,,no,,`,
-  `+65 9123 4567,+6591234567,SG,not_found,skipped,skipped,skipped,skipped,${ISO},${ISO},,,,,no,,,,`,
-  'abc,,,invalid,invalid,invalid,invalid,invalid' + ','.repeat(11),
+  REPORT_HEADER,
+  reportLine({
+    input: '0901234567',
+    e164: '+84901234567',
+    country: 'VN',
+    statuses: { telegram: 'yes', zalo: 'yes' },
+    otherwise: 'skipped',
+    lastChecked: ISO,
+    checked: { telegram: ISO, zalo: ISO },
+    stale: { telegram: 'no', zalo: 'no' },
+  }),
+  reportLine({
+    input: '+65 9123 4567',
+    e164: '+6591234567',
+    country: 'SG',
+    statuses: { telegram: 'not_found' },
+    otherwise: 'skipped',
+    lastChecked: ISO,
+    checked: { telegram: ISO },
+    stale: { telegram: 'no' },
+  }),
+  reportLine({ input: 'abc', e164: '', country: '', statuses: {}, otherwise: 'invalid' }),
   '',
 ].join('\n');
 
@@ -141,7 +159,7 @@ describe('check', () => {
     await run(['check', env.csv, '--out', env.out, '--apps', 'telegram']);
     expect(env.calls).toEqual(['telegram:2']);
     expect(readFileSync(env.out, 'utf8').split('\n')[1]).toBe(
-      `0901234567,+84901234567,VN,yes,skipped,skipped,skipped,skipped,${ISO},${ISO},,,,,no,,,,`,
+      reportLine({ input: '0901234567', e164: '+84901234567', country: 'VN', statuses: { telegram: 'yes' }, otherwise: 'skipped', lastChecked: ISO, checked: { telegram: ISO }, stale: { telegram: 'no' } }),
     );
   });
 
@@ -249,7 +267,7 @@ describe('check', () => {
     await run(['check', env.csv, '--out', env.out]);
     expect(env.logs.join('\n')).toContain('login zalo');
     expect(readFileSync(env.out, 'utf8').split('\n')[1]).toBe(
-      `0901234567,+84901234567,VN,yes,skipped,unknown,skipped,skipped,${ISO},${ISO},,,,,no,,,,`,
+      reportLine({ input: '0901234567', e164: '+84901234567', country: 'VN', statuses: { telegram: 'yes', zalo: 'unknown' }, otherwise: 'skipped', lastChecked: ISO, checked: { telegram: ISO }, stale: { telegram: 'no' } }),
     );
     // An app without an account is not "done": the run says so, with the reason, and still exits 0.
     const logs = env.logs.join('\n');
@@ -297,14 +315,14 @@ describe('check', () => {
     // The old not_found survives (an unknown never overwrites it), flagged stale with its own timestamp.
     const row = readFileSync(env.out, 'utf8').split('\n')[1]?.split(',') ?? [];
     const old = new Date(NOW - 40 * 24 * 60 * 60 * 1000).toISOString();
-    expect(row[3]).toBe('not_found');
-    expect(row[8]).toBe(old);
-    expect(row[9]).toBe(old);
-    expect(row[14]).toBe('yes');
+    expect(row[COLS.statuses]).toBe('not_found');
+    expect(row[COLS.lastChecked]).toBe(old);
+    expect(row[COLS.checked]).toBe(old);
+    expect(row[COLS.stale]).toBe('yes');
     // The second number never got an answer: unknown, no observation time, no stale flag.
     const second = readFileSync(env.out, 'utf8').split('\n')[2]?.split(',') ?? [];
-    expect(second.slice(3, 4)).toEqual(['unknown']);
-    expect(second.slice(9, 14).concat(second.slice(14, 19))).toEqual(Array(10).fill(''));
+    expect(second.slice(COLS.statuses, COLS.statuses + 1)).toEqual(['unknown']);
+    expect(second.slice(COLS.checked)).toEqual(Array(2 * APPS.length).fill(''));
   });
 });
 
@@ -324,7 +342,7 @@ describe('report', () => {
     env.calls.length = 0;
     await run(['report', env.csv, '--out', env.out, '--max-age', '0']);
     const lines = readFileSync(env.out, 'utf8').split('\n');
-    expect(lines[1]?.split(',').slice(14)).toEqual(['yes', '', 'yes', '', '']);
+    expect(lines[1]?.split(',').slice(COLS.stale)).toEqual(APPS.map((app) => ({ telegram: 'yes', zalo: 'yes' })[app as string] ?? ''));
     expect(env.printed.join('\n')).toContain('STALE: telegram 2, zalo 1');
     expect(env.calls).toEqual([]);
   });
@@ -352,6 +370,10 @@ describe('accounts and account-reset', () => {
     const listing = env.printed.join('\n');
     expect(listing).toMatch(/telegram\s+a\s+ready\s+2\/200/);
     expect(listing).toMatch(/zalo\s+z\s+DISABLED: logged out/);
+    // The account that never completed a batch has no timing; the one that did shows average and last.
+    expect(listing).toContain('batch time (avg / last)');
+    expect(listing).toMatch(/zalo\s+z\s+DISABLED: logged out\s+0\/100\s+- \/ -/);
+    expect(listing).toMatch(/telegram\s+a\s+ready\s+2\/200\s+\d+\.\ds \/ \d+\.\ds/);
 
     env.printed.length = 0;
     await run(['account-reset', 'zalo', 'z']);
@@ -655,7 +677,7 @@ describe('report output safety', () => {
     await run(['report', env.csv, '--out', env.out, '--apps', 'telegram']);
     const lines = readFileSync(env.out, 'utf8').split('\n');
     expect(lines[1]).toContain(`'=HYPERLINK`);
-    expect(lines[2]).toBe('0901234567,+84901234567,VN,unknown,skipped,skipped,skipped,skipped' + ','.repeat(11));
+    expect(lines[2]).toBe(reportLine({ input: '0901234567', e164: '+84901234567', country: 'VN', statuses: { telegram: 'unknown' }, otherwise: 'skipped' }));
   });
 });
 
@@ -675,11 +697,15 @@ describe('version, doctor and app home', () => {
     });
   }
 
-  async function runDoctorCommand(extra: Partial<CliDeps> = {}, args: string[] = ['--config', env.config]): Promise<number | undefined> {
+  async function runDoctorCommand(
+    extra: Partial<CliDeps> = {},
+    args: string[] = ['--config', env.config],
+    tail: string[] = [],
+  ): Promise<number | undefined> {
     const before = process.exitCode;
     process.exitCode = undefined;
     try {
-      await program(extra).parseAsync([...args, 'doctor'], { from: 'user' });
+      await program(extra).parseAsync([...args, 'doctor', ...tail], { from: 'user' });
       return process.exitCode === undefined ? undefined : Number(process.exitCode);
     } finally {
       process.exitCode = before;
@@ -699,22 +725,44 @@ describe('version, doctor and app home', () => {
   it('doctor prints one row per check and exits 0 when nothing fails', async () => {
     expect(await runDoctorCommand()).toBeUndefined();
     const text = env.printed.join('\n');
-    for (const name of ['version', 'runtime', 'sqlite', 'config', 'data', 'telegram', 'whatsapp', 'zalo', 'viber', 'line']) {
+    for (const name of ['version', 'runtime', 'sqlite', 'config', 'data', ...APPS]) {
       expect(text).toMatch(new RegExp(`^(OK|WARN)\\s+${name}\\s`, 'm'));
     }
     expect(text.endsWith(DOCTOR_FOOTER)).toBe(true);
     expect(text).not.toMatch(/^FAIL/m);
   });
 
-  it('doctor exits 1 when an adapter cannot be loaded', async () => {
-    const code = await runDoctorCommand({
-      loadAdapter: async (app) => {
-        if (app === 'zalo') throw new Error('Cannot load the zalo adapter: boom');
-        return fakeAdapter(app);
+  it('doctor --deep exits 1 when an adapter module cannot be loaded', async () => {
+    const code = await runDoctorCommand(
+      {
+        loadAdapter: async (app) => {
+          if (app === 'zalo') throw new Error('Cannot load the zalo adapter: boom');
+          return fakeAdapter(app);
+        },
       },
-    });
+      ['--config', env.config],
+      ['--deep'],
+    );
     expect(code).toBe(1);
     expect(env.printed.join('\n')).toMatch(/^FAIL\s+zalo\s+Cannot load the zalo adapter: boom/m);
+    expect(env.printed.join('\n').endsWith(DOCTOR_FOOTER)).toBe(true);
+  });
+
+  it('doctor without --deep resolves adapter packages without importing adapter modules', async () => {
+    const loaded: App[] = [];
+    const resolved: App[] = [];
+    const code = await runDoctorCommand({
+      loadAdapter: async (app) => {
+        loaded.push(app);
+        return fakeAdapter(app);
+      },
+      resolveAdapter: (app) => {
+        resolved.push(app);
+      },
+    });
+    expect(code).toBeUndefined();
+    expect(loaded).toEqual([]);
+    expect(resolved).toEqual([...APPS]);
     expect(env.printed.join('\n').endsWith(DOCTOR_FOOTER)).toBe(true);
   });
 
@@ -753,7 +801,9 @@ describe('version, doctor and app home', () => {
     const home = join(env.dir, 'home');
     expect(await runDoctorCommand({ env: { [HOME_ENV]: home } }, [])).toBeUndefined();
     expect(existsSync(join(home, 'checker.config.json'))).toBe(true);
-    expect(env.printed.join('\n')).toMatch(/^OK\s+config\s+.*\(exists\)/m);
+    const text = env.printed.join('\n');
+    expect(text).toMatch(/^OK\s+config\s+/m); // the path wraps under formatDoctor's columns
+    expect(text).toContain('(exists)');
   });
 
   it('doctor reports an unusable home as a failing config check', async () => {
@@ -762,14 +812,16 @@ describe('version, doctor and app home', () => {
     const home = join(env.dir, 'link');
     symlinkSync(target, home);
     expect(await runDoctorCommand({ env: { [HOME_ENV]: home } }, [])).toBe(1);
-    expect(env.printed.join('\n')).toMatch(/^FAIL\s+config\s+.*symlink/m);
+    const text = env.printed.join('\n');
+    expect(text).toMatch(/^FAIL\s+config\s+/m); // the detail wraps; 'symlink' lands on a continuation line
+    expect(text).toContain('symlink');
   });
 
   describe('hidden data-dir command (used by install.sh / uninstall.sh)', () => {
     it('prints the configured dataDir resolved against the app home, without creating anything', async () => {
       const home = join(env.dir, 'home');
       mkdirSync(home);
-      writeFileSync(join(home, 'checker.config.json'), JSON.stringify({ dataDir: './store' }));
+      writeFileSync(join(home, 'checker.config.json'), JSON.stringify({ configVersion: CURRENT_CONFIG_VERSION, dataDir: './store' }));
       await program({ env: { [HOME_ENV]: home } }).parseAsync(['data-dir'], { from: 'user' });
       expect(env.printed).toEqual([join(home, 'store')]);
       expect(readdirSync(home)).toEqual(['checker.config.json']);

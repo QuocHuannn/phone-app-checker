@@ -9,7 +9,7 @@ export const ko = {
   menuDoctor: 'Mac 준비 상태 점검 (doctor)',
   menuGuide: '안내 / 주의사항',
   menuQuit: '종료',
-  menuPrompt: '번호(0-6) 또는 L을 입력하고 Enter를 누르세요: ',
+  menuPrompt: '0-6 또는 L을 선택하고 Enter를 누르세요: ',
   menuInvalid: ({ choice }) => `잘못된 선택입니다: "${choice}". 0부터 6까지의 숫자 또는 L을 입력하고 Enter를 누르세요.`,
   goodbye: '안녕히 가세요.',
 
@@ -32,8 +32,8 @@ export const ko = {
 
   askCsvIntro: 'Finder에서 CSV 파일을 이 창으로 끌어다 놓거나 경로를 입력한 다음 Enter를 누르세요.',
   askCsvPrompt: ({ hint }) => `CSV 파일 (${hint}): `,
-  askCsvHintBack: 'Enter = 돌아가기',
-  askCsvHintDefault: ({ path }) => `Enter = ${path}`,
+  askCsvHintBack: 'b = 돌아가기',
+  askCsvHintDefault: ({ path }) => `b = 돌아가기 · Enter = ${path}`,
   askReportPrompt: ({ path }) => `보고서 파일 (Enter = ${path}): `,
   reportExists: ({ path }) => `${path} 파일이 이미 있습니다. 덮어쓸까요`,
 
@@ -57,9 +57,9 @@ export const ko = {
   appNotSetUp: '설정 안 됨',
   appLoggedIn: ({ count, names }) => `로그인됨: 계정 ${count}개 (${names})`,
   loginAppsHeader: '앱:',
-  loginAppPrompt: ({ max }) => `어떤 앱에 로그인할까요? (번호 1-${max}, Enter = 돌아가기): `,
+  loginAppPrompt: ({ max }) => `어떤 앱에 로그인할까요? (번호 1-${max}, b = 돌아가기): `,
   loginUnknown: ({ input, max }) => `"${input}"을(를) 이해하지 못했습니다. 1부터 ${max}까지의 숫자를 입력하세요.`,
-  askAccountPrompt: ({ name }) => `계정 이름 (Enter = ${name}): `,
+  askAccountPrompt: ({ name }) => `계정 이름 (Enter = ${name}, b = 돌아가기): `,
   accountNameInvalid: '악센트 없는 영문자, 숫자, "-" 또는 "_"만 사용하세요 (최대 32자, 영문자 또는 숫자로 시작).',
   accountExists: ({ account, app }) => `${app}의 "${account}" 계정이 이미 있습니다. 다시 로그인하면 기존 로그인 세션이 교체됩니다.`,
   loginAgainConfirm: '그래도 다시 로그인할까요?',
@@ -68,18 +68,22 @@ export const ko = {
   hintTelegram: 'Telegram이 전화번호(+84...), 로그인 코드(입력할 때 표시되지 않음), 그리고 있다면 2단계 인증 비밀번호를 물어봅니다.',
   hintViber: 'Viber는 USB 케이블로 연결된 Android 휴대폰이 필요합니다 (docs/viber-setup.md 참고).',
   hintLine: 'LINE은 화면에서 안내합니다 (docs/line-setup.md 참고).',
+  hintThreema: 'Threema가 Gateway ID(*로 시작, 8자)와 그 비밀 키(입력할 때 표시되지 않음)를 물어봅니다 (docs/threema-setup.md 참고).',
+  hintMatrix: 'Matrix가 홈서버(Enter = matrix.org), 사용자 이름, 비밀번호(입력할 때 표시되지 않음)를 물어봅니다. 비밀번호는 한 번만 사용하며 저장되지 않습니다 (docs/matrix-setup.md 참고).',
 
   loginMethodPrompt: ({ max }) => `1-${max} 중에서 선택하세요 (Enter = 1): `,
   loginMethodInvalid: ({ max }) => `1부터 ${max}까지의 숫자를 입력하세요.`,
   loginFailed: ({ app, account }) => `${app} (계정 ${account}) 로그인이 끝나지 않았고 아무것도 저장되지 않았습니다. 메뉴로 돌아왔습니다: 2를 선택해 다시 시도하세요.`,
   whatsappMethodIntro: 'WhatsApp을 어떻게 연결할까요?',
-  whatsappMethodCode: '1) 전화번호로 연결: 휴대폰에서 8자리 코드 입력 (권장)',
-  whatsappMethodQr: '2) 휴대폰으로 QR 코드 스캔',
-  whatsappPhonePrompt: '연결할 WhatsApp 계정의 전화번호를 국가 번호와 함께 입력하세요 (예: +84901234567, Enter로 돌아가기): ',
+  whatsappMethodCode: '전화번호로 연결: 휴대폰에서 8자리 코드 입력 (권장)',
+  whatsappMethodQr: '휴대폰으로 QR 코드 스캔',
+  whatsappMethodCodeDetail: '휴대폰에서: WhatsApp > 설정 > 연결된 기기 > 전화번호로 연결',
+  whatsappMethodQrDetail: ({ need }) => `최소 ${need} 크기의 창이 필요합니다`,
+  whatsappPhonePrompt: '연결할 WhatsApp 계정의 전화번호를 국가 번호와 함께 입력하세요 (예: +84901234567, b = 돌아가기): ',
   whatsappPhoneInvalid: '올바른 전화번호가 아닙니다. 국가 번호를 포함하세요 (예: +84901234567).',
   telegramMethodIntro: 'Telegram에 어떻게 로그인할까요?',
-  telegramMethodQr: '1) 휴대폰의 Telegram 앱으로 QR 코드 스캔 (기본)',
-  telegramMethodCode: '2) 전화번호를 사용해 Telegram이 보내는 로그인 코드 입력',
+  telegramMethodQr: '휴대폰의 Telegram 앱으로 QR 코드 스캔 (기본)',
+  telegramMethodCode: '전화번호를 사용해 Telegram이 보내는 로그인 코드 입력',
   hintTelegramQr:
     'Telegram이 QR 코드를 표시합니다. 휴대폰에서 Telegram > 설정 > 기기 > 데스크톱 기기 연결을 열고 스캔하세요. 2단계 인증 비밀번호가 있다면 스캔 후에 물어봅니다 (입력할 때 표시되지 않음).',
 
@@ -126,11 +130,10 @@ export const ko = {
   spinConnecting: 'Telegram에 연결하는 중...',
   spinWaitingScan: '코드를 스캔할 때까지 기다리는 중...',
   hintMenu: '↑↓ 이동 · Enter 선택 · q 종료',
-  hintBack: '↑↓ 이동 · Enter 선택 · Esc 또는 q 뒤로',
+  hintBack: '↑↓ 이동 · Enter 선택 · Esc, q 또는 b 뒤로',
   bannerAccounts: '준비된 계정:',
   emptyAccounts: '로그인된 계정이 아직 없습니다. 먼저 "앱 계정 로그인"을 선택한 다음 여기로 돌아오세요.',
   loginPickApp: '어떤 앱에 로그인할까요?',
-  loginPickMethod: '어떤 방법으로 로그인할까요?',
   reportSavedTo: ({ path }) => `보고서를 ${path}에 저장했습니다`,
   finalNextOpen: '다음: 파일을 Excel 또는 Numbers로 여세요 (더블클릭).',
   finalNextFinder: ({ command }) => `Finder에서 보려면 입력하세요: ${command}`,
@@ -160,6 +163,16 @@ export const ko = {
   zaloQrExpired: ({ attempt, max }) => `QR 코드가 만료되었습니다. 새 코드를 만듭니다 (${attempt}/${max}).`,
   zaloQrGaveUp: 'QR 코드가 너무 많이 만료되었습니다. 로그인을 다시 실행하세요.',
   zaloQrDeclined: '휴대폰에서 Zalo 로그인이 거부되었습니다.',
+  threemaIdPrompt: 'Threema Gateway ID (8자, *로 시작, 예: *ABCDEFG): ',
+  threemaSecretPrompt: 'Threema Gateway API 비밀 키 (입력할 때 표시되지 않음): ',
+  threemaIdInvalid: 'Gateway ID는 "*" 뒤에 대문자 또는 숫자 7자가 옵니다. 예: *ABCDEFG. 다시 시도하세요.',
+  matrixHomeserverPrompt: ({ url }) => `Matrix 홈서버 주소 (Enter = ${url}): `,
+  matrixHomeserverInvalid: 'https://로 시작하는 주소를 입력하세요. 예: https://matrix.org. 다시 시도하세요.',
+  matrixUserPrompt: 'Matrix 사용자 이름 (예: alice 또는 @alice:matrix.org): ',
+  matrixPasswordPrompt: 'Matrix 비밀번호 (입력할 때 표시되지 않음; 한 번만 사용하며 저장되지 않음): ',
+  matrixTermsIntro: ({ server }) => `ID 서버 ${server}가 조회에 답하기 전에 약관에 동의하라고 요구합니다. 여기서 읽으세요:`,
+  matrixTermsPrompt: '이 약관에 동의하십니까? (y/n): ',
+  matrixTermsDeclined: '약관에 동의하지 않아 아무것도 저장되지 않았습니다.',
   telegramPhonePrompt: 'Telegram 전화번호 (국제 형식, 예: +84901234567): ',
   telegramCodePrompt: 'Telegram이 보낸 로그인 코드 (입력할 때 표시되지 않음): ',
   telegramPasswordPrompt: '2단계 인증 비밀번호 (입력할 때 표시되지 않음): ',
@@ -184,4 +197,179 @@ export const ko = {
   guideBan: '- 회사 전용으로 잃어도 되는 SIM / 계정을 사용하세요. 계정이 제한되거나 차단(ban)될 수 있습니다.',
   guideEvidence: '- 결과는 확인 시점의 관찰일 뿐 증거가 아닙니다.',
   guideDetails: '- 자세한 내용: README.md 및 docs/install-macos.md.',
+
+  // v0.2.0: 최근 파일, CSV 미리보기, 체크리스트, QR 게이트, 계정 작업, 안내 페이지.
+  accountsWord: ({ count }) => (count === 1 ? '계정 1개' : `계정 ${count}개`),
+  accountsNone: '없음',
+  pickCsvTitle: '전화번호 목록 선택 (CSV)',
+  pickCsvDrag: 'Finder에서 CSV 파일을 이 창으로 끌어다 놓거나, 이전에 사용한 파일을 고르세요.',
+  pickCsvType: '경로를 입력하거나 붙여 넣기',
+  pickCsvRecentHint: '목록의 번호, 또는 b = 돌아가기',
+  recentClear: '목록을 지우고 파일 기억 중지',
+  recentConfirm: '최근 파일 목록을 지우고 기억을 중지할까요?',
+  recentCleared: '최근 파일을 지웠습니다. 이제 기억하지 않습니다.',
+  recentMissing: '없어짐',
+  recentWhenJustNow: '방금',
+  recentWhenMinutes: ({ count }) => `${count}분 전`,
+  recentWhenHours: ({ count }) => `${count}시간 전`,
+  recentWhenYesterday: '어제',
+  previewTitle: ({ name, column }) => `${name} · 전화번호 열 "${column}"`,
+  previewCounts: ({ rows, usable, unusable }) =>
+    `${rows}행 · 사용 가능한 번호 ${usable}개 · 사용 불가 ${unusable}개`,
+  previewUnusable: ({ examples }) => `사용 불가 예: ${examples} (보고서에는 유지됨)`,
+  previewCountries: ({ list }) => `국가: ${list}`,
+  previewPrompt: '이 파일을 사용할까요? (Enter = 계속, b = 다른 파일 선택): ',
+  appsTitle: '어떤 앱?',
+  appsHint: '↑↓ 이동 · 스페이스 선택 · Enter 시작 · b 뒤로',
+  appsPickNone: '스페이스 키로 앱을 하나 이상 선택하세요.',
+  accountsTitle: '계정',
+  accountsActionHint: '↑↓ 이동 · r 쿨다운 초기화 · l 다시 로그인 · b 뒤로',
+  pressEnterForMenu: 'Enter를 누르면 메뉴가 나옵니다.',
+  guidePage: ({ n, m }) => `안내 및 주의사항 · ${n}/${m} 페이지`,
+  guideNext: 'Enter = 다음 페이지 · b 뒤로',
+  qrGateTooSmall: ({ cols, rows, needCols, needRows }) =>
+    `이 창은 ${cols} x ${rows}이며, 코드에는 ${needCols} x ${needRows}이 필요합니다.`,
+  qrGateEnlarge: '창을 키우거나(모서리를 끌기) Cmd+마이너스를 한 번 눌러 글자를 줄이세요.',
+  qrGateAltWhatsapp: '대신 페어링 코드 사용',
+  qrGateAltTelegram: '대신 전화번호 코드 사용',
+  qrGatePrompt: ({ alt }) =>
+    `창을 키운 다음 Enter를 눌러 다시 시도하세요${alt === '' ? '' : `, 또는 c를 입력해 ${alt}`} (b = 돌아가기): `,
+  tgLoginTitle: 'Telegram 로그인',
+
+  // v0.2.0: 실시간 실행 대시보드, 실행 로그, 요약, --plain 플래그.
+  dashTitle: ({ file, numbers }) => `${file} 확인 중 · 번호 ${numbers}개`,
+  dashElapsed: ({ time }) => `경과 ${time}`,
+  dashSpeed: ({ rate }) => `분당 ${rate}`,
+  dashEta: ({ left, clock }) => `약 ${left} 남음 · 약 ${clock}에 완료`,
+  dashColApp: '앱',
+  dashColAccount: '계정',
+  dashColState: '상태',
+  dashColDone: '완료',
+  dashColStatus: '결과',
+  dashColLast: '최근',
+  dashWorking: '작업 중',
+  dashWaiting: '대기 중',
+  dashResting: ({ clock, left }) => `휴식 중 · ${clock}에 재개 (${left} 후)`,
+  dashDisabled: '비활성화됨',
+  dashDone: '완료됨',
+  dashStatusCounts: ({ yes, notFound, unknown }) =>
+    `${yes}y ${notFound}nf ${unknown}u`,
+  dashChecks: ({ done, total, numbers, apps }) =>
+    `확인 ${total}개 중 ${done}개 완료 (번호 ${numbers}개 x ${apps === 1 ? '앱' : '앱'} ${apps}개)`,
+  dashCounts: ({ yes, notFound, unknown }) =>
+    `yes ${yes} · not_found ${notFound} · unknown ${unknown}`,
+  dashHintStop: 'Ctrl+C를 누르면 이 배치를 마무리하고 보고서를 저장합니다.',
+  dashDetailsFile: ({ path }) => `로그: ${path}`,
+  progressPercent: ({ percent, done, total }) =>
+    `진행 ${percent}% ${done}/${total}`,
+  progressEta: ({ time }) => `예상 완료 ${time}`,
+  progressPacing: ({ time }) => `간격 조절 ${time}`,
+  progressRestingUntil: ({ clock }) => `${clock}까지 휴식 중`,
+  summaryDone: ({ time, numbers, unfinished }) =>
+    `${time} 만에 완료 · 번호 ${numbers}개 · 미완료 ${unfinished}개`,
+  summaryNumbers: ({ total, valid, invalid }) =>
+    `번호: 고유 ${total}개 (유효 ${valid}개, 무효 ${invalid}개)`,
+  summaryAccountsUsed: ({ list }) => `사용된 계정: ${list}`,
+  summaryColApp: '앱',
+  summaryColYes: 'yes',
+  summaryColNotFound: 'not_found',
+  summaryColUnknown: 'unknown',
+  summaryColSkipped: 'skipped',
+  summaryColInvalid: 'invalid',
+  summaryColCountry: '국가',
+  summaryYesByCountry: '국가별 등록 (yes):',
+  summaryStale: ({ apps, count }) =>
+    `STALE: ${apps} — ${count === 1 ? '결과' : '결과'} ${count}개의 yes/not_found가 최대 기한보다 오래되었거나 미래 날짜입니다 ` +
+    '(보고서의 <app>_checked_at / <app>_stale 참조): 유지되며 다시 확인되지 않았습니다.',
+  summaryFootnote:
+    '`not_found`는 상대방이 검색에서 번호를 숨겼을 수도 있습니다. `unknown` = 아직 확인되지 않았거나 제한됨.',
+  cliNoValidNumbers: ({ invalid }) =>
+    `유효한 전화번호가 없습니다 (무효 ${invalid}개). --column과 파일의 전화번호 열 및 국가 코드를 확인하세요`,
+  cliCsvColumn: ({ name }) => `"${name}" 열`,
+  cliCsvColumnIndex: ({ index }) => `열 ${index} (헤더 행 없음)`,
+  cliCsvRead: ({ file, labelled, rows, unique, invalid, duplicates }) =>
+    `${file}: ${labelled} 사용 중. ${rows === 1 ? '행' : '행'} ${rows}개, 고유 ${unique}개` +
+    `${duplicates === 0 ? '' : `, ${duplicates === 1 ? '중복' : '중복'} ${duplicates}개 병합됨`}, 무효 ${invalid}개`,
+  cliReportWritten: ({ path }) => `보고서가 작성되었습니다: ${path}`,
+  cliInterruptOnce: '중단 요청을 받았습니다: 현재 배치를 마무리한 다음 보고서를 작성합니다 (강제 종료하려면 Ctrl-C를 다시 누르세요)...',
+  cliInterruptOnceParallel:
+    '중단 요청을 받았습니다: 진행 중인 배치를 기다린 다음 보고서를 작성합니다 (강제 종료하려면 Ctrl-C를 다시 누르세요)...',
+  cliInterruptTwice: '두 번째 중단 요청, 지금 종료합니다.',
+  cliWarnNoValid: ({ reason }) => `경고: ${reason}. 위 보고서에는 무효한 행만 나열되어 있습니다.`,
+  cliColApp: '앱',
+  cliColAccount: '계정',
+  cliColState: '상태',
+  cliColUsedToday: '오늘 사용량',
+  cliColBatchTime: '배치 시간 (평균 / 최근)',
+  cliAccountReady: '준비됨',
+  cliAccountDisabled: ({ reason }) => `비활성화됨: ${reason}`,
+  cliAccountCooling: ({ time }) => `${time}까지 쿨다운 중`,
+  cliNoAccounts: '아직 계정이 없습니다. 먼저 로그인하세요 (메뉴 항목 2 또는 실행: phone-app-checker login <app> --account <name>).',
+  cliNoResetState: ({ app, account }) =>
+    `${app} 계정 "${account}"에 기록된 상태가 없습니다. 초기화할 것이 없습니다.`,
+  cliResetDone: ({ app, account }) =>
+    `${app} 계정 "${account}"의 쿨다운 및 비활성화 플래그를 지웠습니다.`,
+  revealPrompt: 'o = Finder에서 보기 · Enter = 메뉴',
+  revealDone: '보고서가 Finder에 표시되었습니다.',
+  revealFailed: 'Finder를 열 수 없습니다. 경로는 위에 있습니다.',
+  schNoAccounts: ({ numbers, app }) =>
+    `계정이 없어 ${numbers === 1 ? '번호' : '번호'} ${numbers}개가 확인되지 않았습니다. 실행: login ${app} --account <name>`,
+  schToCheck: ({ numbers, accounts }) =>
+    `${accounts === 1 ? '계정' : '계정'} ${accounts}개로 ${numbers === 1 ? '번호' : '번호'} ${numbers}개를 확인합니다`,
+  schFailedBefore: ({ count }) =>
+    `이전 실행에서 ${count === 1 ? '번호' : '번호'} ${count}개가 실패했습니다: 마지막에 하나씩 확인합니다`,
+  schRateLimited: ({ account, time }) => `${account}: 속도 제한, ${time}까지 휴식`,
+  schBanned: ({ account, reason, app }) =>
+    `경고 ${account}: 계정이 비활성화되었습니다 (${reason}). 해결한 다음: login ${app} --account ${account}`,
+  schBatchError: ({ account, errors, max, reason }) =>
+    `${account}: 오류 (${errors}/${max}): ${reason}`,
+  schParked: ({ count, failures }) =>
+    `정상적으로 작동하는 실행에서 ${count === 1 ? '번호' : '번호'} ${count}개가 ${failures}번 실패했습니다. ` +
+    '이번 실행에서는 unknown으로 둡니다 (이로 인해 계정이 쿨다운되지 않습니다)',
+  schDropped: ({ account }) => `${account}: 반복된 오류로 이번 실행의 나머지에서 제외되었습니다`,
+  schBatchTimeout: ({ account, count }) =>
+    `${account}: ${count === 1 ? '번호' : '번호'} ${count}개 배치가 제시간에 응답하지 않았습니다. 해당 번호는 unknown으로 유지되며 오늘의 한도에 계산됩니다`,
+  schNoUsable: ({ count }) =>
+    `사용 가능한 계정이 없습니다 (비활성화되었거나 실패함). ${count === 1 ? '번호' : '번호'} ${count}개가 미확인 상태입니다`,
+  schAllBlockedNowait: ({ count }) =>
+    `모든 계정이 쿨다운 중이거나 일일 한도에 도달했습니다. ${count === 1 ? '번호' : '번호'} ${count}개가 미확인 상태입니다 (--no-wait)`,
+  schAllResting: ({ time, count }) =>
+    `모든 계정이 휴식 중입니다. ${time}에 재개합니다 (${count}개 남음)`,
+  schChecked: ({ account, count, left }) =>
+    `${account}: ${count}개 확인됨, ${left}개 남음`,
+  schCloseError: ({ account, reason }) =>
+    `${account}: 세션을 닫는 중 오류 발생: ${reason}`,
+  schStoppedByError: ({ reason }) => `예기치 않은 오류로 중단되었습니다: ${reason}`,
+  runComplete: '모두 확정됨',
+  runNotConclusive: '종료됨, 확정되지 않음',
+  runStopDone: '종료됨',
+  runStopAborted: '중단됨',
+  runStopNoAccounts: '사용 가능한 계정 없음',
+  runStopBlocked: '차단됨',
+  runStopAdapterError: '어댑터를 로드할 수 없음',
+  runKept: ({ count }) => `, ${count}개는 이전 결과 유지`,
+  runLine: ({ app, needed, attempted, conclusive, inconclusive, kept, remaining, label }) =>
+    `${app}: 필요 ${needed}, 시도 ${attempted}, 확정 ${conclusive}, ` +
+    `미확정 ${inconclusive}${kept}, 응답 없음 ${remaining} (${label})`,
+  runIncomplete: ({ inconclusive, needed }) =>
+    `미완료: ${needed === 1 ? '확인' : '확인'} ${needed}개 중 ${inconclusive}개에 새로운 yes/not_found 응답이 없습니다.`,
+  runNotFinal:
+    '보고서가 최종이 아닙니다: unknown으로 표시된 셀은 확인되지 않았으며, 이전 yes/not_found는 오래되었을 수 있습니다.',
+  runAppLine: ({ app, inconclusive, attempted, conclusive }) =>
+    `${app}: 미확정 ${inconclusive}개 (시도 ${attempted}개, 확정 ${conclusive}개)`,
+  runReasonNoAccounts: ({ app }) =>
+    `no_accounts: 사용 가능한 ${app} 계정이 없습니다 (로그인하거나 비활성화된 계정을 해결하세요: login ${app} --account <name>)`,
+  runReasonAdapterError: ({ app }) => `adapter_error: ${app} 어댑터를 로드할 수 없습니다`,
+  runReasonAborted: 'aborted: 실행이 중단되었습니다',
+  runReasonCooldown: 'cooldown: 모든 계정이 속도 제한 또는 오류 후 휴식 중입니다',
+  runReasonDailyCap: 'daily cap: 사용 가능한 모든 계정이 일일 한도에 도달했습니다',
+  runReasonErrors: ({ count }) => `errors: ${count === 1 ? '배치' : '배치'} ${count}개가 실패했습니다`,
+  runReasonParked: ({ batches, numbers }) =>
+    `parked batches: ${batches === 1 ? '배치' : '배치'} ${batches}개, ${numbers === 1 ? '번호' : '번호'} ${numbers}개, 이번 실행에서 포기됨`,
+  runReasonUnknown: ({ count }) =>
+    `unknown answers: ${count === 1 ? '번호' : '번호'} ${count}개가 unknown으로 돌아왔습니다`,
+  runReasonNotReached: 'not_reached: 일부 번호가 확인되지 않았습니다',
+  runResumeHint: '같은 명령을 다시 실행하면 계속됩니다 (완료된 번호는 반복되지 않습니다).',
+  runResumeAt: ({ time }) =>
+    `다음 재개: ${time}. 그때 같은 명령을 다시 실행하세요 (완료된 번호는 반복되지 않습니다).`,
 } satisfies Catalog;

@@ -16,7 +16,7 @@ export const en = {
   menuDoctor: 'Check this Mac is ready (doctor)',
   menuGuide: 'Guide / warnings',
   menuQuit: 'Quit',
-  menuPrompt: 'Choose (0-6 or L) and press Enter: ',
+  menuPrompt: 'Choose 0-6 or L, then Enter: ',
   menuInvalid: ({ choice }: { choice: string }) => `Invalid choice: "${choice}". Type a number from 0 to 6, or L, then press Enter.`,
   goodbye: 'Goodbye.',
 
@@ -42,8 +42,8 @@ export const en = {
   // Asking for the CSV and the report.
   askCsvIntro: 'Drag the CSV file from Finder into this window (or type its path), then press Enter.',
   askCsvPrompt: ({ hint }: { hint: string }) => `CSV file (${hint}): `,
-  askCsvHintBack: 'Enter to go back',
-  askCsvHintDefault: ({ path }: { path: string }) => `Enter = ${path}`,
+  askCsvHintBack: 'b = back',
+  askCsvHintDefault: ({ path }: { path: string }) => `b = back · Enter = ${path}`,
   askReportPrompt: ({ path }: { path: string }) => `Report file (Enter = ${path}): `,
   reportExists: ({ path }: { path: string }) => `File ${path} already exists. Overwrite`,
 
@@ -74,9 +74,9 @@ export const en = {
   appLoggedIn: ({ count, names }: { count: number; names: string }) =>
     `logged in: ${count} ${count === 1 ? 'account' : 'accounts'} (${names})`,
   loginAppsHeader: 'Apps:',
-  loginAppPrompt: ({ max }: { max: number }) => `Log in to which app? (number 1-${max}, Enter to go back): `,
+  loginAppPrompt: ({ max }: { max: number }) => `Log in to which app? (number 1-${max}, b = back): `,
   loginUnknown: ({ input, max }: { input: string; max: number }) => `Did not understand "${input}". Type a number from 1 to ${max}.`,
-  askAccountPrompt: ({ name }: { name: string }) => `Account name (Enter = ${name}): `,
+  askAccountPrompt: ({ name }: { name: string }) => `Account name (Enter = ${name}, b = back): `,
   accountNameInvalid: 'Use only letters without accents, digits, "-" or "_" (up to 32 characters, starting with a letter or digit).',
   accountExists: ({ account, app }: { account: string; app: string }) =>
     `Account "${account}" of ${app} already exists. Logging in again replaces the old login session.`,
@@ -86,6 +86,8 @@ export const en = {
   hintTelegram: 'Telegram will ask for: your phone number (+84...), the login code (not shown while you type) and the two-step password if you have one.',
   hintViber: 'Viber needs an Android phone connected by USB cable (see docs/viber-setup.md).',
   hintLine: 'LINE will guide you on the screen (see docs/line-setup.md).',
+  hintThreema: 'Threema will ask for: your Gateway ID (starts with *, 8 characters) and its secret (not shown while you type). See docs/threema-setup.md.',
+  hintMatrix: 'Matrix will ask for: your homeserver (Enter = matrix.org), your username and your password (not shown while you type). The password is used once and never saved. See docs/matrix-setup.md.',
 
   // 2 - choosing how to log in.
   loginMethodPrompt: ({ max }: { max: number }) => `Choose 1-${max} (Enter = 1): `,
@@ -93,13 +95,15 @@ export const en = {
   loginFailed: ({ app, account }: { app: string; account: string }) =>
     `Login of ${app} (account ${account}) did not finish and nothing was saved. You are back in the menu: choose 2 to try again.`,
   whatsappMethodIntro: 'How do you want to link WhatsApp?',
-  whatsappMethodCode: '1) Link with your phone number: type an 8-character code on your phone (recommended)',
-  whatsappMethodQr: '2) Scan a QR code with your phone',
-  whatsappPhonePrompt: 'Phone number of the WhatsApp account you are linking, with country code (for example +84901234567; Enter to go back): ',
+  whatsappMethodCode: 'Link with your phone number: type an 8-character code on your phone (recommended)',
+  whatsappMethodQr: 'Scan a QR code with your phone',
+  whatsappMethodCodeDetail: 'On the phone: WhatsApp > Settings > Linked devices > Link with phone number',
+  whatsappMethodQrDetail: ({ need }: { need: string }) => `Needs a window of at least ${need}`,
+  whatsappPhonePrompt: 'Phone number of the WhatsApp account you are linking, with country code (for example +84901234567; b = back): ',
   whatsappPhoneInvalid: 'This does not look like a valid phone number. Include the country code, for example +84901234567.',
   telegramMethodIntro: 'How do you want to log in to Telegram?',
-  telegramMethodQr: '1) Scan a QR code with the Telegram app on your phone (default)',
-  telegramMethodCode: '2) Type the login code Telegram sends, using your phone number',
+  telegramMethodQr: 'Scan a QR code with the Telegram app on your phone (default)',
+  telegramMethodCode: 'Type the login code Telegram sends, using your phone number',
   hintTelegramQr:
     'Telegram will show a QR code: on your phone open Telegram > Settings > Devices > Link Desktop Device, then scan it. A two-step password, if you have one, is asked after scanning (not shown while you type).',
 
@@ -160,11 +164,10 @@ export const en = {
 
   // Rich terminal screens: hints, empty states, final box.
   hintMenu: '↑↓ move · Enter select · q quit',
-  hintBack: '↑↓ move · Enter select · Esc or q back',
+  hintBack: '↑↓ move · Enter select · Esc, q or b back',
   bannerAccounts: 'Accounts ready:',
   emptyAccounts: 'No account is logged in yet. Choose "Log in an app account" first, then come back here.',
   loginPickApp: 'Log in to which app?',
-  loginPickMethod: 'How do you want to log in?',
   reportSavedTo: ({ path }: { path: string }) => `Report saved to ${path}`,
   finalNextOpen: 'Next: open the file with Excel or Numbers (double-click it).',
   finalNextFinder: ({ command }: { command: string }) => `To show it in Finder, type: ${command}`,
@@ -197,6 +200,16 @@ export const en = {
   zaloQrExpired: ({ attempt, max }: { attempt: number; max: number }) => `The QR code expired. Making a new one (${attempt}/${max}).`,
   zaloQrGaveUp: 'The QR code expired too many times. Run the login again.',
   zaloQrDeclined: 'Zalo login was declined on the phone.',
+  threemaIdPrompt: 'Threema Gateway ID (8 characters, starts with *, for example *ABCDEFG): ',
+  threemaSecretPrompt: 'Threema Gateway API secret (not shown while you type): ',
+  threemaIdInvalid: 'A Gateway ID is "*" followed by 7 capital letters or digits, for example *ABCDEFG. Try again.',
+  matrixHomeserverPrompt: ({ url }: { url: string }) => `Matrix homeserver address (Enter = ${url}): `,
+  matrixHomeserverInvalid: 'Type an address that starts with https://, for example https://matrix.org. Try again.',
+  matrixUserPrompt: 'Matrix username (for example alice, or @alice:matrix.org): ',
+  matrixPasswordPrompt: 'Matrix password (not shown while you type; used once, never saved): ',
+  matrixTermsIntro: ({ server }: { server: string }) => `The identity server ${server} asks you to accept its terms before it answers lookups. Read them here:`,
+  matrixTermsPrompt: 'Do you accept these terms? (y/n): ',
+  matrixTermsDeclined: 'The terms were not accepted; nothing was saved.',
   telegramPhonePrompt: 'Telegram phone number (international format, for example +84901234567): ',
   telegramCodePrompt: 'Login code sent by Telegram (not shown while you type): ',
   telegramPasswordPrompt: 'Two-step verification password (not shown while you type): ',
@@ -224,4 +237,179 @@ export const en = {
   guideBan: '- Use the company\'s own disposable SIM / accounts: accounts can be restricted or banned.',
   guideEvidence: '- A result is only an observation at the time of checking, not evidence.',
   guideDetails: '- Details: README.md and docs/install-macos.md.',
+
+  // v0.2.0: recent files, CSV preview, checklist, QR gate, accounts actions, guide pages.
+  accountsWord: ({ count }: { count: number }) => (count === 1 ? '1 account' : `${count} accounts`),
+  accountsNone: 'none',
+  pickCsvTitle: 'Choose the phone list (CSV)',
+  pickCsvDrag: 'Drag a CSV file from Finder into this window, or pick one you used before.',
+  pickCsvType: 'Type or paste a path',
+  pickCsvRecentHint: 'a number from the list, or b = back',
+  recentClear: 'clear the list and stop remembering files',
+  recentConfirm: 'Clear the recent files and stop remembering them?',
+  recentCleared: 'Recent files cleared; remembering is now off.',
+  recentMissing: 'missing',
+  recentWhenJustNow: 'just now',
+  recentWhenMinutes: ({ count }: { count: number }) => `${count} min ago`,
+  recentWhenHours: ({ count }: { count: number }) => `${count} h ago`,
+  recentWhenYesterday: 'yesterday',
+  previewTitle: ({ name, column }: { name: string; column: string }) => `${name} · phone column "${column}"`,
+  previewCounts: ({ rows, usable, unusable }: { rows: number; usable: number; unusable: number }) =>
+    `${rows} rows · ${usable} usable numbers · ${unusable} unusable`,
+  previewUnusable: ({ examples }: { examples: string }) => `Unusable, for example: ${examples} (kept in the report)`,
+  previewCountries: ({ list }: { list: string }) => `Countries: ${list}`,
+  previewPrompt: 'Use this file? (Enter = continue, b = pick another): ',
+  appsTitle: 'Which apps?',
+  appsHint: '↑↓ move · space ticks · Enter start · b back',
+  appsPickNone: 'Tick at least one app with the space bar.',
+  accountsTitle: 'Accounts',
+  accountsActionHint: '↑↓ move · r reset cooldown · l log in again · b back',
+  pressEnterForMenu: 'Press Enter for the menu.',
+  guidePage: ({ n, m }: { n: number; m: number }) => `Guide and warnings · page ${n} of ${m}`,
+  guideNext: 'Enter = next page · b back',
+  qrGateTooSmall: ({ cols, rows, needCols, needRows }: { cols: number; rows: number; needCols: number; needRows: number }) =>
+    `This window is ${cols} x ${rows}; the code needs ${needCols} x ${needRows}.`,
+  qrGateEnlarge: 'Enlarge the window (drag a corner), or press Cmd+minus once to shrink the text.',
+  qrGateAltWhatsapp: 'use the pairing code instead',
+  qrGateAltTelegram: 'use the phone-number code instead',
+  qrGatePrompt: ({ alt }: { alt: string }) =>
+    `Enlarge the window, then press Enter to try again${alt === '' ? '' : `, or type c to ${alt}`} (b = back): `,
+  tgLoginTitle: 'Log in to Telegram',
+
+  // v0.2.0: live run dashboard, run log, summary, --plain flag.
+  dashTitle: ({ file, numbers }: { file: string; numbers: number }) => `Checking ${file} · ${numbers} numbers`,
+  dashElapsed: ({ time }: { time: string }) => `Elapsed ${time}`,
+  dashSpeed: ({ rate }: { rate: number }) => `${rate}/min`,
+  dashEta: ({ left, clock }: { left: string; clock: string }) => `about ${left} left · finish about ${clock}`,
+  dashColApp: 'APP',
+  dashColAccount: 'ACCOUNT',
+  dashColState: 'STATE',
+  dashColDone: 'DONE',
+  dashColStatus: 'RESULTS',
+  dashColLast: 'LAST',
+  dashWorking: 'working',
+  dashWaiting: 'waiting',
+  dashResting: ({ clock, left }: { clock: string; left: string }) => `resting · resumes ${clock} (in ${left})`,
+  dashDisabled: 'disabled',
+  dashDone: 'done',
+  dashStatusCounts: ({ yes, notFound, unknown }: { yes: number; notFound: number; unknown: number }) =>
+    `${yes}y ${notFound}nf ${unknown}u`,
+  dashChecks: ({ done, total, numbers, apps }: { done: number; total: number; numbers: number; apps: number }) =>
+    `${done} of ${total} checks (${numbers} numbers x ${apps} ${apps === 1 ? 'app' : 'apps'})`,
+  dashCounts: ({ yes, notFound, unknown }: { yes: number; notFound: number; unknown: number }) =>
+    `yes ${yes} · not_found ${notFound} · unknown ${unknown}`,
+  dashHintStop: 'Ctrl+C finishes this batch and saves the report.',
+  dashDetailsFile: ({ path }: { path: string }) => `Log: ${path}`,
+  progressPercent: ({ percent, done, total }: { percent: number; done: number; total: number }) =>
+    `progress ${percent}% ${done}/${total}`,
+  progressEta: ({ time }: { time: string }) => `ETA ${time}`,
+  progressPacing: ({ time }: { time: string }) => `pacing ${time}`,
+  progressRestingUntil: ({ clock }: { clock: string }) => `resting until ${clock}`,
+  summaryDone: ({ time, numbers, unfinished }: { time: string; numbers: number; unfinished: number }) =>
+    `Done in ${time} · ${numbers} numbers · ${unfinished} unfinished`,
+  summaryNumbers: ({ total, valid, invalid }: { total: number; valid: number; invalid: number }) =>
+    `Numbers: ${total} unique (${valid} valid, ${invalid} invalid)`,
+  summaryAccountsUsed: ({ list }: { list: string }) => `Accounts used: ${list}`,
+  summaryColApp: 'app',
+  summaryColYes: 'yes',
+  summaryColNotFound: 'not_found',
+  summaryColUnknown: 'unknown',
+  summaryColSkipped: 'skipped',
+  summaryColInvalid: 'invalid',
+  summaryColCountry: 'country',
+  summaryYesByCountry: 'Registered (yes) by country:',
+  summaryStale: ({ apps, count }: { apps: string; count: number }) =>
+    `STALE: ${apps} — ${count} yes/not_found ${count === 1 ? 'result is' : 'results are'} older than the max age or dated in the future ` +
+    '(see <app>_checked_at / <app>_stale in the report): kept, not re-confirmed.',
+  summaryFootnote:
+    '`not_found` can also mean the person hides their number from search; `unknown` = not checked yet or throttled.',
+  cliNoValidNumbers: ({ invalid }: { invalid: number }) =>
+    `no valid phone numbers (${invalid} invalid); check --column and the file's phone column and country codes`,
+  cliCsvColumn: ({ name }: { name: string }) => `column "${name}"`,
+  cliCsvColumnIndex: ({ index }: { index: string }) => `column ${index} (no header row)`,
+  cliCsvRead: ({ file, labelled, rows, unique, invalid, duplicates }: { file: string; labelled: string; rows: number; unique: number; invalid: number; duplicates: number }) =>
+    `${file}: using ${labelled}; ${rows} ${rows === 1 ? 'row' : 'rows'}, ${unique} unique` +
+    `${duplicates === 0 ? '' : `, ${duplicates} ${duplicates === 1 ? 'duplicate' : 'duplicates'} merged`}, ${invalid} invalid`,
+  cliReportWritten: ({ path }: { path: string }) => `Report written to ${path}`,
+  cliInterruptOnce: 'Interrupt received: finishing the current batch, then writing the report (Ctrl-C again to force quit)...',
+  cliInterruptOnceParallel:
+    'Interrupt received: waiting for the batches in flight, then writing the report (Ctrl-C again to force quit)...',
+  cliInterruptTwice: 'Second interrupt, exiting now.',
+  cliWarnNoValid: ({ reason }: { reason: string }) => `WARNING: ${reason}. The report above lists only invalid rows.`,
+  cliColApp: 'app',
+  cliColAccount: 'account',
+  cliColState: 'state',
+  cliColUsedToday: 'used today',
+  cliColBatchTime: 'batch time (avg / last)',
+  cliAccountReady: 'ready',
+  cliAccountDisabled: ({ reason }: { reason: string }) => `DISABLED: ${reason}`,
+  cliAccountCooling: ({ time }: { time: string }) => `cooling down until ${time}`,
+  cliNoAccounts: 'No accounts yet. Log in first (menu item 2, or run: phone-app-checker login <app> --account <name>).',
+  cliNoResetState: ({ app, account }: { app: string; account: string }) =>
+    `No recorded state for ${app} account "${account}"; nothing to reset.`,
+  cliResetDone: ({ app, account }: { app: string; account: string }) =>
+    `Cleared cooldown and disabled flag for ${app} account "${account}".`,
+  revealPrompt: 'o = show in Finder · Enter = menu',
+  revealDone: 'The report is shown in Finder.',
+  revealFailed: 'Could not open Finder; the path is above.',
+  schNoAccounts: ({ numbers, app }: { numbers: number; app: string }) =>
+    `no accounts, ${numbers} ${numbers === 1 ? 'number' : 'numbers'} left unchecked. Run: login ${app} --account <name>`,
+  schToCheck: ({ numbers, accounts }: { numbers: number; accounts: number }) =>
+    `${numbers} ${numbers === 1 ? 'number' : 'numbers'} to check with ${accounts} ${accounts === 1 ? 'account' : 'accounts'}`,
+  schFailedBefore: ({ count }: { count: number }) =>
+    `${count} ${count === 1 ? 'number' : 'numbers'} failed in an earlier run: checking them last, one by one`,
+  schRateLimited: ({ account, time }: { account: string; time: string }) => `${account}: rate limited, resting until ${time}`,
+  schBanned: ({ account, reason, app }: { account: string; reason: string; app: string }) =>
+    `WARNING ${account}: account disabled (${reason}). Fix it, then: login ${app} --account ${account}`,
+  schBatchError: ({ account, errors, max, reason }: { account: string; errors: number; max: number; reason: string }) =>
+    `${account}: error (${errors}/${max}): ${reason}`,
+  schParked: ({ count, failures }: { count: number; failures: number }) =>
+    `${count} ${count === 1 ? 'number' : 'numbers'} failed ${failures} times in a run that otherwise works; ` +
+    'leaving them unknown for this run (no account is put on cooldown for it)',
+  schDropped: ({ account }: { account: string }) => `${account}: dropped for the rest of this run after repeated errors`,
+  schBatchTimeout: ({ account, count }: { account: string; count: number }) =>
+    `${account}: a batch of ${count} ${count === 1 ? 'number' : 'numbers'} did not return in time; its numbers stay unknown and count against today's cap`,
+  schNoUsable: ({ count }: { count: number }) =>
+    `no usable account left (disabled or failing), ${count} ${count === 1 ? 'number' : 'numbers'} unchecked`,
+  schAllBlockedNowait: ({ count }: { count: number }) =>
+    `all accounts are cooling down or at their daily cap, ${count} ${count === 1 ? 'number' : 'numbers'} unchecked (--no-wait)`,
+  schAllResting: ({ time, count }: { time: string; count: number }) =>
+    `all accounts are resting; resuming at ${time} (${count} left)`,
+  schChecked: ({ account, count, left }: { account: string; count: number; left: number }) =>
+    `${account}: ${count} checked, ${left} left`,
+  schCloseError: ({ account, reason }: { account: string; reason: string }) =>
+    `${account}: error while closing session: ${reason}`,
+  schStoppedByError: ({ reason }: { reason: string }) => `stopped by an unexpected error: ${reason}`,
+  runComplete: 'all conclusive',
+  runNotConclusive: 'finished, NOT conclusive',
+  runStopDone: 'finished',
+  runStopAborted: 'interrupted',
+  runStopNoAccounts: 'no usable account',
+  runStopBlocked: 'blocked',
+  runStopAdapterError: 'adapter could not load',
+  runKept: ({ count }: { count: number }) => `, ${count} keep an older result`,
+  runLine: ({ app, needed, attempted, conclusive, inconclusive, kept, remaining, label }: { app: string; needed: number; attempted: number; conclusive: number; inconclusive: number; kept: string; remaining: number; label: string }) =>
+    `${app}: needed ${needed}, attempted ${attempted}, conclusive ${conclusive}, ` +
+    `inconclusive ${inconclusive}${kept}, no answer ${remaining} (${label})`,
+  runIncomplete: ({ inconclusive, needed }: { inconclusive: number; needed: number }) =>
+    `INCOMPLETE: ${inconclusive} of ${needed} ${needed === 1 ? 'check has' : 'checks have'} no fresh yes/not_found answer.`,
+  runNotFinal:
+    'The report is NOT final: cells marked unknown are unchecked, and an older yes/not_found may be outdated.',
+  runAppLine: ({ app, inconclusive, attempted, conclusive }: { app: string; inconclusive: number; attempted: number; conclusive: number }) =>
+    `${app}: ${inconclusive} inconclusive (${attempted} attempted, ${conclusive} conclusive)`,
+  runReasonNoAccounts: ({ app }: { app: string }) =>
+    `no_accounts: no usable ${app} account (log in, or fix a disabled one: login ${app} --account <name>)`,
+  runReasonAdapterError: ({ app }: { app: string }) => `adapter_error: the ${app} adapter could not be loaded`,
+  runReasonAborted: 'aborted: the run was interrupted',
+  runReasonCooldown: 'cooldown: every account is resting after a rate limit or an error',
+  runReasonDailyCap: 'daily cap: every usable account reached its daily limit',
+  runReasonErrors: ({ count }: { count: number }) => `errors: ${count} ${count === 1 ? 'batch' : 'batches'} failed`,
+  runReasonParked: ({ batches, numbers }: { batches: number; numbers: number }) =>
+    `parked batches: ${batches} ${batches === 1 ? 'batch' : 'batches'}, ${numbers} ${numbers === 1 ? 'number' : 'numbers'}, given up for this run`,
+  runReasonUnknown: ({ count }: { count: number }) =>
+    `unknown answers: ${count} ${count === 1 ? 'number' : 'numbers'} came back unknown`,
+  runReasonNotReached: 'not_reached: some numbers were not checked',
+  runResumeHint: 'Run the same command again to continue (finished numbers are not repeated).',
+  runResumeAt: ({ time }: { time: string }) =>
+    `Next resume: ${time}. Run the same command again then (finished numbers are not repeated).`,
 };

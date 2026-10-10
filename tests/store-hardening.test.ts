@@ -1,6 +1,8 @@
+import { execFileSync } from 'node:child_process';
 import { chmodSync, closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, truncateSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Store } from '../src/store.ts';
@@ -51,7 +53,7 @@ describe('migration', () => {
   it('creates the schema, private modes and WAL mode from nothing', () => {
     const dir = join(tempDir(), 'data');
     const store = openIn(dir);
-    expect(userVersion(store.db)).toBe(2);
+    expect(userVersion(store.db)).toBe(3);
     const tables = store.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all() as { name: string }[];
     expect(tables.map((t) => t.name)).toEqual(['accounts', 'failed_checks', 'results']);
     expect((store.db.prepare('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode).toBe('wal');
@@ -79,13 +81,13 @@ describe('migration', () => {
     chmodSync(path, 0o600);
 
     const store = openIn(dir);
-    expect(userVersion(store.db)).toBe(2);
+    expect(userVersion(store.db)).toBe(3);
     expect(store.getResult('+84901234567', 'zalo')).toEqual({ status: 'yes', checkedAt: 1700000000000 });
     expect(store.getAccount('zalo', 'a')).toMatchObject({ cooldownUntil: 5, disabledReason: 'banned', usedToday: 7, nextAllowedAt: 9 });
     expect(store.failedChecks('zalo').size).toBe(0);
     store.close();
     // Opening again is a no-op.
-    expect(userVersion(openIn(dir).db)).toBe(2);
+    expect(userVersion(openIn(dir).db)).toBe(3);
   });
 
   it('refuses a database from a newer version without touching it or leaving it locked', () => {
@@ -96,7 +98,7 @@ describe('migration', () => {
     future.close();
     chmodSync(path, 0o600);
     const before = readFileSync(path);
-    expect(() => Store.open(dir)).toThrow(/newer version \(schema 99, supported 2\)/);
+    expect(() => Store.open(dir)).toThrow(/newer version \(schema 99, supported 3\)/);
     expect(readFileSync(path).equals(before)).toBe(true);
     // The failed open released its handle: another connection can write immediately.
     const other = new DatabaseSync(path);
@@ -107,8 +109,63 @@ describe('migration', () => {
   it('treats an empty database file as new', () => {
     const dir = tempDir();
     writeFileSync(join(dir, 'checker.db'), '', { mode: 0o600 });
-    expect(userVersion(openIn(dir).db)).toBe(2);
+    expect(userVersion(openIn(dir).db)).toBe(3);
   });
+  it.each([[1], [2]])('opens the committed 0.1.0 fixture database at schema %s and keeps its rows', (schema) => {
+    const dir = tempDir();
+    const path = join(dir, 'checker.db');
+    const seed = fileURLToPath(new URL('./fixtures/v0.1.0/seed-checker-db.mjs', import.meta.url));
+    execFileSync(process.execPath, [seed, path, String(schema)]);
+    chmodSync(path, 0o600);
+
+    const store = openIn(dir);
+    expect(userVersion(store.db)).toBe(3);
+    expect(store.getResult('+84901000001', 'telegram')).toEqual({ status: 'yes', checkedAt: 1700000000000 });
+    expect(store.getResult('+84902000002', 'whatsapp')).toEqual({ status: 'not_found', checkedAt: 1700000001000 });
+    expect(store.getResult('+84903000003', 'zalo')).toEqual({ status: 'unknown', checkedAt: 1700000002000 });
+    expect(store.getAccount('telegram', 'main')).toMatchObject({ usedToday: 3, day: '2026-10-01' });
+    expect(store.failedChecks('telegram').get('+84904000004')).toBe(schema === 1 ? undefined : 2);
+    store.close();
+    // Reopening the migrated database is a no-op.
+    expect(userVersion(openIn(dir).db)).toBe(3);
+  });
+
+  it('upgrades a version-2 database to 3 keeping accounts, with no batch timing until one is measured', () => {
+    const dir = tempDir();
+    const path = join(dir, 'checker.db');
+    const v2 = new DatabaseSync(path);
+    v2.exec(`
+      CREATE TABLE results (e164 TEXT NOT NULL, app TEXT NOT NULL, status TEXT NOT NULL, checked_at INTEGER NOT NULL, PRIMARY KEY (e164, app));
+      CREATE TABLE accounts (app TEXT NOT NULL, name TEXT NOT NULL, cooldown_until INTEGER NOT NULL DEFAULT 0, disabled_reason TEXT,
+        day TEXT NOT NULL DEFAULT '', used_today INTEGER NOT NULL DEFAULT 0, next_allowed_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (app, name));
+      CREATE TABLE failed_checks (e164 TEXT NOT NULL, app TEXT NOT NULL, failures INTEGER NOT NULL, last_failed_at INTEGER NOT NULL, PRIMARY KEY (e164, app));
+      INSERT INTO results VALUES ('+84901234567', 'telegram', 'yes', 1700000000000);
+      INSERT INTO accounts VALUES ('telegram', 'main', 5, NULL, '2026-10-08', 7, 9);
+      PRAGMA user_version = 2;
+    `);
+    v2.close();
+    chmodSync(path, 0o600);
+
+    const store = openIn(dir);
+    expect(userVersion(store.db)).toBe(3);
+    expect(store.getResult('+84901234567', 'telegram')).toEqual({ status: 'yes', checkedAt: 1700000000000 });
+    expect(store.getAccount('telegram', 'main')).toEqual({
+      app: 'telegram',
+      name: 'main',
+      cooldownUntil: 5,
+      disabledReason: null,
+      day: '2026-10-08',
+      usedToday: 7,
+      nextAllowedAt: 9,
+      lastBatchMs: null,
+      avgBatchMs: null,
+      batchesDone: 0,
+    });
+    store.saveAccount({ ...store.getAccount('telegram', 'main'), lastBatchMs: 1200, avgBatchMs: 1500, batchesDone: 4 });
+    store.close();
+    expect(openIn(dir).getAccount('telegram', 'main')).toMatchObject({ lastBatchMs: 1200, avgBatchMs: 1500, batchesDone: 4, usedToday: 7 });
+  });
+
 });
 
 describe('damaged databases', () => {
@@ -234,7 +291,7 @@ describe('disk full', () => {
     const before = store.allResults('telegram').size;
     expect(() =>
       store.transaction(() => {
-        store.saveAccount({ app: 'telegram', name: 'a', cooldownUntil: 0, disabledReason: null, day: '2026-10-08', usedToday: 1, nextAllowedAt: 0 });
+        store.saveAccount({ app: 'telegram', name: 'a', cooldownUntil: 0, disabledReason: null, day: '2026-10-08', usedToday: 1, nextAllowedAt: 0, lastBatchMs: null, avgBatchMs: null, batchesDone: 0 });
         fill(store, '+8492');
       }),
     ).toThrow(/full/);
@@ -339,7 +396,7 @@ describe('saveResults model check', () => {
     const store = openIn(tempDir());
     const names = ["'; DROP TABLE results; --", 'a"b', 'ünï©ode 😀', "robert'); DROP TABLE accounts;--", ''];
     for (const name of names) {
-      store.saveAccount({ app: 'viber', name, cooldownUntil: 1, disabledReason: name, day: '2026-10-08', usedToday: 2, nextAllowedAt: 3 });
+      store.saveAccount({ app: 'viber', name, cooldownUntil: 1, disabledReason: name, day: '2026-10-08', usedToday: 2, nextAllowedAt: 3, lastBatchMs: null, avgBatchMs: null, batchesDone: 0 });
       store.saveResults('viber', new Map([[name, 'yes']]), 5);
       expect(store.getAccount('viber', name)).toMatchObject({ name, disabledReason: name, usedToday: 2 });
       expect(store.getResult(name, 'viber')?.status).toBe('yes');
@@ -350,7 +407,7 @@ describe('saveResults model check', () => {
   it('round-trips the largest exact integers', () => {
     const store = openIn(tempDir());
     const big = Number.MAX_SAFE_INTEGER;
-    store.saveAccount({ app: 'line', name: 'a', cooldownUntil: big, disabledReason: null, day: 'x', usedToday: big, nextAllowedAt: big });
+    store.saveAccount({ app: 'line', name: 'a', cooldownUntil: big, disabledReason: null, day: 'x', usedToday: big, nextAllowedAt: big, lastBatchMs: null, avgBatchMs: null, batchesDone: 0 });
     expect(store.getAccount('line', 'a')).toMatchObject({ cooldownUntil: big, usedToday: big, nextAllowedAt: big });
     store.saveResults('line', new Map([['+1', 'yes']]), big);
     expect(store.getResult('+1', 'line')?.checkedAt).toBe(big);

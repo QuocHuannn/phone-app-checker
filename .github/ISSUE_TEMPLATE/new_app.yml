@@ -1,0 +1,73 @@
+name: App request
+description: Propose a messaging app that phone-app-checker could check
+labels: ["app-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## STOP: never paste secrets or personal data
+        **Do not paste phone numbers, keys, tokens, session files, `report.csv` contents, QR codes or pairing codes.** Use placeholders such as `+84901234567`.
+
+        Read [responsible use](https://github.com/QuocHuannn/phone-app-checker/blob/main/docs/responsible-use.md) and [adding an adapter](https://github.com/QuocHuannn/phone-app-checker/blob/main/docs/adding-an-adapter.md) first. The list of apps that were already looked at and rejected is at the end of that page. Requests that would help check people without their consent, send messages, or collect profile data will be declined.
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Before you submit
+      options:
+        - label: I removed all real phone numbers, keys, tokens and sessions from this request.
+          required: true
+        - label: I searched existing issues and the "Apps already considered" list.
+          required: true
+        - label: I have read the responsible-use page. I understand that the tool never sends messages and never reads profile data.
+          required: true
+  - type: input
+    id: app
+    attributes:
+      label: App name and website
+    validations:
+      required: true
+  - type: textarea
+    id: mechanism
+    attributes:
+      label: How can a phone number be looked up?
+      description: Name the official API endpoint or the documented mechanism, with a link. "There is an unofficial library" is not enough on its own; say what it does and how it is licensed.
+    validations:
+      required: true
+  - type: textarea
+    id: account
+    attributes:
+      label: What account or credentials does a lookup need?
+      description: For example a developer account, a phone number with a SIM, or an API key. Say whether it is free.
+    validations:
+      required: true
+  - type: textarea
+    id: region
+    attributes:
+      label: Where does it work?
+      description: Countries or regions where the lookup is meaningful, and what `not_found` would mean (for example "the person never linked a phone number").
+    validations:
+      required: true
+  - type: textarea
+    id: disclosure
+    attributes:
+      label: What is disclosed, and to whom?
+      description: Is the number, or a hash of it, sent to a third party? Is the hash reversible?
+    validations:
+      required: true
+  - type: textarea
+    id: terms
+    attributes:
+      label: Terms of service
+      description: What do the platform's terms say about this kind of lookup? Link the clause if you found one. "I did not check" is an acceptable answer; say so.
+  - type: textarea
+    id: license
+    attributes:
+      label: Libraries and licence
+      description: Any library you would use and its licence. The project is GPL-3.0-or-later, so the licence must be compatible. Plain HTTPS with no new dependency is preferred.
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to write the adapter myself (see docs/adding-an-adapter.md).
+        - label: I can test it against the live service and report what happens (without numbers).

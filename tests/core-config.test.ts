@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   accountDirPath,
   assertAccountName,
+  CURRENT_CONFIG_VERSION,
   DEFAULT_APPS,
   ensureAccountDir,
   listAccountNames,
@@ -79,9 +80,21 @@ describe('loadConfig', () => {
     [{ apps: { telegram: { batchSize: 'big' } } }, /batchSize must be a non-negative number/],
     [{ apps: { telegram: { rateLimitCooldownMs: 0 } } }, /rateLimitCooldownMs must be >= 1/],
     [{ apps: { telegram: { enabled: 'yes' } } }, /enabled must be true\/false/],
+    [{ apps: { telegram: { maxParallelAccounts: 0 } } }, /maxParallelAccounts must be a whole number >= 1/],
+    [{ apps: { telegram: { maxParallelAccounts: 1.5 } } }, /maxParallelAccounts must be a whole number >= 1/],
+    [{ apps: { telegram: { maxParallelAccounts: '2' } } }, /maxParallelAccounts must be a whole number >= 1/],
+    [{ apps: { viber: { maxParallelAccounts: 2 } } }, /apps\.viber\.maxParallelAccounts must be 1.*one Android device|apps\.viber\.maxParallelAccounts must be 1/],
     [[], /JSON object/],
   ])('rejects invalid config %j', (content, message) => {
     expect(() => loadConfig(write(content))).toThrow(message);
+  });
+
+  it('runs one account at a time unless maxParallelAccounts is raised, and accepts it for every app but Viber', () => {
+    const config = loadConfig(write({ apps: { telegram: { maxParallelAccounts: 3 }, viber: { maxParallelAccounts: 1 } } }));
+    expect(config.apps.telegram.maxParallelAccounts).toBe(3);
+    expect(config.apps.whatsapp.maxParallelAccounts).toBe(1);
+    expect(config.apps.viber.maxParallelAccounts).toBe(1);
+    expect(DEFAULT_APPS.telegram.maxParallelAccounts).toBe(1);
   });
 
   it('fails clearly when an explicitly named file is missing', () => {
@@ -188,6 +201,99 @@ describe('loadConfig home mode', () => {
     const config = loadConfig(undefined, home);
     expect(config.defaultRegion).toBe('SG');
     expect(config.dataDir).toBe(join(home, 'data'));
+  });
+});
+
+describe('loadConfig configVersion migration', () => {
+  const FIXTURE = fileURLToPath(new URL('./fixtures/v0.1.0/checker.config.json', import.meta.url));
+  const hush = () => vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+  it('upgrades the shipped 0.1.0 config in place, keeps a mode-600 backup and says so once', () => {
+    const file = join(dir, 'checker.config.json');
+    copyFileSync(FIXTURE, file);
+    const original = readFileSync(file, 'utf8');
+    const stderr = hush();
+    try {
+      const config = loadConfig(file);
+      expect(config.defaultRegion).toBe('VN');
+      expect(config.apps.telegram.batchSize).toBe(10);
+      expect(config.apps.telegram.options).toEqual({ apiId: null, apiHash: null });
+
+      const backup = `${file}.v1.bak`;
+      expect(readFileSync(backup, 'utf8')).toBe(original);
+      expect(statSync(backup).mode & 0o777).toBe(0o600);
+      expect(statSync(file).mode & 0o777).toBe(0o600);
+      expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ configVersion: CURRENT_CONFIG_VERSION, ...JSON.parse(original) });
+      expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain(backup);
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it('is a no-op on the second load: file unchanged, no extra backup, no message', () => {
+    const file = join(dir, 'checker.config.json');
+    copyFileSync(FIXTURE, file);
+    const stderr = hush();
+    try {
+      loadConfig(file);
+      stderr.mockClear();
+      const migrated = readFileSync(file, 'utf8');
+      loadConfig(file);
+      expect(readFileSync(file, 'utf8')).toBe(migrated);
+      expect(readdirSync(dir).sort()).toEqual(['checker.config.json', 'checker.config.json.v1.bak']);
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it('never overwrites an existing backup: the next migration takes a suffixed name', () => {
+    const file = join(dir, 'checker.config.json');
+    copyFileSync(FIXTURE, file);
+    const stderr = hush();
+    try {
+      loadConfig(file);
+      writeFileSync(file, JSON.stringify({ maxAgeDays: 7 }));
+      loadConfig(file);
+      expect(readFileSync(`${file}.v1.bak`, 'utf8')).toContain('"zalo"');
+      expect(readFileSync(`${file}.v1-2.bak`, 'utf8')).toBe(JSON.stringify({ maxAgeDays: 7 }));
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it('refuses a file that needs a newer program without touching it', () => {
+    const file = write({ configVersion: CURRENT_CONFIG_VERSION + 1 });
+    const before = readFileSync(file, 'utf8');
+    expect(() => loadConfig(file)).toThrow(/needs a newer version/);
+    expect(readFileSync(file, 'utf8')).toBe(before);
+    expect(readdirSync(dir)).toEqual(['checker.config.json']);
+  });
+
+  it.each([[2.5], ['2'], [0], [-1], [null]])('rejects a malformed configVersion %j', (version) => {
+    expect(() => loadConfig(write({ configVersion: version }))).toThrow(/configVersion must be a whole number/);
+  });
+
+  it('still rejects unknown keys after the in-memory upgrade, leaving the file alone', () => {
+    const file = write({ typo: 1 });
+    const before = readFileSync(file, 'utf8');
+    expect(() => loadConfig(file)).toThrow(/unknown setting "typo"/);
+    expect(readFileSync(file, 'utf8')).toBe(before);
+    expect(readdirSync(dir)).toEqual(['checker.config.json']);
+  });
+
+  it('leaves a current file byte-identical (no backup, no rewrite, no message)', () => {
+    const file = write({ configVersion: CURRENT_CONFIG_VERSION, defaultRegion: 'SG' });
+    const before = readFileSync(file, 'utf8');
+    const stderr = hush();
+    try {
+      expect(loadConfig(file).defaultRegion).toBe('SG');
+      expect(readFileSync(file, 'utf8')).toBe(before);
+      expect(readdirSync(dir)).toEqual(['checker.config.json']);
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
   });
 });
 

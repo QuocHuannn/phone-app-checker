@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { main } from '../src/cli.ts';
 import { Store } from '../src/store.ts';
-import type { Adapter, App, CheckStatus } from '../src/types.ts';
+import { APPS, type Adapter, type App, type CheckStatus } from '../src/types.ts';
+import { REPORT_HEADER } from './helpers/report-rows.ts';
 import { NOW, runSmokeScenario, type SmokeResult } from './smoke/scenario.ts';
 
 let dir: string;
@@ -27,17 +28,14 @@ describe('CLI end to end (injected test adapter, real everything else)', () => {
 
   it('normalises numbers, merges duplicates and writes invalid rows', () => {
     const lines = result.report1.trimEnd().split('\n');
-    expect(lines[0]).toBe(
-      'input,e164,country,telegram,whatsapp,zalo,viber,line,last_checked_at,' +
-        'telegram_checked_at,whatsapp_checked_at,zalo_checked_at,viber_checked_at,line_checked_at,' +
-        'telegram_stale,whatsapp_stale,zalo_stale,viber_stale,line_stale',
-    );
+    expect(lines[0]).toBe(REPORT_HEADER);
     // "0901234567" and "090 123 4567" are one number; the first spelling is kept.
     expect(lines.filter((l) => l.includes('+84901234567'))).toHaveLength(1);
     expect(result.report1).toContain('0084912345678,+84912345678,VN,');
     expect(result.report1).toContain('+65 9123 4567,+6591234567,SG,');
-    expect(result.report1).toContain('abc,,,invalid,invalid,invalid,invalid,invalid,');
-    expect(result.report1).toContain('\n,,,invalid,invalid,invalid,invalid,invalid,');
+    const invalid = `${APPS.map(() => 'invalid').join(',')},`;
+    expect(result.report1).toContain(`abc,,,${invalid}`);
+    expect(result.report1).toContain(`\n,,,${invalid}`);
   });
 
   it('reports skipped for disabled apps and for numbers outside Zalo scope', () => {
@@ -45,7 +43,8 @@ describe('CLI end to end (injected test adapter, real everything else)', () => {
       const cells = line.split(',');
       if (cells[1] === '') continue;
       expect(cells.slice(4, 5)).toEqual(['skipped']); // whatsapp disabled
-      expect(cells.slice(6, 8)).toEqual(['skipped', 'skipped']); // viber, line disabled
+      // viber, line and every later app are disabled in this scenario
+      expect(cells.slice(3 + APPS.indexOf('viber'), 3 + APPS.length)).toEqual(APPS.slice(APPS.indexOf('viber')).map(() => 'skipped'));
       if (cells[2] !== 'VN') expect(cells[5]).toBe('skipped'); // zalo is Vietnam only
     }
   });

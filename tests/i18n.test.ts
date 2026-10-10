@@ -98,6 +98,12 @@ describe('catalogs', () => {
         hintTelegram: ['+84'],
         hintViber: ['docs/viber-setup.md'],
         hintLine: ['docs/line-setup.md'],
+        hintThreema: ['docs/threema-setup.md', '*'],
+        threemaIdPrompt: ['*ABCDEFG'],
+        threemaIdInvalid: ['*ABCDEFG'],
+        hintMatrix: ['docs/matrix-setup.md', 'matrix.org'],
+        matrixHomeserverInvalid: ['https://matrix.org'],
+        matrixUserPrompt: ['alice'],
         telegramIntro: ['api_id', 'api_hash'],
         telegramStep1: ['https://my.telegram.org/apps'],
         telegramStep2: ['api_id', 'api_hash'],
@@ -162,7 +168,17 @@ describe('catalogs', () => {
 
   it('translations are really translated: no other language repeats English text', () => {
     // Allowed to match English: only text that is the same in every language by nature.
-    const sameEverywhere = new Set<string>(['askCsvHintDefault']); // "Enter = <path>"
+    const sameEverywhere = new Set<string>([
+      'askCsvHintDefault', // "Enter = <path>"
+      // Report-status cell values (yes/not_found/unknown/skipped/invalid) are CSV vocabulary: untranslatable everywhere.
+      'dashStatusCounts',
+      'dashCounts',
+      'summaryColYes',
+      'summaryColNotFound',
+      'summaryColUnknown',
+      'summaryColSkipped',
+      'summaryColInvalid',
+    ]);
     for (const lang of LANGS.filter((code) => code !== 'en')) {
       for (const [key, message] of entries(lang)) {
         if (sameEverywhere.has(key)) continue;

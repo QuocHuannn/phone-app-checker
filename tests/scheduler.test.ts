@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_APPS, type Config } from '../src/config.ts';
 import type { ProgressEvent } from '../src/progress.ts';
 import { describeRun, isFresh, MAX_BATCH_FAILURES, MAX_CONSECUTIVE_ERRORS, runChecks, type AppRunSummary } from '../src/scheduler.ts';
+import { formatLocalTime } from '../src/ui.ts';
 import { nextLocalMidnight, Store } from '../src/store.ts';
 import {
   AccountBanned,
@@ -212,9 +213,10 @@ describe('scheduler', () => {
       const events: ProgressEvent[] = [];
       await h.run({ numbers: numbers(4), onProgress: (event) => events.push(structuredClone(event)) });
       const waits = events.filter((event) => event.waiting !== undefined);
-      expect(waits).toEqual([{ app: 'telegram', needed: 4, remaining: 2, waiting: { until: NOON + 1000, kind: 'pacing' } }]);
+      expect(waits).toMatchObject([{ app: 'telegram', needed: 4, remaining: 2, waiting: { until: NOON + 1000, kind: 'pacing' } }]);
       const at = events.indexOf(waits[0] as ProgressEvent);
-      expect(events[at + 1]).toEqual({ app: 'telegram', needed: 4, remaining: 2 });
+      expect(events[at + 1]).toMatchObject({ app: 'telegram', needed: 4, remaining: 2 });
+      expect(events[at + 1]?.waiting).toBeUndefined();
     });
 
     it('says when every account rests (a cooldown) and when it resumes', async () => {
@@ -237,7 +239,8 @@ describe('scheduler', () => {
       const rest = events.find((event) => event.waiting?.kind === 'cooldown');
       expect(rest).toMatchObject({ needed: 4, remaining: 4, waiting: { kind: 'cooldown' } });
       expect(rest?.waiting?.until).toBeGreaterThan(NOON);
-      expect(events.at(-1)).toEqual({ app: 'telegram', needed: 4, remaining: 0 });
+      expect(events.at(-1)).toMatchObject({ app: 'telegram', needed: 4, remaining: 0 });
+      expect(events.at(-1)?.waiting).toBeUndefined();
     });
 
     it('reports nothing for an app with nothing to check, and a run without a listener is unchanged', async () => {
@@ -502,6 +505,9 @@ describe('daily cap and day rollover', () => {
       day: '2000-01-01',
       usedToday: 3,
       nextAllowedAt: 0,
+      lastBatchMs: null,
+      avgBatchMs: null,
+      batchesDone: 0,
     });
     const [summary] = await h.run({ numbers: numbers(3), wait: false });
     expect(summary).toMatchObject({ stopped: 'done', answered: 3 });
@@ -618,6 +624,53 @@ describe('one bad batch does not take down the account', () => {
     expect(h.logs.join('\n')).not.toContain('dropped for the rest of this run');
     expect(h.store.getAccount('telegram', 'a').disabledReason).toBeNull();
   });
+  it('serves a failed batch from the retry queue after the fresh numbers, and settles it', async () => {
+    const h = harness(makeConfig({ batchSize: 2, minIntervalMs: 0, errorCooldownMs: 0 }));
+    let callNo = 0;
+    const handler: Handler = (account, batch) => {
+      callNo += 1;
+      if (callNo === 1) throw new Error('transient lookup failure');
+      return allYes(account, batch, callNo);
+    };
+    const [summary] = await h.run({ numbers: numbers(6), handlers: { telegram: handler } });
+
+    // The first batch goes to the retry queue, the rest of the input is checked first, and the
+    // retried numbers are removed from their own (small) queue when the answer finally arrives.
+    expect(h.calls.map((c) => c.e164s)).toEqual([
+      [num(0).e164, num(1).e164],
+      [num(2).e164, num(3).e164],
+      [num(4).e164, num(5).e164],
+      [num(0).e164, num(1).e164],
+    ]);
+    for (const n of numbers(6)) expect(status(h.store, 'telegram', n)).toBe('yes');
+    expect(summary).toMatchObject({ answered: 6, remaining: 0, errors: 1, stopped: 'done' });
+  });
+
+  it('keeps only the unanswered tail of a retried batch queued after a partial answer', async () => {
+    const h = harness(makeConfig({ batchSize: 2, minIntervalMs: 0, errorCooldownMs: 0 }));
+    const calls: string[][] = [];
+    const handler: Handler = (account, batch) => {
+      calls.push(batch.map((n) => n.e164));
+      if (calls.length === 1) throw new Error('transient lookup failure');
+      if (calls.length === 4) {
+        // The retried batch answers its first number but is cut off before the second.
+        throw new RateLimited('cut off', 1, new Map([[(batch[0] as PhoneNumber).e164, 'yes']]));
+      }
+      return allYes(account, batch, calls.length);
+    };
+    const [summary] = await h.run({ numbers: numbers(6), handlers: { telegram: handler } });
+
+    expect(calls).toEqual([
+      [num(0).e164, num(1).e164],
+      [num(2).e164, num(3).e164],
+      [num(4).e164, num(5).e164],
+      [num(0).e164, num(1).e164],
+      [num(1).e164],
+    ]);
+    for (const n of numbers(6)) expect(status(h.store, 'telegram', n)).toBe('yes');
+    expect(summary).toMatchObject({ answered: 6, remaining: 0, errors: 1, stopped: 'done' });
+  });
+
 
   it('does not park batches while nothing succeeds: a real outage still drops the account', async () => {
     const h = harness(makeConfig({ batchSize: 1, minIntervalMs: 0 }));
@@ -680,7 +733,7 @@ describe('one bad batch does not take down the account', () => {
 });
 
 describe('attempted vs conclusive vs inconclusive, and the INCOMPLETE banner', () => {
-  const banner = (summaries: AppRunSummary[]) => describeRun(summaries).banner.join('\n');
+  const banner = (summaries: AppRunSummary[]) => describeRun(summaries, undefined, NOON).banner.join('\n');
 
   it('a refresh that comes back unknown keeps the old answer, counts as inconclusive and is never "done"', async () => {
     const h = harness(makeConfig({ batchSize: 10 }));
@@ -743,7 +796,7 @@ describe('attempted vs conclusive vs inconclusive, and the INCOMPLETE banner', (
     });
     const text = banner(summaries);
     expect(text).toContain('cooldown');
-    expect(text).toContain(`Next resume: ${new Date(NOON + 10_000).toISOString()}`);
+    expect(text).toContain(`Next resume: ${formatLocalTime(NOON + 10_000, NOON)}`);
   });
 
   it('daily cap with --no-wait: daily cap reason, resume at local midnight', async () => {
@@ -759,7 +812,7 @@ describe('attempted vs conclusive vs inconclusive, and the INCOMPLETE banner', (
       resumeAt: nextLocalMidnight(NOON),
     });
     expect(banner(summaries)).toContain('daily cap');
-    expect(banner(summaries)).toContain(`Next resume: ${new Date(nextLocalMidnight(NOON)).toISOString()}`);
+    expect(banner(summaries)).toContain(`Next resume: ${formatLocalTime(nextLocalMidnight(NOON), NOON)}`);
   });
 
   it('unexpected errors are counted and named', async () => {

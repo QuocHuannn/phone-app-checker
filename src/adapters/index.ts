@@ -8,6 +8,10 @@ export const APP_SCOPE: Record<App, (n: PhoneNumber) => boolean> = {
   zalo: (n) => n.country === 'VN',
   viber: () => true,
   line: () => true,
+  // Threema's lookup is by phone hash and works for any region; only users who linked a number are found.
+  threema: () => true,
+  // Matrix's lookup is by hashed phone number and works for any region; only users who linked a number to an identity server are found.
+  matrix: () => true,
 };
 
 /**
@@ -29,6 +33,10 @@ export async function loadAdapter(app: App): Promise<Adapter> {
         return (await import('./viber.ts')).viberAdapter;
       case 'line':
         return (await import('./line.ts')).lineAdapter;
+      case 'threema':
+        return (await import('./threema.ts')).threemaAdapter;
+      case 'matrix':
+        return (await import('./matrix.ts')).matrixAdapter;
     }
   } catch (error) {
     throw new Error(`Cannot load the ${app} adapter: ${(error as Error).message}`, { cause: error });

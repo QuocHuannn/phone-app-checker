@@ -1,6 +1,6 @@
 import { chmodSync, closeSync, constants, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync } from 'node:fs';
 import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { assertSafeAppRoot } from './paths.ts';
 import type { App, CheckStatus } from './types.ts';
 
@@ -21,9 +21,15 @@ export interface AccountState {
   usedToday: number;
   /** Epoch ms before which the next batch must not start (minIntervalMs + jitter). */
   nextAllowedAt: number;
+  /** Wall time of the most recent completed batch, null until one finishes. */
+  lastBatchMs: number | null;
+  /** Running average of completed batch wall times, null until one finishes. */
+  avgBatchMs: number | null;
+  /** Batches that completed since the counters were added (the average is over these). */
+  batchesDone: number;
 }
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 export function localDay(ms: number): string {
   const d = new Date(ms);
@@ -45,6 +51,9 @@ interface AccountRow {
   day: string;
   used_today: number;
   next_allowed_at: number;
+  last_batch_ms: number | null;
+  avg_batch_ms: number | null;
+  batches_done: number;
 }
 
 function toState(row: AccountRow): AccountState {
@@ -56,6 +65,9 @@ function toState(row: AccountRow): AccountState {
     day: row.day,
     usedToday: row.used_today,
     nextAllowedAt: row.next_allowed_at,
+    lastBatchMs: row.last_batch_ms,
+    avgBatchMs: row.avg_batch_ms,
+    batchesDone: row.batches_done,
   };
 }
 
@@ -147,7 +159,17 @@ const SIDECAR_SUFFIXES = ['-wal', '-shm', '-journal'] as const;
 export class Store {
   readonly db: DatabaseSync;
   private depth = 0;
+  /** Statements are parsed and planned once per store; hot paths run them thousands of times per batch loop. */
+  private readonly stmts = new Map<string, StatementSync>();
 
+  private stmt(sql: string): StatementSync {
+    let stmt = this.stmts.get(sql);
+    if (stmt === undefined) {
+      stmt = this.db.prepare(sql);
+      this.stmts.set(sql, stmt);
+    }
+    return stmt;
+  }
   constructor(path: string) {
     this.db = new DatabaseSync(path);
     try {
@@ -202,35 +224,64 @@ export class Store {
     }
   }
 
+  /**
+   * Version ladder: bumping `SCHEMA_VERSION` means adding one `version < N` block here — one
+   * transaction each, never an ad-hoc ALTER elsewhere — and each block stamps its own number.
+   * Step 1 creates the tables the first release shipped; step 2 adds `failed_checks`, the table
+   * a v1 database (which already has results + accounts) gained; step 3 adds per-account batch
+   * latency columns (phase 5's dispatcher measures them).
+   */
   private migrate(): void {
-    if (this.schemaVersion() === SCHEMA_VERSION) return;
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS results (
-        e164 TEXT NOT NULL,
-        app TEXT NOT NULL,
-        status TEXT NOT NULL,
-        checked_at INTEGER NOT NULL,
-        PRIMARY KEY (e164, app)
-      );
-      CREATE TABLE IF NOT EXISTS accounts (
-        app TEXT NOT NULL,
-        name TEXT NOT NULL,
-        cooldown_until INTEGER NOT NULL DEFAULT 0,
-        disabled_reason TEXT,
-        day TEXT NOT NULL DEFAULT '',
-        used_today INTEGER NOT NULL DEFAULT 0,
-        next_allowed_at INTEGER NOT NULL DEFAULT 0,
-        PRIMARY KEY (app, name)
-      );
-      CREATE TABLE IF NOT EXISTS failed_checks (
-        e164 TEXT NOT NULL,
-        app TEXT NOT NULL,
-        failures INTEGER NOT NULL,
-        last_failed_at INTEGER NOT NULL,
-        PRIMARY KEY (e164, app)
-      );
-      PRAGMA user_version = ${SCHEMA_VERSION};
-    `);
+    const version = this.schemaVersion();
+    if (version === SCHEMA_VERSION) return;
+    if (version < 1) {
+      this.transaction(() => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS results (
+            e164 TEXT NOT NULL,
+            app TEXT NOT NULL,
+            status TEXT NOT NULL,
+            checked_at INTEGER NOT NULL,
+            PRIMARY KEY (e164, app)
+          );
+          CREATE TABLE IF NOT EXISTS accounts (
+            app TEXT NOT NULL,
+            name TEXT NOT NULL,
+            cooldown_until INTEGER NOT NULL DEFAULT 0,
+            disabled_reason TEXT,
+            day TEXT NOT NULL DEFAULT '',
+            used_today INTEGER NOT NULL DEFAULT 0,
+            next_allowed_at INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (app, name)
+          );
+          PRAGMA user_version = 1;
+        `);
+      });
+    }
+    if (version < 2) {
+      this.transaction(() => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS failed_checks (
+            e164 TEXT NOT NULL,
+            app TEXT NOT NULL,
+            failures INTEGER NOT NULL,
+            last_failed_at INTEGER NOT NULL,
+            PRIMARY KEY (e164, app)
+          );
+          PRAGMA user_version = 2;
+        `);
+      });
+    }
+    if (version < 3) {
+      this.transaction(() => {
+        this.db.exec(`
+          ALTER TABLE accounts ADD COLUMN last_batch_ms REAL;
+          ALTER TABLE accounts ADD COLUMN avg_batch_ms REAL;
+          ALTER TABLE accounts ADD COLUMN batches_done INTEGER NOT NULL DEFAULT 0;
+          PRAGMA user_version = 3;
+        `);
+      });
+    }
   }
 
   /** Run `fn` atomically. Re-entrant: nested calls join the outer transaction. */
@@ -254,7 +305,7 @@ export class Store {
 
   /** Every stored result of one app, keyed by E.164. */
   allResults(app: App): Map<string, StoredResult> {
-    const rows = this.db.prepare('SELECT e164, status, checked_at FROM results WHERE app = ?').all(app) as unknown as {
+    const rows = this.stmt('SELECT e164, status, checked_at FROM results WHERE app = ?').all(app) as unknown as {
       e164: string;
       status: CheckStatus;
       checked_at: number;
@@ -265,21 +316,21 @@ export class Store {
   }
 
   getResult(e164: string, app: App): StoredResult | undefined {
-    const row = this.db
-      .prepare('SELECT status, checked_at FROM results WHERE e164 = ? AND app = ?')
-      .get(e164, app) as unknown as { status: CheckStatus; checked_at: number } | undefined;
+    const row = this.stmt('SELECT status, checked_at FROM results WHERE e164 = ? AND app = ?').get(e164, app) as unknown as
+      | { status: CheckStatus; checked_at: number }
+      | undefined;
     return row ? { status: row.status, checkedAt: row.checked_at } : undefined;
   }
 
   /** Upsert a batch of results in one transaction. */
   saveResults(app: App, results: Map<string, CheckStatus>, checkedAt: number): void {
     if (results.size === 0) return;
-    const stmt = this.db.prepare(
+    const stmt = this.stmt(
       `INSERT INTO results (e164, app, status, checked_at) VALUES (?, ?, ?, ?)
        ON CONFLICT (e164, app) DO UPDATE SET status = excluded.status, checked_at = excluded.checked_at
        WHERE excluded.status <> 'unknown' OR results.status = 'unknown'`,
     );
-    const answered = this.db.prepare('DELETE FROM failed_checks WHERE e164 = ? AND app = ?');
+    const answered = this.stmt('DELETE FROM failed_checks WHERE e164 = ? AND app = ?');
     this.transaction(() => {
       for (const [e164, status] of results) {
         stmt.run(e164, app, status, checkedAt);
@@ -295,7 +346,7 @@ export class Store {
    * one, so a number the platform keeps rejecting cannot block, or take its neighbours down with it.
    */
   failedChecks(app: App): Map<string, number> {
-    const rows = this.db.prepare('SELECT e164, failures FROM failed_checks WHERE app = ?').all(app) as unknown as {
+    const rows = this.stmt('SELECT e164, failures FROM failed_checks WHERE app = ?').all(app) as unknown as {
       e164: string;
       failures: number;
     }[];
@@ -303,7 +354,7 @@ export class Store {
   }
 
   recordFailedChecks(app: App, e164s: Iterable<string>, failedAt: number): void {
-    const stmt = this.db.prepare(
+    const stmt = this.stmt(
       `INSERT INTO failed_checks (e164, app, failures, last_failed_at) VALUES (?, ?, 1, ?)
        ON CONFLICT (e164, app) DO UPDATE SET failures = failures + 1, last_failed_at = excluded.last_failed_at`,
     );
@@ -313,38 +364,38 @@ export class Store {
   }
 
   getAccount(app: App, name: string): AccountState {
-    const row = this.db
-      .prepare(
-        `SELECT app, name, cooldown_until, disabled_reason, day, used_today, next_allowed_at
+    const row = this.stmt(
+      `SELECT app, name, cooldown_until, disabled_reason, day, used_today, next_allowed_at,
+              last_batch_ms, avg_batch_ms, batches_done
          FROM accounts WHERE app = ? AND name = ?`,
-      )
-      .get(app, name) as unknown as AccountRow | undefined;
+    ).get(app, name) as unknown as AccountRow | undefined;
     if (!row) {
-      return { app, name, cooldownUntil: 0, disabledReason: null, day: '', usedToday: 0, nextAllowedAt: 0 };
+      return { app, name, cooldownUntil: 0, disabledReason: null, day: '', usedToday: 0, nextAllowedAt: 0, lastBatchMs: null, avgBatchMs: null, batchesDone: 0 };
     }
     return toState(row);
   }
 
   /** All accounts that have state recorded, ordered by app then name. */
   listAccounts(): AccountState[] {
-    const rows = this.db
-      .prepare(
-        `SELECT app, name, cooldown_until, disabled_reason, day, used_today, next_allowed_at
+    const rows = this.stmt(
+      `SELECT app, name, cooldown_until, disabled_reason, day, used_today, next_allowed_at,
+              last_batch_ms, avg_batch_ms, batches_done
          FROM accounts ORDER BY app, name`,
-      )
-      .all() as unknown as AccountRow[];
+    ).all() as unknown as AccountRow[];
     return rows.map(toState);
   }
 
   saveAccount(state: AccountState): void {
-    this.db
-      .prepare(
-        `INSERT INTO accounts (app, name, cooldown_until, disabled_reason, day, used_today, next_allowed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+    this.stmt(
+      `INSERT INTO accounts (app, name, cooldown_until, disabled_reason, day, used_today, next_allowed_at,
+         last_batch_ms, avg_batch_ms, batches_done)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (app, name) DO UPDATE SET cooldown_until = excluded.cooldown_until,
            disabled_reason = excluded.disabled_reason, day = excluded.day,
-           used_today = excluded.used_today, next_allowed_at = excluded.next_allowed_at`,
-      )
+           used_today = excluded.used_today, next_allowed_at = excluded.next_allowed_at,
+           last_batch_ms = excluded.last_batch_ms, avg_batch_ms = excluded.avg_batch_ms,
+           batches_done = excluded.batches_done`,
+    )
       .run(
         state.app,
         state.name,
@@ -353,6 +404,9 @@ export class Store {
         state.day,
         state.usedToday,
         state.nextAllowedAt,
+        state.lastBatchMs,
+        state.avgBatchMs,
+        state.batchesDone,
       );
   }
 
@@ -361,12 +415,10 @@ export class Store {
    * cannot be used to bypass the daily cap.
    */
   resetAccount(app: App, name: string): boolean {
-    const result = this.db
-      .prepare(
-        `UPDATE accounts SET cooldown_until = 0, disabled_reason = NULL, next_allowed_at = 0
+    const result = this.stmt(
+      `UPDATE accounts SET cooldown_until = 0, disabled_reason = NULL, next_allowed_at = 0
          WHERE app = ? AND name = ?`,
-      )
-      .run(app, name);
+    ).run(app, name);
     return Number(result.changes) > 0;
   }
 

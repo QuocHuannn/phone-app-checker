@@ -193,7 +193,7 @@ Throughput is accounts x `dailyCap` per day: 10 000 numbers on one Telegram acco
 
 ## Performance
 
-0.2.0 removes the quadratic work in the scheduler and streams the CSV and the report. On the maintainer's Mac (Apple Silicon, Node 24.14), a five-app 100 000-row `check` stage went from 158 s to 29 s with a byte-identical report, `doctor` from about 480 ms to about 70 ms in the macOS archive, and 300 000-row parsing uses about 19 % less memory. Machine, commands, before/after tables, the parallel-accounts simulation and how to reproduce them: [docs/performance.md](docs/performance.md).
+0.2.0 removes the quadratic work in the scheduler and streams the CSV and the report. On the maintainer's Mac (Apple Silicon, Node 24.14), a five-app 100 000-row `check` stage went from 158 s to 29 s and produces the same result rows as 0.1.0 (the report is identical except for the six new threema/matrix columns), `doctor` from about 480 ms to about 70 ms in the macOS archive, and 300 000-row parsing uses about 19 % less memory. Machine, commands, before/after tables, the parallel-accounts simulation and how to reproduce them: [docs/performance.md](docs/performance.md).
 
 ## How it works
 

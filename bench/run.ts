@@ -149,6 +149,7 @@ if (existsSync(goldenPath)) {
   }
 }
 
+mkdirSync(OUT_DIR, { recursive: true });
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const outFile = join(OUT_DIR, `bench-${stamp}.json`);
 writeFileSync(outFile, JSON.stringify({ options: { ...args, work: undefined }, node: process.version, results, golden: goldenStatus }, null, 2));

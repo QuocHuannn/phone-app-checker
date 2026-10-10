@@ -40,7 +40,7 @@ Install 0.2.0 over 0.1.0 with its `install.sh`; config, sessions and results are
 - **Breaking:** `checker.db` is schema 3. 0.1.0 cannot open it.
 - **Breaking:** the report gains a status column each for `threema` and `matrix` (after `line`) plus their `*_checked_at` / `*_stale` columns, so anything that reads the report by column position must use the header names.
 - **Breaking (menu):** prompts say `b = back`, and `b` is reserved: it can no longer be used as an account name.
-- Faster: the scheduler no longer does quadratic work on large lists, the CSV is read in chunks and the report is streamed, prepared SQL statements are reused, and results are loaded once per app and run. A five-app 100 000-row `check` stage went from 158 s to 29 s with an identical report (this Mac; see `docs/performance.md`).
+- Faster: the scheduler no longer does quadratic work on large lists, the CSV is read in chunks and the report is streamed, prepared SQL statements are reused, and results are loaded once per app and run. A five-app 100 000-row `check` stage went from 158 s to 29 s; the report is identical to 0.1.0's except for the six new threema/matrix columns (this Mac; see `docs/performance.md`).
 - Faster start: `doctor` no longer imports adapter libraries by default, non-English catalogs and `libphonenumber-js` load lazily, and the macOS archive runs precompiled JavaScript (cold `doctor` about 480 ms to about 70 ms).
 - Progress output is drawn on a 1 Hz tick instead of on every event.
 - User-visible times (rest until, resume at, ETA) are shown in local time.

@@ -42,13 +42,13 @@ Five apps, 100 000 rows, seed 1, fake adapters with zero latency:
 | Results loaded per app and run | 3 | 1 | one `allResults` read per app |
 | SQLite transactions (one per completed batch) | 205 318 | 205 318 | same durability model |
 | Time spent in transactions | 21.1 s | 16.4 s | -22 % (prepared statements reused) |
-| Report SHA-256 | `fae76d86...` | `fae76d86...` | **identical bytes** |
+| Report SHA-256 | `fae76d86...` | `14d9ca16...` | same result rows; six new threema/matrix columns |
 
 300 000-row parse: 435 MB peak before, 352 MB after (-19 %), about 2.1 s both.
 
 Where the time went: the 0.1.0 scheduler re-compacted its whole pending list after every batch, which is quadratic in the list size. 0.2.0 compacts only the batch prefix. The CSV is now read in 256 KB chunks and fed record by record into the column detector, and the report is streamed to its temporary file through 256 KB buffered writes (atomic rename, mode 600 and fsync unchanged). The database keeps `PRAGMA synchronous` at its default (FULL) and one transaction per completed batch, so a crash still loses at most the batch in flight.
 
-The 20 000-row golden run (seed 1, 2 accounts, five apps, zero latency) produces the report hash `4ddd117eaf8f1986c233c872333377ddb680ee9ec10e0a754b56f7aaab3b3453` on both the 0.1.0 code and 0.2.0. That is the guard that the speed-up did not change any result.
+The 20 000-row golden run (seed 1, 2 accounts, five apps, zero latency) produces the report hash `be17c53492b5ac2f2c0ada6b44ced2d5f790ea34d266be70d7a8379b117639ae` under 0.2.0. The report is identical to 0.1.0's except for the six new threema/matrix columns: stripping `threema`, `matrix`, `threema_checked_at`, `matrix_checked_at`, `threema_stale` and `matrix_stale` reproduces the 0.1.0 hash `4ddd117eaf8f1986c233c872333377ddb680ee9ec10e0a754b56f7aaab3b3453` byte-for-byte. That is the guard that the speed-up did not change any result.
 
 ## Start-up
 
@@ -67,7 +67,7 @@ Re-measure after `npm run build` with `npm run bench:startup`.
 
 ## Parallel accounts
 
-`maxParallelAccounts` (default 1) lets several accounts of one app have a batch in flight at once. The default keeps the 0.1.0 behaviour exactly (the golden report hash is unchanged). The simulation below uses the shipped Telegram pacing on a virtual clock: 8 accounts, 5 000 rows, 476 batches. The batch latencies are **made up** to show the shape; they are not measurements of Telegram.
+`maxParallelAccounts` (default 1) lets several accounts of one app have a batch in flight at once. The default keeps the 0.1.0 behaviour exactly (the result rows are unchanged; the report only gains the six threema/matrix columns). The simulation below uses the shipped Telegram pacing on a virtual clock: 8 accounts, 5 000 rows, 476 batches. The batch latencies are **made up** to show the shape; they are not measurements of Telegram.
 
 | Batch latency | K = 1 | K = 2 | K = 4 | K = 8 |
 | --- | --- | --- | --- | --- |

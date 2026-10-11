@@ -116,11 +116,64 @@ describe('ProgressRenderer on a rich terminal (dashboard)', () => {
     expect(text).toContain('resting');
     expect(text).toContain(`resumes ${formatLocalTime(resume, t.now())}`);
     expect(text).toContain('5/40');
+    expect(text).toMatch(/0%\s+0 of 80 checks/); // the percentage travels with the totals bar
     expect(text).toContain('of 80 checks');
     expect(text).toContain('40 numbers x 2 apps');
+    // The one-line state legend names every icon the rows use.
+    expect(text).toContain('● working  ○ waiting  ◷ cooldown  ✖ disabled  ✔ done');
     expect(text).toContain('yes 45');
     expect(text).toContain('Ctrl+C');
     expect(text).toContain('Log: /tmp/run.log');
+    t.renderer.finish();
+  });
+
+  it('colour-codes every account state cell and legend entry in a rich frame', () => {
+    const t = setup({ mode: 'bar', columns: 90, rows: 24 });
+    const resume = t.now() + 60_000;
+    t.renderer.update(
+      event('telegram', 40, 40, undefined, [
+        acct('w1', 'working'),
+        acct('w2', 'waiting'),
+        acct('w3', 'waiting', { waitingUntil: resume }),
+        acct('c', 'cooldown', { waitingUntil: resume }),
+        acct('d', 'disabled'),
+        acct('ok', 'done'),
+      ]),
+    );
+    const raw = t.writes.join('');
+    // working green, waiting dim (idle or pacing), cooldown yellow, disabled red, done green+bold.
+    expect(raw).toContain(`${ESC}[32m● working${ESC}[39m`);
+    expect(raw).toContain(`${ESC}[2m○ waiting${ESC}[22m`);
+    expect(raw).toContain(`${ESC}[2m◷ resting`); // a pacing wait dims, not yellows
+    expect(raw).toContain(`${ESC}[33m◷ resting`); // a real cooldown yellows
+    expect(raw).toContain(`${ESC}[31m✖ disabled${ESC}[39m`);
+    expect(raw).toContain(`${ESC}[32m${ESC}[1m✔ done${ESC}[22m${ESC}[39m`);
+    // The legend paints each entry with the colour its rows get.
+    expect(raw).toContain(`${ESC}[33m◷ cooldown${ESC}[39m`);
+    const text = t.screen();
+    expect(text).toContain('○ waiting');
+    expect(text).toContain('◷ resting');
+    expect(text).toContain('● working  ○ waiting  ◷ cooldown  ✖ disabled  ✔ done');
+    t.renderer.finish();
+  });
+
+  it('keeps pacing dim and cooldown yellow when the frame collapses to one row per app', () => {
+    const t = setup({ mode: 'bar', columns: 90, rows: 15 }); // budget 13: four account rows (14 frame rows) collapse to apps level
+    const soon = t.now() + 30_000;
+    t.renderer.update(
+      event('telegram', 10, 10, undefined, [acct('p1', 'waiting', { waitingUntil: soon }), acct('p2', 'waiting', { waitingUntil: soon })]),
+    );
+    t.renderer.update(
+      event('zalo', 10, 10, undefined, [acct('c1', 'cooldown', { waitingUntil: soon }), acct('c2', 'cooldown', { waitingUntil: soon })]),
+    );
+    t.draw();
+    const frame = t.writes.at(-1) ?? ''; // the last draw, not the earlier full-level frame
+    const text = t.screen();
+    expect(text).not.toContain('p1'); // collapsed: app rows only
+    expect(text).toContain('resting');
+    // Exactly one resting row each: telegram paces (dim), zalo cools down (yellow).
+    expect(frame.match(/\u001b\[2m◷ resting/g)).toHaveLength(1);
+    expect(frame.match(/\u001b\[33m◷ resting/g)).toHaveLength(1);
     t.renderer.finish();
   });
 
@@ -284,15 +337,19 @@ describe('ProgressRenderer as timestamped plain lines', () => {
   it('writes HH:MM-stamped lines without escapes; state changes print at once, progress at most every 10 s', () => {
     const t = setup({ mode: 'plain', rich: false });
     t.renderer.update(event('telegram', 40, 40));
-    expect(t.lines).toEqual([expect.stringMatching(/^\d\d:\d\d progress 0% 0\/40$/)]);
+    expect(t.lines).toEqual([
+      'APP · ACCOUNT · STATE · DONE · RESULTS · LAST',
+      '* working  [ ] waiting  ~ cooldown  [x] disabled  [ok] done',
+      expect.stringMatching(/^\d\d:\d\d progress 0% 0\/40$/),
+    ]);
     t.advance(3000);
     t.renderer.update(event('telegram', 40, 30));
-    expect(t.lines).toHaveLength(1); // inside the 10 s window: throttled
+    expect(t.lines).toHaveLength(3); // inside the 10 s window: throttled
     t.renderer.update(event('telegram', 40, 30, { until: t.now() + 60_000, kind: 'cooldown' }));
-    expect(t.lines).toHaveLength(2); // a state change always prints
-    expect(t.lines[1]).toMatch(/^\d\d:\d\d progress 25% 10\/40 \| ETA \d+ s \| resting until \d\d:\d\d$/);
+    expect(t.lines).toHaveLength(4); // a state change always prints
+    expect(t.lines[3]).toMatch(/^\d\d:\d\d progress 25% 10\/40 \| ETA \d+ s \| resting until \d\d:\d\d$/);
     t.renderer.update(event('telegram', 40, 30));
-    expect(t.lines).toHaveLength(3); // back to work is a state change too
+    expect(t.lines).toHaveLength(5); // back to work is a state change too
     t.advance(10_000);
     t.renderer.update(event('telegram', 40, 0));
     expect(t.lines.at(-1)).toMatch(/progress 100% 40\/40/);
@@ -331,15 +388,20 @@ describe('ProgressRenderer as plain lines (not a terminal)', () => {
     t.renderer.update(event('telegram', 100, 100));
     t.renderer.update(event('whatsapp', 100, 100));
     // The first line is written at the first report (apps start in parallel, so the total grows as the others report in).
-    expect(t.lines).toEqual(['progress 0% 0/100']);
+    // The header and the state legend lead once, then the first report line.
+    expect(t.lines).toEqual([
+      'APP · ACCOUNT · STATE · DONE · RESULTS · LAST',
+      '* working  [ ] waiting  ~ cooldown  [x] disabled  [ok] done',
+      'progress 0% 0/100',
+    ]);
     t.advance(3000);
     t.renderer.update(event('telegram', 100, 70));
     // Not enough time passed since the last line: nothing new.
-    expect(t.lines).toHaveLength(1);
+    expect(t.lines).toHaveLength(3);
     t.advance(8000);
     t.renderer.update(event('telegram', 100, 40));
-    expect(t.lines).toHaveLength(2);
-    expect(t.lines[1]).toMatch(/^progress 30% 60\/200 \| telegram 60\/100, whatsapp 0\/100 \| ETA \d+ s$/);
+    expect(t.lines).toHaveLength(4);
+    expect(t.lines[3]).toMatch(/^progress 30% 60\/200 \| telegram 60\/100, whatsapp 0\/100 \| ETA \d+ s$/);
     t.renderer.update(event('telegram', 100, 0));
     t.renderer.update(event('whatsapp', 100, 0));
     // Finishing always writes the last state once.
@@ -375,6 +437,17 @@ describe('ProgressRenderer as plain lines (not a terminal)', () => {
   it('reports a cooldown as plain text', () => {
     const t = setup({ mode: 'lines', rich: false });
     t.renderer.update(event('zalo', 10, 4, { until: t.now() + 60 * 60_000, kind: 'cooldown' }));
-    expect(t.lines[0]).toMatch(/^progress 60% 6\/10 \| resting until \d\d:\d\d$/);
+    expect(t.lines[2]).toMatch(/^progress 60% 6\/10 \| resting until \d\d:\d\d$/);
+  });
+
+  it('keeps the header and legend uncoloured when stdout is a rich terminal', () => {
+    const t = setup({ mode: 'lines', rich: true });
+    t.renderer.update(event('zalo', 10, 4));
+    expect(t.lines[0]).toBe('APP · ACCOUNT · STATE · DONE · RESULTS · LAST');
+    expect(t.lines[1]).toBe('● working  ○ waiting  ◷ cooldown  ✖ disabled  ✔ done');
+    expect(t.lines[2]).toBe('progress 60% 6/10');
+    for (const line of t.lines) {
+      expect(line).not.toContain(ESC);
+    }
   });
 });

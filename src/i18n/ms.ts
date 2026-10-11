@@ -372,4 +372,8 @@ export const ms = {
   runResumeHint: 'Jalankan arahan yang sama sekali lagi untuk meneruskan (nombor yang selesai tidak diulang).',
   runResumeAt: ({ time }: { time: string }) =>
     `Sambungan semula seterusnya: ${time}. Jalankan arahan yang sama pada masa itu (nombor yang selesai tidak diulang).`,
+  themeAuto: 'Auto (ikut terminal)',
+  themeDark: 'Gelap',
+  themeLight: 'Cerah',
+  themeHighContrast: 'Kontras tinggi',
 } satisfies Catalog;

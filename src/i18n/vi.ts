@@ -369,4 +369,8 @@ export const vi = {
   runResumeHint: 'Chạy lại đúng lệnh đó để tiếp tục (các số đã xong sẽ không bị lặp lại).',
   runResumeAt: ({ time }) =>
     `Lần tiếp tục tiếp theo: ${time}. Chạy lại đúng lệnh đó vào lúc đó (các số đã xong sẽ không bị lặp lại).`,
+  themeAuto: 'Tự động (theo terminal)',
+  themeDark: 'Tối',
+  themeLight: 'Sáng',
+  themeHighContrast: 'Tương phản cao',
 } satisfies Catalog;

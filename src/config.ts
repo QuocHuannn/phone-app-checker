@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { writePrivateFileAtomic } from './private-file.ts';
 import type { App, PacingSettings } from './types.ts';
 import { APPS, terminalSafe } from './types.ts';
+import { THEME_MODES, type ThemeMode } from './ui.ts';
 
 export interface AppConfig extends PacingSettings {
   /** App-specific options (e.g. Telegram apiId/apiHash, Viber adb serial). */
@@ -22,6 +23,8 @@ export interface Config {
   dataDir: string;
   /** Reuse yes/not_found results younger than this. */
   maxAgeDays: number;
+  /** Terminal theme: `auto` detects the background from COLORFGBG. */
+  theme: ThemeMode;
   apps: Record<App, AppConfig>;
 }
 
@@ -142,10 +145,10 @@ const WHOLE_NUMBER_KEYS: readonly string[] = ['batchSize', 'dailyCap'];
 /** A wait longer than a year is a typo (an extra zero, microseconds for milliseconds) and would hang a run. */
 const MAX_DURATION_MS = 365 * 24 * 60 * MINUTE;
 
-const TOP_LEVEL_KEYS = ['configVersion', 'defaultRegion', 'dataDir', 'maxAgeDays', 'apps'];
+const TOP_LEVEL_KEYS = ['configVersion', 'defaultRegion', 'dataDir', 'maxAgeDays', 'theme', 'apps'];
 
 /** `configVersion` the binary writes and loads: a file without one predates versioning, so it is 1. */
-export const CURRENT_CONFIG_VERSION = 2;
+export const CURRENT_CONFIG_VERSION = 3;
 
 /** Open flag that refuses to follow a symlink in the last path component (POSIX only). */
 const NOFOLLOW = constants.O_NOFOLLOW ?? 0;
@@ -159,6 +162,8 @@ const NOFOLLOW = constants.O_NOFOLLOW ?? 0;
 const CONFIG_STEPS: readonly ((config: Record<string, unknown>) => Record<string, unknown>)[] = [
   // v1 (0.1.0) -> v2: declare the format version; every key keeps its meaning.
   (config) => ({ configVersion: 2, ...config }),
+  // v2 (0.2.0) -> v3: the theme preference; every other key keeps its meaning.
+  (config) => ({ theme: 'auto', ...config, configVersion: 3 }),
 ];
 
 function configVersionOf(config: Record<string, unknown>): number {
@@ -368,6 +373,8 @@ export function loadConfig(path?: string, home?: string): Config {
   if (typeof maxAgeDays !== 'number' || !Number.isFinite(maxAgeDays) || maxAgeDays < 0) {
     fail('maxAgeDays must be a non-negative number');
   }
+  const theme = (raw.theme ?? 'auto') as ThemeMode;
+  if (!(THEME_MODES as readonly string[]).includes(theme)) fail(`theme must be one of ${THEME_MODES.join(', ')}`);
 
   const rawApps = raw.apps ?? {};
   if (!isPlainObject(rawApps)) fail('apps must be an object');
@@ -391,7 +398,7 @@ export function loadConfig(path?: string, home?: string): Config {
     );
   }
 
-  return { defaultRegion, dataDir: resolve(base, dataDir), maxAgeDays, apps };
+  return { defaultRegion, dataDir: resolve(base, dataDir), maxAgeDays, theme, apps };
 }
 
 /** Account names become directory names, so keep them to a safe alphabet. */

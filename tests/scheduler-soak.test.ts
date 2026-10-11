@@ -48,7 +48,7 @@ const PACING: Record<App, Partial<PacingSettings>> = {
 function makeConfig(): Config {
   const apps = structuredClone(DEFAULT_APPS);
   for (const app of APPS) Object.assign(apps[app], { enabled: true, errorCooldownMs: 10 * 60_000 }, PACING[app]);
-  return { defaultRegion: 'VN', dataDir: '/unused', maxAgeDays: 30, apps };
+  return { defaultRegion: 'VN', dataDir: '/unused', maxAgeDays: 30, theme: 'auto', apps };
 }
 
 /** Deterministic hash used for ground truth and sloppy-answer choices. */

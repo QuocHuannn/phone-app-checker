@@ -197,6 +197,43 @@ describe('check on a rich terminal', () => {
   });
 });
 
+describe('the --theme flag and the theme config key', () => {
+  it('accepts every theme value and the run still completes with its summary and box', async () => {
+    // Command output uses the semantic tones (ok/warn/error), not the accent — the accent itself is
+    // exercised per-theme in ui.test.ts and reaches the banner once the menu's Ui is themed (phase 4).
+    for (const theme of ['auto', 'dark', 'light', 'high-contrast']) {
+      await run(['check', csv, '--out', out, '--force', '--theme', theme], { display: display(), printDisplay: display(), env: RICH_ENV });
+      expect(logs.some((line) => stripAnsi(line).startsWith('╭─')), theme).toBe(true);
+      expect(logs, theme).toContain(`Report written to ${out}`);
+      logs.length = 0;
+      printed.length = 0;
+      screen.length = 0;
+    }
+  });
+
+  it('accepts the theme config key and keeps COLORFGBG-driven runs working', async () => {
+    writeFileSync(config, JSON.stringify({ ...JSON.parse(readFileSync(config, 'utf8')), theme: 'light' }));
+    await run(['check', csv, '--out', out], { display: display(), printDisplay: display(), env: { ...RICH_ENV, COLORFGBG: '0;15' } });
+    expect(logs.some((line) => stripAnsi(line).startsWith('╭─'))).toBe(true);
+    expect(logs).toContain(`Report written to ${out}`);
+  });
+
+  it('--plain wins over every theme: no ANSI anywhere', async () => {
+    await run(['check', csv, '--out', out, '--theme', 'high-contrast', '--plain'], { display: display(), printDisplay: display(), env: RICH_ENV });
+    expect([...logs, ...printed].join('\n')).not.toContain(ESC);
+  });
+
+  it('rejects an unknown theme the same way every bad option is rejected', async () => {
+    const program = createProgram({ env: RICH_ENV, exit: () => {} });
+    program.exitOverride();
+    program.configureOutput({ writeOut: () => {}, writeErr: () => {} });
+    await expect(program.parseAsync(['--config', config, '--theme', 'neon', 'check', csv, '--out', out], { from: 'user' })).rejects.toMatchObject({
+      code: 'commander.invalidArgument',
+    });
+    expect(program.helpInformation()).toContain('--theme <mode>');
+  });
+});
+
 describe('embedded (run from the menu) and the report command', () => {
   it('embedded: no closing box (the menu draws its own) but the report hook still fires', async () => {
     await run(['check', csv, '--out', out], { display: display(110), printDisplay: display(), env: RICH_ENV, embedded: true, onReport: (info) => reports.push(info) });

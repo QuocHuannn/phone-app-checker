@@ -469,7 +469,7 @@ describe.skipIf(process.platform !== 'darwin')('release scripts', () => {
       const file = join(defaultHome, 'data', 'sessions', 'telegram', 'acct', 'session');
       mkdirSync(join(defaultHome, 'data', 'sessions', 'telegram', 'acct'), { recursive: true });
       writeFileSync(file, 'secret');
-      writeFileSync(join(defaultHome, 'checker.config.json'), '{"configVersion": 2}');
+      writeFileSync(join(defaultHome, 'checker.config.json'), '{"configVersion": 3}');
       return file;
     }
 
@@ -1112,7 +1112,7 @@ describe.skipIf(process.platform !== 'darwin')('lifecycle exclusion: maintenance
     writeFileSync(file, 'secret');
     // A current-version config: `data-dir` (exempt from the barrier) must not migrate anything
     // while the purge waits, or the snapshot below sees a .bak the test never created.
-    writeFileSync(join(defaultHome, 'checker.config.json'), '{"configVersion": 2}');
+    writeFileSync(join(defaultHome, 'checker.config.json'), '{"configVersion": 3}');
     return file;
   }
 

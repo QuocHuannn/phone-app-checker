@@ -33,7 +33,7 @@ function makeConfig(parallel: number, pacing: Partial<AppConfig> = {}): Config {
       pacing,
     );
   }
-  return { defaultRegion: 'VN', dataDir: '/unused', maxAgeDays: 30, apps };
+  return { defaultRegion: 'VN', dataDir: '/unused', maxAgeDays: 30, theme: 'auto', apps };
 }
 
 interface Behave {

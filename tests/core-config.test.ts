@@ -84,6 +84,8 @@ describe('loadConfig', () => {
     [{ apps: { telegram: { maxParallelAccounts: 1.5 } } }, /maxParallelAccounts must be a whole number >= 1/],
     [{ apps: { telegram: { maxParallelAccounts: '2' } } }, /maxParallelAccounts must be a whole number >= 1/],
     [{ apps: { viber: { maxParallelAccounts: 2 } } }, /apps\.viber\.maxParallelAccounts must be 1.*one Android device|apps\.viber\.maxParallelAccounts must be 1/],
+    [{ theme: 'neon' }, /theme must be one of/],
+    [{ theme: 42 }, /theme must be one of/],
     [[], /JSON object/],
   ])('rejects invalid config %j', (content, message) => {
     expect(() => loadConfig(write(content))).toThrow(message);
@@ -223,7 +225,7 @@ describe('loadConfig configVersion migration', () => {
       expect(readFileSync(backup, 'utf8')).toBe(original);
       expect(statSync(backup).mode & 0o777).toBe(0o600);
       expect(statSync(file).mode & 0o777).toBe(0o600);
-      expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ configVersion: CURRENT_CONFIG_VERSION, ...JSON.parse(original) });
+      expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ configVersion: CURRENT_CONFIG_VERSION, theme: 'auto', ...JSON.parse(original) });
       expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain(backup);
     } finally {
       stderr.mockRestore();
@@ -294,6 +296,42 @@ describe('loadConfig configVersion migration', () => {
     } finally {
       stderr.mockRestore();
     }
+  });
+
+  it('upgrades a 0.2.0 (v2) config in place to v3 with theme auto, keeps a mode-600 v2 backup and stays put on reload', () => {
+    const file = write({ configVersion: 2, defaultRegion: 'SG' });
+    const original = readFileSync(file, 'utf8');
+    const stderr = hush();
+    try {
+      const config = loadConfig(file);
+      expect(config.theme).toBe('auto');
+      expect(config.defaultRegion).toBe('SG');
+
+      const backup = `${file}.v2.bak`;
+      expect(readFileSync(backup, 'utf8')).toBe(original);
+      expect(statSync(backup).mode & 0o777).toBe(0o600);
+      expect(statSync(file).mode & 0o777).toBe(0o600);
+      expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ configVersion: CURRENT_CONFIG_VERSION, theme: 'auto', defaultRegion: 'SG' });
+      expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain(backup);
+
+      stderr.mockClear();
+      const migrated = readFileSync(file, 'utf8');
+      loadConfig(file);
+      expect(readFileSync(file, 'utf8')).toBe(migrated);
+      expect(readdirSync(dir).sort()).toEqual(['checker.config.json', 'checker.config.json.v2.bak']);
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it('keeps an explicit theme through the v2 -> v3 upgrade and rejects a bad value without touching the file', () => {
+    const kept = loadConfig(write({ configVersion: 2, theme: 'high-contrast' }));
+    expect(kept.theme).toBe('high-contrast');
+    const file = write({ configVersion: 2, theme: 'solarized' });
+    const before = readFileSync(file, 'utf8');
+    expect(() => loadConfig(file)).toThrow(/theme must be one of/);
+    expect(readFileSync(file, 'utf8')).toBe(before);
   });
 });
 

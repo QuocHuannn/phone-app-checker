@@ -5,6 +5,7 @@ import { isSupportedCountry } from 'libphonenumber-js/max';
 import { afterAll, describe, expect, it } from 'vitest';
 import { DEFAULT_APPS, loadConfig, type Config } from '../src/config.ts';
 import { APPS } from '../src/types.ts';
+import { THEME_MODES } from '../src/ui.ts';
 import { Prng } from './helpers/prng.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'checker-config-fuzz-'));
@@ -23,6 +24,7 @@ function assertSane(config: Config): void {
   expect(isSupportedCountry(config.defaultRegion)).toBe(true);
   expect(isAbsolute(config.dataDir)).toBe(true);
   expect(Number.isFinite(config.maxAgeDays) && config.maxAgeDays >= 0).toBe(true);
+  expect(THEME_MODES).toContain(config.theme);
   for (const app of APPS) {
     const c = config.apps[app];
     expect(typeof c.enabled).toBe('boolean');

@@ -26,7 +26,7 @@ import { openUrl, revealPath } from './open-url.ts';
 import { ProgressRenderer, type ProgressEvent } from './progress.ts';
 import type { PromptIo } from './prompt.ts';
 import { reportBox } from './screens.ts';
-import { createUi, PLAIN_ENV, PLAIN_UI, type DrawStream, type Ui, type UiStream } from './ui.ts';
+import { createUi, PLAIN_ENV, PLAIN_UI, resolveTheme, THEME_MODES, type DrawStream, type ResolvedTheme, type ThemeMode, type Ui, type UiStream } from './ui.ts';
 import {
   buildReport,
   checkReportTarget,
@@ -87,6 +87,7 @@ export interface CliDeps {
 interface GlobalOptions {
   config?: string;
   plain?: boolean;
+  theme?: ThemeMode;
 }
 
 interface ReportOptions {
@@ -210,10 +211,14 @@ export function createProgram(deps: CliDeps = {}): Command {
   const display = deps.display ?? (deps.log === undefined ? process.stderr : undefined);
   // Built lazily: --plain is parsed inside the action and must be honoured before the first draw.
   let uiCache: Ui | undefined;
-  const getUi = (): Ui => (uiCache ??= display === undefined ? PLAIN_UI : createUi(display, env));
+  const getUi = (cfg: Config): Ui => (uiCache ??= display === undefined ? PLAIN_UI : createUi(display, env, resolvedTheme(cfg)));
   let printUiCache: Ui | undefined;
-  const getPrintUi = (): Ui =>
-    (printUiCache ??= deps.printDisplay !== undefined ? createUi(deps.printDisplay, env) : deps.print === undefined ? createUi(process.stdout, env) : PLAIN_UI);
+  const getPrintUi = (cfg: Config): Ui =>
+    (printUiCache ??= deps.printDisplay !== undefined
+      ? createUi(deps.printDisplay, env, resolvedTheme(cfg))
+      : deps.print === undefined
+        ? createUi(process.stdout, env, resolvedTheme(cfg))
+        : PLAIN_UI);
 
   const program = new Command();
   program
@@ -222,6 +227,7 @@ export function createProgram(deps: CliDeps = {}): Command {
     .option('--config <path>', 'config file (default: ./checker.config.json, or $PHONE_APP_CHECKER_HOME/checker.config.json when set)')
     .version(packageVersion(), '-V, --version')
     .option('--plain', 'plain output tier: no colour, no cursor movement (also NO_COLOR, TERM=dumb or PHONE_APP_CHECKER_PLAIN)')
+    .addOption(new Option('--theme <mode>', 'theme: auto (detect the terminal background via COLORFGBG), dark, light or high-contrast').choices(THEME_MODES as string[]))
     // One error style for everything the command line says: commander's "error: ..." becomes "Error: ...".
     .configureOutput({ outputError: (message, write) => write(message.replace(/^error: /, 'Error: ')) })
     .addHelpText('after', `\nRun with no arguments in a terminal to open an interactive menu: no commands to remember. English by default; press L in the menu to switch language (saved), or set ${LANG_ENV}=<en|vi|id|ms|ko|zh>.`);
@@ -259,6 +265,9 @@ export function createProgram(deps: CliDeps = {}): Command {
     return loadConfig(program.opts<GlobalOptions>().config, home);
   };
 
+  /** --theme beats the config's theme, which defaults to `auto`; the resolved theme never re-reads the file. */
+  const resolvedTheme = (cfg: Config): ResolvedTheme => resolveTheme(program.opts<GlobalOptions>().theme ?? cfg.theme, env);
+
   /** A path from the command line or the customer's file system can hold ESC/CR/LF/bidi: print a bounded, control-stripped copy; file operations keep the original. */
   const shownPath = (path: string): string => terminalSafe(path, DISPLAY_PATH_MAX);
 
@@ -280,6 +289,7 @@ export function createProgram(deps: CliDeps = {}): Command {
   }
 
   function emitReport(
+    cfg: Config,
     store: Store,
     input: ParsedInput,
     apps: App[],
@@ -294,14 +304,14 @@ export function createProgram(deps: CliDeps = {}): Command {
     const rows = buildReport(store, input.entries, apps, freshness, stored);
     writeReport(out, rows, target);
     const tr = translator(loginLanguage(undefined));
-    print(formatSummary(summarize(rows), getPrintUi(), { apps, tr, ...extras }));
+    print(formatSummary(summarize(rows), getPrintUi(cfg), { apps, tr, ...extras }));
     log(tr('cliReportWritten', { path: shownPath(resolve(out)) }));
   }
 
   /** Tell the caller a report was written and, on a terminal, close with the "Report saved to ..." box. */
-  function announceReport(path: string, inconclusive: number): void {
+  function announceReport(cfg: Config, path: string, inconclusive: number): void {
     deps.onReport?.({ path, inconclusive });
-    const ui = getUi();
+    const ui = getUi(cfg);
     if (ui.rich && !deps.embedded) for (const line of reportBox(ui, loginLanguage(undefined), { path, inconclusive })) log(line);
   }
 
@@ -410,7 +420,7 @@ export function createProgram(deps: CliDeps = {}): Command {
       const { store, lock } = openLockedStore(cfg.dataDir);
       const abort = new AbortController();
       const numbers = input.entries.flatMap((entry) => (entry.phone ? [entry.phone] : []));
-      const ui = getUi();
+      const ui = getUi(cfg);
       const bar = options.progress === 'auto' && ui.rich && display !== undefined;
       const runLog = bar ? openRunLog(cfg.dataDir, csv, numbers.length) : undefined;
       const fileLine = (message: string): void => {
@@ -490,6 +500,7 @@ export function createProgram(deps: CliDeps = {}): Command {
         const run = describeRun(summaries, tr, now());
         for (const line of run.lines) say(line);
         emitReport(
+          cfg,
           store,
           input,
           apps,
@@ -504,7 +515,7 @@ export function createProgram(deps: CliDeps = {}): Command {
         );
         // Exit code is unchanged (0 = the command produced its report); the banner is the warning.
         for (const line of run.banner) say(ui.bold(ui.red(line)));
-        announceReport(resolve(options.out), summaries.reduce((total, s) => total + s.inconclusive, 0));
+        announceReport(cfg, resolve(options.out), summaries.reduce((total, s) => total + s.inconclusive, 0));
         if (abort.signal.aborted) process.exitCode = 130;
       } finally {
         progress?.finish();
@@ -532,8 +543,8 @@ export function createProgram(deps: CliDeps = {}): Command {
       const maxAgeMs = (options.maxAge ?? cfg.maxAgeDays) * DAY_MS;
       const store = Store.open(cfg.dataDir);
       try {
-        emitReport(store, input, apps, options.out, target, { now: now(), maxAgeMs });
-        announceReport(resolve(options.out), 0);
+        emitReport(cfg, store, input, apps, options.out, target, { now: now(), maxAgeMs });
+        announceReport(cfg, resolve(options.out), 0);
         // The report is still written (its invalid rows show what went wrong), but an input without a
         // single valid number must not look like a successful report: same failure as `check`.
         if (validCount(input) === 0) {

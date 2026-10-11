@@ -377,7 +377,7 @@ main() {
   [ -f "$backup" ] || fail $id $label "config backup $backup was not created" "$T/doctor-upgrade.err"
   [ "$(mode_of "$backup")" = "600" ] || fail $id $label "config backup mode is $(mode_of "$backup"), expected 600"
   grep -qF 'checker.config.json.v1.bak' "$T/doctor-upgrade.err" || fail $id $label "stderr did not name the backup file" "$T/doctor-upgrade.err"
-  [ "$(/usr/bin/plutil -extract configVersion raw -o - "$data_home/checker.config.json" 2>"$log")" = "2" ] || fail $id $label "configVersion is not 2 after the upgrade" "$log"
+  [ "$(/usr/bin/plutil -extract configVersion raw -o - "$data_home/checker.config.json" 2>"$log")" = "3" ] || fail $id $label "configVersion is not 3 after the upgrade" "$log"
   if awk '$1 == "FAIL" { bad = 1 } END { exit bad ? 0 : 1 }' "$T/doctor-upgrade.out"; then fail $id $label "doctor reports a FAIL row on the upgraded home" "$T/doctor-upgrade.out"; fi
   (cd "$T/work" && crp phone-app-checker report numbers.csv --apps telegram,zalo) >"$log" 2>&1 || fail $id $label "report on the upgraded home exited non-zero" "$log"
   [ -f "$T/work/report.csv" ] || fail $id $label "report.csv not written on the upgraded home" "$log"

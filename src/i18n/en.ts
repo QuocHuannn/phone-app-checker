@@ -412,4 +412,8 @@ export const en = {
   runResumeHint: 'Run the same command again to continue (finished numbers are not repeated).',
   runResumeAt: ({ time }: { time: string }) =>
     `Next resume: ${time}. Run the same command again then (finished numbers are not repeated).`,
+  themeAuto: 'Auto (detect from terminal)',
+  themeDark: 'Dark',
+  themeLight: 'Light',
+  themeHighContrast: 'High contrast',
 };

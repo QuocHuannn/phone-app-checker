@@ -372,4 +372,8 @@ export const ko = {
   runResumeHint: '같은 명령을 다시 실행하면 계속됩니다 (완료된 번호는 반복되지 않습니다).',
   runResumeAt: ({ time }) =>
     `다음 재개: ${time}. 그때 같은 명령을 다시 실행하세요 (완료된 번호는 반복되지 않습니다).`,
+  themeAuto: '자동 (터미널 감지)',
+  themeDark: '다크',
+  themeLight: '라이트',
+  themeHighContrast: '고대비',
 } satisfies Catalog;

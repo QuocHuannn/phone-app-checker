@@ -372,4 +372,8 @@ export const id = {
   runResumeHint: 'Jalankan perintah yang sama lagi untuk melanjutkan (nomor yang sudah selesai tidak diulang).',
   runResumeAt: ({ time }) =>
     `Lanjut berikutnya: ${time}. Jalankan perintah yang sama lagi pada waktu itu (nomor yang sudah selesai tidak diulang).`,
+  themeAuto: 'Otomatis (deteksi terminal)',
+  themeDark: 'Gelap',
+  themeLight: 'Terang',
+  themeHighContrast: 'Kontras tinggi',
 } satisfies Catalog;

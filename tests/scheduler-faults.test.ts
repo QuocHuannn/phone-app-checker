@@ -25,7 +25,7 @@ function config(pacing: Partial<PacingSettings> = {}): Config {
   for (const app of APPS) {
     Object.assign(apps[app], { batchSize: 2, dailyCap: 1000, minIntervalMs: 1000, jitterMs: 0, rateLimitCooldownMs: 60_000, errorCooldownMs: 5_000 }, pacing);
   }
-  return { defaultRegion: 'VN', dataDir: '/unused', maxAgeDays: 30, apps };
+  return { defaultRegion: 'VN', dataDir: '/unused', maxAgeDays: 30, theme: 'auto', apps };
 }
 
 interface Rig {

@@ -369,4 +369,8 @@ export const zh = {
   runResumeHint: '再次运行相同命令即可继续 (已完成的号码不会重复检查)。',
   runResumeAt: ({ time }) =>
     `下次恢复: ${time}。届时再次运行相同命令 (已完成的号码不会重复检查)。`,
+  themeAuto: '自动 (检测终端)',
+  themeDark: '深色',
+  themeLight: '浅色',
+  themeHighContrast: '高对比度',
 } satisfies Catalog;

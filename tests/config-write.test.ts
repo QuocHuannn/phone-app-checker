@@ -38,6 +38,7 @@ describe('saveTelegramCredentials', () => {
     expect(written).toEqual({
       configVersion: CURRENT_CONFIG_VERSION,
       defaultRegion: 'SG',
+      theme: 'auto',
       apps: { zalo: { enabled: false }, telegram: { dailyCap: 7, options: { apiId: 1234567, apiHash: HASH, other: 'kept' } } },
     });
     expect(statSync(file).mode & 0o777).toBe(0o600);
@@ -52,12 +53,14 @@ describe('saveTelegramCredentials', () => {
     saveTelegramCredentials(file, 42, HASH);
     expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({
       configVersion: CURRENT_CONFIG_VERSION,
+      theme: 'auto',
       apps: { telegram: { options: { apiId: 42, apiHash: HASH } } },
     });
     writeFileSync(file, `\uFEFF${JSON.stringify({ maxAgeDays: 3 })}`);
     saveTelegramCredentials(file, 43, HASH);
     expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({
       configVersion: CURRENT_CONFIG_VERSION,
+      theme: 'auto',
       maxAgeDays: 3,
       apps: { telegram: { options: { apiId: 43, apiHash: HASH } } },
     });

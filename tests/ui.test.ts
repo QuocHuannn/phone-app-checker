@@ -59,7 +59,7 @@ describe('resolveTheme / accent', () => {
   });
 
   it('info box frames (banner, report box) pick up the accent colour', () => {
-    const frame = (theme: 'dark' | 'light' | 'high-contrast') => box(createUi(TTY, RICH_ENV, theme), 'Title', ['body'])[0];
+    const frame = (theme: 'dark' | 'light' | 'high-contrast') => box(createUi(TTY, RICH_ENV, theme), 'Title', ['body'])[0] ?? '';
     expect(frame('dark')).toContain(`${ESC}[36m`);
     expect(frame('light')).toContain(`${ESC}[34m`);
     expect(frame('high-contrast')).toContain(`${ESC}[7m`);

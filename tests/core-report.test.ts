@@ -3,12 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { parsePhoneCsv, type InputEntry } from '../src/csv.ts';
-import { buildReport, formatReportCsv, formatSummary, REPORT_COLUMNS, summarize, writeReport, type ReportRow } from '../src/report.ts';
+import { buildReport, formatReportCsv, formatSummary, REPORT_COLUMNS, summarize, writeReport, type AppTotals, type ReportRow, type ReportSummary } from '../src/report.ts';
+import { createUi, stripAnsi } from '../src/ui.ts';
 import { Store } from '../src/store.ts';
 import { APPS, type App, type CheckStatus } from '../src/types.ts';
 import { COLS, countsFor, REPORT_HEADER, reportLine, statusesFor } from './helpers/report-rows.ts';
 
 const DAY = 24 * 60 * 60 * 1000;
+const ESC = '\u001b';
 const T1 = Date.UTC(2026, 9, 1);
 const T2 = Date.UTC(2026, 9, 2);
 const T3 = Date.UTC(2026, 9, 3);
@@ -164,10 +166,50 @@ describe('summary', () => {
 
     const text = formatSummary(summary);
     expect(text).toContain('Numbers: 3 unique (2 valid, 1 invalid)');
-    expect(text).toMatch(/telegram\s+1\s+1\s+0\s+0\s+1/);
+    // Counts carry each status's share of all 3 rows; the TOTAL line shares of all 21 cells (3 rows × 7 apps).
+    expect(text).toMatch(/telegram\s+1 \(33%\)\s+1 \(33%\)\s+0 \(0%\)\s+0 \(0%\)\s+1 \(33%\)/);
+    expect(text).toContain('TOTAL · yes: 2 (10%) · not_found: 2 (10%) · unknown: 1 (5%) · skipped: 9 (43%) · invalid: 7 (33%)');
     expect(text).toContain('Registered (yes) by country');
+    expect(text).toMatch(/VN\s+2\s+21\s+10%/);
     expect(text).toContain('not_found');
     expect(text).not.toContain('STALE');
+  });
+
+  it('rich tier: status colours and a bold TOTAL line, same text once stripped', () => {
+    const { store, entries } = fixture();
+    const summary = summarize(buildReport(store, entries, ['telegram', 'whatsapp', 'zalo'], FRESH));
+    const rich = formatSummary(summary, createUi({ isTTY: true, columns: 100, rows: 30 }, { TERM: 'xterm-256color' }));
+    expect(rich).toContain(`${ESC}[1m${ESC}[32m`); // yes header: bold + green
+    expect(rich).toContain(`${ESC}[31m`); // invalid column red
+    expect(rich).toContain(`${ESC}[1mTOTAL${ESC}[22m`);
+    expect(rich).toContain(`${ESC}[32myes: ${ESC}[39m`);
+    // Layout parity: stripping every escape sequence reproduces the plain tier byte for byte.
+    expect(stripAnsi(rich)).toBe(formatSummary(summary));
+  });
+
+  it('an empty report shows a dash instead of percentages', () => {
+    const text = formatSummary(summarize([]));
+    expect(text).toContain('0 (—)');
+    expect(text).toContain('yes: 0 (—)');
+    expect(text).not.toContain('Registered (yes) by country');
+  });
+
+  it('caps the country table at 10 rows and counts the rest', () => {
+    const perApp = Object.fromEntries(
+      APPS.map((app) => [app, { yes: 12, not_found: 0, unknown: 0, skipped: 0, invalid: 0 }]),
+    ) as Record<App, AppTotals>;
+    const yesByCountry = new Map(
+      Array.from({ length: 12 }, (_, i) => [
+        `C${String(i).padStart(2, '0')}`,
+        Object.fromEntries(APPS.map((app) => [app, 1])) as Record<App, number>,
+      ]),
+    );
+    const summary: ReportSummary = { rows: 12, valid: 12, invalid: 0, perApp, stale: countsFor({}), yesByCountry };
+    const text = formatSummary(summary);
+    expect(text).toContain('C09');
+    expect(text).toContain('… 2 more');
+    expect(text).not.toContain('C10');
+    expect(text).not.toContain('C11');
   });
 
   it('counts stale observations per app and says so', () => {

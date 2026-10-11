@@ -454,7 +454,7 @@ export interface SummaryExtras {
   tr?: Translator;
 }
 
-/** Human-readable summary: status counts per requested app, then `yes` counts per country. `ui` colours the status table (plain by default). */
+/** Human-readable summary: per-app status counts as a share of all rows, a TOTAL line, then `yes` counts per country. `ui` colours the status table (plain by default). */
 export function formatSummary(summary: ReportSummary, ui: Ui = PLAIN_UI, options: SummaryExtras = {}): string {
   const tr = options.tr ?? translator();
   const shown = options.apps ?? APPS;
@@ -464,20 +464,36 @@ export function formatSummary(summary: ReportSummary, ui: Ui = PLAIN_UI, options
     out.push(tr('summaryDone', { time: formatDuration(options.durationMs), numbers: summary.rows, unfinished }), '');
   }
   out.push(tr('summaryNumbers', { total: summary.rows, valid: summary.valid, invalid: summary.invalid }), '');
-  const perApp = shown.map((app) => [app, ...STATUSES.map((status) => String(summary.perApp[app][status]))]);
+  /** `count`/`total` as `84%`; `—` when there is nothing to divide by. */
+  const percent = (count: number, total: number): string => (total === 0 ? '—' : `${Math.round((count / total) * 100)}%`);
+  /** Status names in the order of {@link STATUSES}; the app table's column headers and the TOTAL line's labels. */
+  const statusNames = [tr('summaryColYes'), tr('summaryColNotFound'), tr('summaryColUnknown'), tr('summaryColSkipped'), tr('summaryColInvalid')];
+  const counts = shown.map((app) => STATUSES.map((status) => summary.perApp[app][status]));
+  const perApp = shown.map((app, row) => [
+    app,
+    ...STATUSES.map((_, column) => `${counts[row]?.[column] ?? 0} (${percent(counts[row]?.[column] ?? 0, summary.rows)})`),
+  ]);
   out.push(
     table(
-      [tr('summaryColApp'), tr('summaryColYes'), tr('summaryColNotFound'), tr('summaryColUnknown'), tr('summaryColSkipped'), tr('summaryColInvalid')],
+      [tr('summaryColApp'), ...statusNames],
       perApp,
       (row, column, cell) => {
         if (column === 0) return row < 0 ? ui.bold(cell) : cell;
         const status = STATUSES[column - 1];
         // Headers carry the colour of their column; a zero count is quiet (dim) whatever the column.
         if (row < 0) return ui.bold(statusPaint(ui, status)(cell));
-        return (perApp[row]?.[column] ?? '0') === '0' ? ui.dim(cell) : statusPaint(ui, status)(cell);
+        return counts[row]?.[column - 1] === 0 ? ui.dim(cell) : statusPaint(ui, status)(cell);
       },
     ),
   );
+  // TOTAL line: each status's share of every check made (rows × shown apps), so a multi-app run stays under 100%.
+  const checks = summary.rows * shown.length;
+  const totals = STATUSES.map((status, index) => {
+    const paint = statusPaint(ui, status);
+    const count = counts.reduce((sum, appCounts) => sum + (appCounts[index] ?? 0), 0);
+    return `${paint(`${statusNames[index] ?? status}: `)}${ui.bold(paint(`${count} (${percent(count, checks)})`))}`;
+  });
+  out.push(`${ui.bold('TOTAL')} · ${totals.join(' · ')}`);
   const accounts = shown
     .flatMap((app) => (options.accountsUsed?.[app] ?? []).map((name) => ({ app, name })))
     .map(({ app, name }) => `${app} ${name}`);
@@ -487,13 +503,29 @@ export function formatSummary(summary: ReportSummary, ui: Ui = PLAIN_UI, options
       const total = (counts: Record<App, number>) => shown.reduce((sum, app) => sum + counts[app], 0);
       return total(b[1]) - total(a[1]) || a[0].localeCompare(b[0]);
     });
+    const top = countries.slice(0, 10);
+    const countryYes = top.map(([, appCounts]) => shown.reduce((sum, app) => sum + appCounts[app], 0));
     out.push('', tr('summaryYesByCountry'));
     out.push(
       table(
-        [tr('summaryColCountry'), ...shown],
-        countries.map(([country, counts]) => [country === '' ? '??' : country, ...shown.map((app) => String(counts[app]))]),
+        [tr('summaryColCountry'), tr('summaryColYes'), 'total', '%'],
+        // `total` is every shown report cell (rows × apps), same denominator as the TOTAL line: a
+        // country's yes cells never exceed it and the percentage is a share of all checks, not a
+        // within-country rate (per-country row counts do not exist in ReportSummary).
+        top.map(([country], row) => [
+          country === '' ? '??' : country,
+          String(countryYes[row] ?? 0),
+          String(checks),
+          percent(countryYes[row] ?? 0, checks),
+        ]),
+        (row, column, cell) => {
+          if (row < 0) return ui.bold(cell);
+          if (column === 1) return (countryYes[row] ?? 0) === 0 ? ui.dim(cell) : ui.green(cell);
+          return cell;
+        },
       ),
     );
+    if (countries.length > top.length) out.push(`… ${countries.length - top.length} more`);
   }
   const stale = shown.filter((app) => summary.stale[app] > 0);
   if (stale.length > 0) {

@@ -84,14 +84,14 @@ async function run(args: string[], deps: Partial<CliDeps> = {}, banned = false):
 }
 
 describe('check output when it is not a terminal (compatibility)', () => {
-  it('is exactly what it was: no ANSI, no progress lines, no box, summary text unchanged', async () => {
+  it('is plain output as before: no ANSI, no progress lines, no box, aligned summary text', async () => {
     await run(['check', csv, '--out', out]);
     const everything = [...logs, ...printed].join('\n');
     expect(everything).not.toContain(ESC);
     expect(logs.some((line) => line.startsWith('progress '))).toBe(false);
     expect(logs.some((line) => line.includes('Report saved to'))).toBe(false);
     expect(logs).toContain(`Report written to ${out}`);
-    expect(printed.join('\n')).toContain('app       yes  not_found  unknown  skipped  invalid');
+    expect(printed.join('\n')).toContain('app           yes  not_found  unknown  skipped  invalid');
     expect(screen).toEqual([]);
   });
 
@@ -161,8 +161,8 @@ describe('check on a rich terminal', () => {
     expect(text).toContain(`${ESC}[31m`);
     // Same layout as the plain table once the colours are removed.
     const plain = stripAnsi(text).split('\n');
-    expect(plain).toContain('app       yes  not_found  unknown  skipped  invalid');
-    expect(plain.find((line) => line.startsWith('telegram'))).toBe('telegram    1          1        0        0        1');
+    expect(plain).toContain('app           yes  not_found  unknown  skipped  invalid');
+    expect(plain.find((line) => line.startsWith('telegram'))).toBe('telegram  1 (33%)    1 (33%)   0 (0%)   0 (0%)  1 (33%)');
   });
 
   it('closes with the "Report saved to" box, translated, with the next steps', async () => {

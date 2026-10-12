@@ -13,8 +13,8 @@ export const en = {
   menuLogin: 'Log in an app account',
   menuAccounts: 'View logged-in accounts',
   menuReport: 'Rebuild the latest report',
-  menuDoctor: 'Check this Mac is ready (doctor)',
   menuGuide: 'Guide / warnings',
+  menuSettings: 'Settings',
   menuQuit: 'Quit',
   menuPrompt: 'Choose 0-6 or L, then Enter: ',
   menuInvalid: ({ choice }: { choice: string }) => `Invalid choice: "${choice}". Type a number from 0 to 6, or L, then press Enter.`,
@@ -57,7 +57,7 @@ export const en = {
   commandError: ({ error }: { error: string }) => `Error: ${error}`,
   commandFailed: ({ code }: { code: number }) => `The command did not succeed (code ${code}). You are still in the menu.`,
   configUnreadable: ({ reason }: { reason: string }) => `Cannot read the configuration: ${reason}`,
-  configFixHint: ({ file }: { file: string }) => `Open ${file} to fix it, then choose "Check this Mac is ready (doctor)" (5) for details.`,
+  configFixHint: ({ file }: { file: string }) => `Open ${file} to fix it, then run phone-app-checker doctor to check the details.`,
 
   // 1 - check a CSV.
   checkNoAccounts: 'No account is logged in yet, so nothing can be checked.',
@@ -163,8 +163,10 @@ export const en = {
   spinWaitingScan: 'Waiting for you to scan the code...',
 
   // Rich terminal screens: hints, empty states, final box.
-  hintMenu: '↑↓ move · Enter select · q quit',
-  hintBack: '↑↓ move · Enter select · Esc, q or b back',
+  keyHintNavigate: '↑↓ move',
+  keyHintSelect: 'Enter select',
+  keyHintBack: 'Esc, q or b back',
+  keyHintQuit: 'q quit',
   bannerAccounts: 'Accounts ready:',
   emptyAccounts: 'No account is logged in yet. Choose "Log in an app account" first, then come back here.',
   loginPickApp: 'Log in to which app?',
@@ -225,8 +227,26 @@ export const en = {
   // 4 - rebuild the report.
   reportIntro: 'Rebuilds the report from the saved results (no new checks are made).',
 
-  // 5 - doctor.
-  doctorFailHint: 'A line says FAIL: fix it as described on that line, then choose item 5 again.',
+  // 6 - settings.
+  settingsTitle: 'Settings',
+  settingsTheme: ({ mode }: { mode: string }) => `Theme: ${mode}`,
+  settingsThemeSaved: 'Theme saved to the config file.',
+  settingsSaveFailed: ({ reason }: { reason: string }) => `Could not save the setting (${reason}); it applies to this session only.`,
+  settingsLanguage: ({ language }: { language: string }) => `Language: ${language}`,
+  settingsLanguageChoose: 'choose a language',
+  settingsRecents: 'Remember recent files',
+  settingsRecentsOn: 'on',
+  settingsRecentsOff: 'off',
+  settingsRecentsClear: 'Enter = clear the list and stop remembering files',
+  settingsDataDir: ({ path }: { path: string }) => `Data folder: ${path}`,
+  settingsConfigFile: ({ path }: { path: string }) => `Config file: ${path}`,
+  settingsPrompt: ({ max }: { max: number }) => `Setting to change (1-${max}, Enter = back): `,
+
+  // First-run welcome (shown once, when nothing is logged in and no check has run).
+  welcomeTitle: 'WELCOME',
+  welcomeBody: 'Welcome to Phone App Checker. No accounts are logged in yet; a check needs at least one.',
+  welcomeLogin: 'Press 2 to log in an app account.',
+  welcomeGuide: 'Press 5 to read the guide and warnings first.',
 
   // 6 - guide and warnings.
   guideTitle: 'GUIDE AND WARNINGS',

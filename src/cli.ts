@@ -14,7 +14,7 @@ import {
   loadConfig,
   type Config,
 } from './config.ts';
-import { saveTelegramCredentials } from './config-write.ts';
+import { saveTelegramCredentials, saveTheme as writeThemeToConfig } from './config-write.ts';
 import { formatDoctor, runDoctor } from './doctor.ts';
 import { bootstrapHome, ensureHomeDirectory, packageVersion } from './home.ts';
 import { LANG_ENV, resolveLang, translate, translator, type Lang, type Translator } from './i18n/index.ts';
@@ -676,7 +676,7 @@ async function execute(argv: string[], deps: CliDeps): Promise<{ code: number; e
  * `langFlag` is the value of `--lang`. In release mode the language choice lives in the app home; without one
  * (a source checkout) there is nowhere private to keep it, so a choice only lasts for the session.
  */
-function menuHost(io: PromptIo, deps: CliDeps, langFlag?: string): MenuHost {
+function menuHost(io: PromptIo, deps: CliDeps, flags: { langFlag?: string; themeFlag?: ThemeMode }): MenuHost {
   const env = deps.env ?? process.env;
   const home = env[HOME_ENV] || undefined;
   const lifecycle = deps.lifecycleDir ?? lifecycleDir(env.HOME || undefined);
@@ -688,7 +688,8 @@ function menuHost(io: PromptIo, deps: CliDeps, langFlag?: string): MenuHost {
     cwd: process.cwd(),
     homeDir: homedir(),
     env,
-    langFlag,
+    langFlag: flags.langFlag,
+    themeFlag: flags.themeFlag,
     loadConfig: () => {
       // Same exclusion as every command that reads the config or creates the app home (see `guarded`).
       const hold = acquireLifecycleShared(lifecycle);
@@ -725,6 +726,15 @@ function menuHost(io: PromptIo, deps: CliDeps, langFlag?: string): MenuHost {
               hold.release();
             }
           },
+          saveTheme: (theme: ThemeMode) => {
+            const hold = acquireLifecycleShared(lifecycle);
+            try {
+              ensureHomeDirectory(appHome);
+              writeThemeToConfig(configFilePath(undefined, home), theme);
+            } finally {
+              hold.release();
+            }
+          },
         }),
     openUrl: (url) => openUrl(url),
     revealPath: (path) => revealPath(path),
@@ -749,14 +759,37 @@ function menuHost(io: PromptIo, deps: CliDeps, langFlag?: string): MenuHost {
 
 /**
  * Arguments that still mean "open the menu": none at all, or only the hidden `--lang <code>` /
- * `--lang=<code>` (the language the menu starts in), possibly with `--plain`. `undefined` for any other command line.
+ * `--lang=<code>` (the language the menu starts in) and `--theme <mode>` / `--theme=<mode>`
+ * (the theme it draws with), possibly with `--plain`. `undefined` for any other command line —
+ * an unknown value then reaches commander's own error for the flag.
  */
-function menuArguments(args: string[]): { langFlag?: string } | undefined {
+function menuArguments(args: string[]): { langFlag?: string; themeFlag?: ThemeMode } | undefined {
+  const flags: { langFlag?: string; themeFlag?: ThemeMode } = {};
   const rest = args.filter((arg) => arg !== '--plain');
-  if (rest.length === 0) return {};
-  if (rest.length === 2 && rest[0] === '--lang' && rest[1] !== undefined) return { langFlag: rest[1] };
-  if (rest.length === 1 && rest[0]?.startsWith('--lang=')) return { langFlag: rest[0].slice('--lang='.length) };
-  return undefined;
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index] as string;
+    if (arg === '--lang') {
+      const value = rest[index + 1];
+      if (value === undefined || value.startsWith('--')) return undefined;
+      flags.langFlag = value;
+      index += 1;
+    } else if (arg.startsWith('--lang=')) {
+      flags.langFlag = arg.slice('--lang='.length);
+    } else if (arg === '--theme') {
+      const value = rest[index + 1];
+      if (value === undefined || value.startsWith('--')) return undefined;
+      if (!(THEME_MODES as readonly string[]).includes(value)) return undefined;
+      flags.themeFlag = value as ThemeMode;
+      index += 1;
+    } else if (arg.startsWith('--theme=')) {
+      const value = arg.slice('--theme='.length);
+      if (!(THEME_MODES as readonly string[]).includes(value)) return undefined;
+      flags.themeFlag = value as ThemeMode;
+    } else {
+      return undefined;
+    }
+  }
+  return flags;
 }
 
 /** Run the CLI; resolves with the process exit code. No arguments (or only `--lang <code>`) on a terminal opens the menu. */
@@ -765,7 +798,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
   const env = deps.env ?? process.env;
   if (argv.slice(2).includes('--plain')) env[PLAIN_ENV] = '1';
   const menuArgs = menuArguments(argv.slice(2));
-  if (menuArgs !== undefined && isInteractive(terminal)) return runMenu(menuHost(terminal, deps, menuArgs.langFlag));
+  if (menuArgs !== undefined && isInteractive(terminal)) return runMenu(menuHost(terminal, deps, menuArgs));
   const result = await execute(argv, deps);
   if (result.error !== undefined) console.error(`Error: ${result.error}`);
   return result.code;

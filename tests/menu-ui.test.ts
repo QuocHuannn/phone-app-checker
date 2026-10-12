@@ -41,6 +41,7 @@ interface Setup {
   results?: CommandResult[];
   env?: NodeJS.ProcessEnv;
   openUrl?: MenuHost['openUrl'];
+  saveTheme?: MenuHost['saveTheme'];
 }
 
 function build(io: MenuHost['io'], setup: Setup = {}) {
@@ -74,6 +75,7 @@ function build(io: MenuHost['io'], setup: Setup = {}) {
           },
         }
       : { openUrl: setup.openUrl }),
+    ...(setup.saveTheme === undefined ? {} : { saveTheme: setup.saveTheme }),
   };
   return { host, runs, opened, configFile };
 }
@@ -149,7 +151,7 @@ describe('rich main menu (arrow keys on a real terminal)', () => {
     // Icon and word together: the state never rests on a symbol or a colour alone.
     expect(screen).toContain('✔ whatsapp 1 account');
     for (const app of ['telegram', 'zalo', 'viber', 'line']) expect(screen).toContain(`○ ${app} none`);
-    for (const row of ['1 Check a CSV file', '2 Log in an app account', '3 View logged-in accounts', '6 Guide / warnings', '0 Quit']) {
+    for (const row of ['1 Check a CSV file', '2 Log in an app account', '3 View logged-in accounts', '5 Guide / warnings', '6 Settings', '0 Quit']) {
       expect(screen).toContain(row);
     }
     expect(screen).toContain('L Language / Ngôn ngữ / Bahasa / 언어 / 语言: English');
@@ -191,7 +193,7 @@ describe('rich main menu (arrow keys on a real terminal)', () => {
     const tty = fakeTty();
     const { host, runs } = build(tty.io);
     const done = runMenu(host);
-    let at = await answer(tty, 'q quit', '6');
+    let at = await answer(tty, 'q quit', '5');
     at = await until(tty, '╭─ GUIDE AND WARNINGS', at);
     expect(view(tty)).toContain('│ - Only check numbers of people who agreed to be contacted.');
     at = await answer(tty, 'Press Enter for the menu.', '\r', at);
@@ -316,7 +318,7 @@ describe('the menu on a screen grid (what the user actually sees)', () => {
     expect(view(tty)).toContain('Accounts ready: [ok] telegram 1 account');
     expect(view(tty)).toContain('[ ] whatsapp none');
 
-    await tty.send('6\r');
+    await tty.send('5\r');
     const paused = await until(tty, 'Press Enter for the menu.', prompt);
     const guide = stripAnsi(tty.screen()).slice(stripAnsi(tty.screen()).indexOf('GUIDE AND WARNINGS'), stripAnsi(tty.screen()).lastIndexOf('Press Enter for the menu.'));
     expect(guide.length).toBeGreaterThan(100);
@@ -327,12 +329,36 @@ describe('the menu on a screen grid (what the user actually sees)', () => {
   });
 });
 
+describe('settings', () => {
+  it('lists the config in an arrow-key list and Enter on the theme row cycles and saves it', async () => {
+    const saved: string[] = [];
+    const tty = fakeTty({ columns: 80, rows: 24 });
+    const { host } = build(tty.io, { accounts: { telegram: ['a'] }, saveTheme: (theme) => void saved.push(theme) });
+    const done = runMenu(host);
+    let at = await answer(tty, 'q quit', '6');
+    at = await until(tty, 'Esc, q or b back', at);
+    for (const row of ['Theme: Auto', 'Language: English', 'Remember recent files: on', 'Data folder:', 'Config file:']) {
+      expect(view(tty)).toContain(row);
+    }
+    // Enter activates the highlighted theme row: the next mode is applied and saved.
+    await tty.send('\r');
+    at = await until(tty, 'Theme saved', at);
+    expect(saved).toEqual(['dark']);
+    expect(view(tty).slice(at)).toContain('Theme: Dark');
+    // b goes back to the main menu, 0 quits.
+    await tty.send('b');
+    await until(tty, 'q quit', at);
+    await tty.send('0');
+    await done;
+  });
+});
+
 describe('guide pages', () => {
   it('splits the guide into pages that fit a short window: Enter reads the next page, the last one waits for Enter', async () => {
     const tty = fakeTty({ columns: 80, rows: 14 });
     const { host } = build(tty.io);
     const done = runMenu(host);
-    let at = await answer(tty, 'q quit', '6');
+    let at = await answer(tty, 'q quit', '5');
     at = await until(tty, 'Guide and warnings · page 1 of 2', at);
     const first = view(tty).slice(at);
     expect(first).toContain('agreed to be contacted');
@@ -349,7 +375,7 @@ describe('guide pages', () => {
     const tty = fakeTty({ columns: 80, rows: 14 });
     const { host } = build(tty.io);
     const done = runMenu(host);
-    let at = await answer(tty, 'q quit', '6');
+    let at = await answer(tty, 'q quit', '5');
     at = await answer(tty, 'Enter = next page · b back', 'b\r', at);
     await answer(tty, 'q quit', '0', at);
     expect(await done).toBe(0);

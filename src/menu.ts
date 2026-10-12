@@ -1,4 +1,4 @@
-import { accessSync, constants, existsSync, statSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdirSync, statSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readTelegramCredentials } from './adapters/telegram-credentials.ts';
@@ -18,13 +18,14 @@ import {
 } from './i18n/index.ts';
 import { normalizePhone } from './phone.ts';
 import { TELEGRAM_APPS_URL } from './open-url.ts';
+import { writePrivateFileAtomic } from './private-file.ts';
 import { askHidden, askVisible, PromptCancelled, type PromptIo } from './prompt.ts';
 import { qrWindowNeed, type QrStream } from './qr.ts';
 import { openRecentFiles, type RecentEntry, type RecentFiles } from './recent.ts';
 import { APP_TITLE, banner, reportBox, statusStrip } from './screens.ts';
 import { canSelect, selectMany, selectMenu, type SelectItem, type SelectResult } from './select.ts';
 import { APPS, terminalSafe, type App, type LoginMethod } from './types.ts';
-import { box, createUi, wrap, type Ui, type UiStream } from './ui.ts';
+import { box, createUi, resolveTheme, THEME_MODES, wrap, type ThemeMode, type Ui, type UiStream } from './ui.ts';
 
 /** Longest user-supplied text (code points) echoed back to the terminal. */
 const SHOWN_MAX = 512;
@@ -32,6 +33,14 @@ const DEFAULT_REPORT_NAME = 'report.csv';
 const DEFAULT_ACCOUNT = 'default';
 /** Typed exactly so means "back" in every text prompt of the menu. */
 const BACK_CHAR = /^b$/i;
+
+/** The translated name of each `theme` preference value (p01's keys), for the Settings row. */
+const THEME_LABEL: Record<ThemeMode, MessageKey> = {
+  auto: 'themeAuto',
+  dark: 'themeDark',
+  light: 'themeLight',
+  'high-contrast': 'themeHighContrast',
+};
 
 /**
  * Largest QR side (modules) a login is expected to show, per app: the pre-login window check (r3 §3.4 M10)
@@ -67,10 +76,14 @@ export interface MenuHost {
   run: (args: string[]) => Promise<CommandResult>;
   /** Language given with `--lang` (beats the environment and the saved choice). */
   langFlag?: string;
+  /** Theme given with `--theme` (beats the config's `theme` for this session and the commands the menu runs). */
+  themeFlag?: ThemeMode;
   /** The saved language code, if any (never throws). Absent when nothing can be saved. */
   readLanguage?: () => string | undefined;
   /** Save the language choice; throws on failure (the menu then keeps the choice for this session only). */
   saveLanguage?: (lang: Lang) => void;
+  /** Save the theme choice in the config file; throws on failure. Absent without an app home: the choice is session-only. */
+  saveTheme?: (theme: ThemeMode) => void;
   /** Open an address in the default browser (macOS `open`); resolves false when it could not. Absent: the menu never offers it. */
   openUrl?: (url: string) => Promise<boolean>;
   /** Reveal a file in Finder (macOS `open -R`); resolves false when it could not. Absent: the menu prints the path instead. */
@@ -86,6 +99,10 @@ interface Menu {
   last: { csv?: string; out?: string };
   /** Colours, icons and window size of the menu's output; plain (no ANSI) unless the output is a real terminal. */
   ui: Ui;
+  /** The theme preference the menu draws with (`--theme`, then the config, then `auto`). */
+  themeMode: ThemeMode;
+  /** Set when the theme came from `--theme` or a Settings toggle: the commands the menu runs get `--theme` too, saved or not. */
+  themeOverride: boolean;
   /** Recent-file store, opened lazily per data directory (one open per config). */
   recents?: { dir: string; files: RecentFiles | null };
 }
@@ -98,6 +115,22 @@ function t<K extends MessageKey>(menu: Menu, key: K, ...args: MessageArgs<K>): s
 /** True when both ends are a terminal: only then may the menu open (it would hang a script). */
 export function isInteractive(io: PromptIo): boolean {
   return io.input.isTTY === true && 'isTTY' in io.output && io.output.isTTY === true;
+}
+
+/** The persistent hint line under an arrow-key list that goes back: `↑↓ move · Enter select · Esc, q or b back`. */
+function backHint(menu: Menu): string {
+  return `${t(menu, 'keyHintNavigate')} · ${t(menu, 'keyHintSelect')} · ${t(menu, 'keyHintBack')}`;
+}
+
+/** The persistent hint line under the main menu's arrow-key list: the row keys (1-6, L, 0) are named too. */
+function menuHint(menu: Menu): string {
+  return `${t(menu, 'keyHintNavigate')} · ${t(menu, 'keyHintSelect')} · ${t(menu, 'keyHintQuit')} · 1-6, L, 0`;
+}
+
+/** Run a command for a menu action; when the theme was forced (--theme or a Settings toggle) the command sees it too. */
+function runVia(menu: Menu, args: string[]): Promise<CommandResult> {
+  // `--theme` is a program option: it goes before the subcommand — after the `--` terminator it would be an extra positional.
+  return menu.host.run(menu.themeOverride ? ['--theme', menu.themeMode, ...args] : args);
 }
 
 const shown = (text: string): string => terminalSafe(text, SHOWN_MAX);
@@ -239,7 +272,7 @@ async function pickCsvPath(menu: Menu, cfg: Config, fallback?: string): Promise<
       { value: { kind: 'type' as const }, label: t(menu, 'pickCsvType'), key: 't' },
       { value: { kind: 'clear' as const }, label: t(menu, 'recentClear'), key: 'c' },
     ];
-    const result = await selectMenu(host.io, menu.ui, { title: t(menu, 'pickCsvTitle'), items, hint: t(menu, 'hintBack') });
+    const result = await selectMenu(host.io, menu.ui, { title: t(menu, 'pickCsvTitle'), items, hint: backHint(menu) });
     if (result.picked && result.value.kind === 'path') return result.value.path;
     if (result.picked && result.value.kind === 'clear') {
       if (await confirm(menu, t(menu, 'recentConfirm'), false)) {
@@ -465,7 +498,7 @@ async function checkCsv(menu: Menu): Promise<void> {
   recentsFor(menu, cfg)?.add(csv);
 
   say(t(menu, 'checkStarting', { apps: apps.join(', ') }));
-  const result = await host.run(['check', '--out', out, '--apps', apps.join(','), '--', csv]);
+  const result = await runVia(menu, ['check', '--out', out, '--apps', apps.join(','), '--', csv]);
   reportCommandResult(menu, result);
   if (result.code === 0) {
     showReportDone(menu, out, result, true);
@@ -614,12 +647,12 @@ async function askAccountName(menu: Menu): Promise<string | undefined> {
 }
 
 /** Arrow-key list on a rich terminal: the result (also carries `action` when `options.actions` is used). Only call when `canSelect`. */
-function pick<V>(menu: Menu, title: string | undefined, items: SelectItem<V>[], hint: MessageKey, initial = 0): Promise<SelectResult<V>> {
-  return selectMenu(menu.host.io, menu.ui, { ...(title === undefined ? {} : { title }), items, hint: t(menu, hint), initial });
+function pick<V>(menu: Menu, title: string | undefined, items: SelectItem<V>[], hint: string, initial = 0): Promise<SelectResult<V>> {
+  return selectMenu(menu.host.io, menu.ui, { ...(title === undefined ? {} : { title }), items, hint, initial });
 }
 
 /** `pick` reduced to the chosen value or `undefined` when the user backs out (q / Esc / b). */
-async function pickRow<V>(menu: Menu, title: string | undefined, items: SelectItem<V>[], hint: MessageKey, initial = 0): Promise<V | undefined> {
+async function pickRow<V>(menu: Menu, title: string | undefined, items: SelectItem<V>[], hint: string, initial = 0): Promise<V | undefined> {
   const result = await pick(menu, title, items, hint, initial);
   return result.picked ? result.value : undefined;
 }
@@ -645,7 +678,7 @@ async function chooseLoginMethod(
         key: String(index + 1),
       };
     });
-    return pickRow(menu, t(menu, lines[0]), rows, 'hintBack');
+    return pickRow(menu, t(menu, lines[0]), rows, backHint(menu));
   }
   menu.say(t(menu, lines[0]));
   [lines[1], lines[2]].forEach((key, index) => {
@@ -726,7 +759,7 @@ async function chooseLoginApp(menu: Menu, logged: Map<App, string[]>): Promise<A
       label: `${app}: ${appStatusText(menu, logged.get(app))}`,
       key: String(index + 1),
     }));
-    return pickRow(menu, t(menu, 'loginPickApp'), rows, 'hintBack');
+    return pickRow(menu, t(menu, 'loginPickApp'), rows, backHint(menu));
   }
   say(t(menu, 'loginAppsHeader'));
   APPS.forEach((app, index) => say(appStatusLine(menu, app, index, logged.get(app))));
@@ -827,7 +860,7 @@ async function loginFlow(menu: Menu, cfg: Config, app: App, logged: Map<App, str
 
   // WhatsApp and Zalo print their own instructions together with the code; Telegram, Viber and LINE need an introduction.
   if (hint !== undefined) say(t(menu, hint));
-  const result = await host.run(['login', app, '--account', account, ...choice, '--lang', menu.lang]);
+  const result = await runVia(menu, ['login', app, '--account', account, ...choice, '--lang', menu.lang]);
   reportCommandResult(menu, result);
   // A successful login already printed its own "Logged in ..." line (the command does, in the menu's language).
   say(result.code === 0 ? t(menu, 'loginNextStep') : t(menu, 'loginFailed', { app, account }));
@@ -845,17 +878,11 @@ async function viewReport(menu: Menu): Promise<void> {
   menu.last = { csv, out };
   recentsFor(menu, cfg)?.add(csv);
   const apps = [...loggedInApps(cfg).keys()];
-  const result = await host.run(['report', '--out', out, ...(apps.length > 0 ? ['--apps', apps.join(',')] : []), '--', csv]);
+  const result = await runVia(menu, ['report', '--out', out, ...(apps.length > 0 ? ['--apps', apps.join(',')] : []), '--', csv]);
   reportCommandResult(menu, result);
   if (result.code === 0) showReportDone(menu, out, result, false);
 }
 
-async function showDoctor(menu: Menu): Promise<void> {
-  const result = await menu.host.run(['doctor']);
-  reportCommandResult(menu, result);
-  if (result.code !== 0) menu.say(t(menu, 'doctorFailHint'));
-  await pauseForMenu(menu);
-}
 
 const GUIDE = [
   'guideTitle',
@@ -932,7 +959,7 @@ async function chooseLanguage(menu: Menu): Promise<void> {
       label: `${LANGUAGE_NAMES[code]}${code === menu.lang ? ' *' : ''}`,
       key: String(index + 1),
     }));
-    const picked = await pickRow(menu, t(menu, 'languageHeader'), rows, 'hintBack', LANGS.indexOf(menu.lang));
+    const picked = await pickRow(menu, t(menu, 'languageHeader'), rows, backHint(menu), LANGS.indexOf(menu.lang));
     if (picked !== undefined) applyLanguage(menu, picked);
     return;
   }
@@ -960,8 +987,8 @@ function showMenuRows(menu: Menu): void {
   menu.say(`  2. ${t(menu, 'menuLogin')}`);
   menu.say(`  3. ${t(menu, 'menuAccounts')}`);
   menu.say(`  4. ${t(menu, 'menuReport')}`);
-  menu.say(`  5. ${t(menu, 'menuDoctor')}`);
-  menu.say(`  6. ${t(menu, 'menuGuide')}`);
+  menu.say(`  5. ${t(menu, 'menuGuide')}`);
+  menu.say(`  6. ${t(menu, 'menuSettings')}`);
   // Not translated on purpose: it must stay findable whatever language the menu is stuck in.
   menu.say(`  L. ${LANGUAGE_LABEL}: ${LANGUAGE_NAMES[menu.lang]}`);
   menu.say(`  0. ${t(menu, 'menuQuit')}`);
@@ -991,8 +1018,8 @@ function menuItems(menu: Menu): SelectItem<string>[] {
     row('2', '2', t(menu, 'menuLogin')),
     row('3', '3', t(menu, 'menuAccounts')),
     row('4', '4', t(menu, 'menuReport')),
-    row('5', '5', t(menu, 'menuDoctor')),
-    row('6', '6', t(menu, 'menuGuide')),
+    row('5', '5', t(menu, 'menuGuide')),
+    row('6', '6', t(menu, 'menuSettings')),
     // Not translated on purpose: it must stay findable whatever language the menu is stuck in.
     row('l', 'L', `${LANGUAGE_LABEL}: ${LANGUAGE_NAMES[menu.lang]}`),
     row('0', '0', t(menu, 'menuQuit')),
@@ -1020,7 +1047,7 @@ async function readChoice(menu: Menu): Promise<string> {
       for (const line of statusStrip(ui, menu.lang, logged)) menu.say(`  ${line}`);
     }
     if (canSelect(host.io, ui) && ui.rows >= 12) {
-      const result = await selectMenu(host.io, ui, { items: menuItems(menu), hint: t(menu, 'hintMenu') });
+      const result = await selectMenu(host.io, ui, { items: menuItems(menu), hint: menuHint(menu) });
       return result.picked ? result.value : '0';
     }
     showMenuRows(menu);
@@ -1043,7 +1070,7 @@ async function showAccounts(menu: Menu): Promise<void> {
     say(t(menu, 'emptyAccounts'));
     return;
   }
-  reportCommandResult(menu, await host.run(['accounts']));
+  reportCommandResult(menu, await runVia(menu, ['accounts']));
   if (!canSelect(host.io, menu.ui)) {
     await pauseForMenu(menu);
     return;
@@ -1064,7 +1091,7 @@ async function showAccounts(menu: Menu): Promise<void> {
       if (action === undefined) return;
       const row = items[action.index] as SelectItem<{ app: App; name: string }>;
       if (action.key === 'r') {
-        reportCommandResult(menu, await host.run(['account-reset', row.value.app, row.value.name]));
+        reportCommandResult(menu, await runVia(menu, ['account-reset', row.value.app, row.value.name]));
         continue;
       }
       if (action.key === 'l') {
@@ -1078,6 +1105,121 @@ async function showAccounts(menu: Menu): Promise<void> {
   }
 }
 
+/** One row of the Settings screen: an action when `enabled`, a read-only fact when not. */
+interface SettingRow {
+  value: 'theme' | 'language' | 'recents' | 'dataDir' | 'configFile';
+  label: string;
+  detail?: string;
+  enabled: boolean;
+}
+
+/** The Settings screen's rows, in order: theme, language, recents, then the two read-only paths. */
+function settingsRows(menu: Menu, cfg: Config, remembering: boolean): SettingRow[] {
+  const mode = menu.themeMode;
+  const next = THEME_MODES[(THEME_MODES.indexOf(mode) + 1) % THEME_MODES.length] as ThemeMode;
+  return [
+    { value: 'theme', label: t(menu, 'settingsTheme', { mode: t(menu, THEME_LABEL[mode]) }), detail: `Enter → ${t(menu, THEME_LABEL[next])}`, enabled: true },
+    { value: 'language', label: t(menu, 'settingsLanguage', { language: LANGUAGE_NAMES[menu.lang] }), detail: t(menu, 'settingsLanguageChoose'), enabled: true },
+    { value: 'recents', label: `${t(menu, 'settingsRecents')}: ${t(menu, remembering ? 'settingsRecentsOn' : 'settingsRecentsOff')}`, detail: t(menu, 'settingsRecentsClear'), enabled: remembering },
+    { value: 'dataDir', label: t(menu, 'settingsDataDir', { path: shown(cfg.dataDir) }), enabled: false },
+    { value: 'configFile', label: t(menu, 'settingsConfigFile', { path: shown(menu.host.configFile()) }), enabled: false },
+  ];
+}
+
+/** The recents row's action: clear the list and stop remembering (the store's only opt-out). */
+async function recentsSetting(menu: Menu, cfg: Config): Promise<void> {
+  if (!(await confirm(menu, t(menu, 'recentConfirm'), false))) return;
+  recentsFor(menu, cfg)?.disable();
+  menu.say(t(menu, 'recentCleared'));
+}
+
+/**
+ * The Settings screen: view the config and toggle theme / language / recents. On a rich terminal it is an
+ * arrow-key list where Enter activates the highlighted row and `b` (Esc/q) goes back; on the numbered
+ * prompt Enter is the way back. The paths are read-only rows.
+ */
+async function showSettings(menu: Menu): Promise<void> {
+  const cfg = configOrReport(menu);
+  if (cfg === undefined) return;
+  const act = async (value: SettingRow['value']): Promise<void> => {
+    if (value === 'theme') {
+      const next = THEME_MODES[(THEME_MODES.indexOf(menu.themeMode) + 1) % THEME_MODES.length] as ThemeMode;
+      menu.themeMode = next;
+      menu.themeOverride = true;
+      menu.ui = createUi(menu.host.io.output as UiStream, menu.host.env, resolveTheme(next, menu.host.env));
+      try {
+        if (menu.host.saveTheme === undefined) throw new Error('nowhere to save the theme');
+        menu.host.saveTheme(next);
+        menu.say(t(menu, 'settingsThemeSaved'));
+      } catch (error) {
+        menu.say(t(menu, 'settingsSaveFailed', { reason: shown(error instanceof Error ? error.message : String(error)) }));
+      }
+    } else if (value === 'language') {
+      await chooseLanguage(menu);
+    } else if (value === 'recents') {
+      await recentsSetting(menu, cfg);
+    }
+  };
+  if (canSelect(menu.host.io, menu.ui)) {
+    for (;;) {
+      const rows = settingsRows(menu, cfg, recentsFor(menu, cfg)?.enabled !== false);
+      const result = await selectMenu(menu.host.io, menu.ui, {
+        title: t(menu, 'settingsTitle'),
+        items: rows.map((row) => ({ value: row, label: row.label, detail: row.detail, enabled: row.enabled })),
+        hint: backHint(menu),
+      });
+      if (!result.picked) return;
+      await act(result.value.value);
+    }
+  }
+  for (;;) {
+    const rows = settingsRows(menu, cfg, recentsFor(menu, cfg)?.enabled !== false);
+    menu.say();
+    menu.say(t(menu, 'settingsTitle'));
+    const enabled = rows.filter((row) => row.enabled);
+    rows.forEach((row, index) => {
+      const slot = enabled.indexOf(row);
+      menu.say(slot >= 0 ? `  ${slot + 1}. ${row.label}` : `  - ${row.label}`);
+      if (row.detail !== undefined && slot >= 0) menu.say(`     ${row.detail}`);
+    });
+    const answer = (await askVisible(t(menu, 'settingsPrompt', { max: enabled.length }), menu.host.io)).trim();
+    if (answer === '' || BACK_CHAR.test(answer)) return;
+    const picked = /^\d+$/.test(answer) ? enabled[Number(answer) - 1] : undefined;
+    if (picked === undefined) {
+      menu.say(t(menu, 'loginMethodInvalid', { max: enabled.length }));
+      continue;
+    }
+    await act(picked.value);
+  }
+}
+
+/** The welcome flag file inside the data directory (mode 600); its existence means the box was shown once. */
+const WELCOMED_FILE = 'welcomed.json';
+
+/**
+ * First-run welcome: shown once, when no account is logged in and no check has run (no results database
+ * yet), then a private flag file is written to the data directory so it never shows again. A broken
+ * config or an unwritable data directory only means the box may appear again next time.
+ */
+function maybeWelcome(menu: Menu, cfg: Config | undefined): void {
+  if (cfg === undefined) return;
+  const flag = join(cfg.dataDir, WELCOMED_FILE);
+  if (existsSync(flag)) return;
+  if (loggedInApps(cfg).size > 0 || existsSync(join(cfg.dataDir, 'checker.db'))) return;
+  if (menu.ui.rich) {
+    for (const line of box(menu.ui, t(menu, 'welcomeTitle'), [t(menu, 'welcomeBody'), t(menu, 'welcomeLogin'), t(menu, 'welcomeGuide')])) menu.say(line);
+  } else {
+    menu.say(t(menu, 'welcomeBody'));
+    menu.say(`  ${t(menu, 'welcomeLogin')} ${t(menu, 'welcomeGuide')}`);
+  }
+  try {
+    mkdirSync(cfg.dataDir, { recursive: true, mode: 0o700 });
+    writePrivateFileAtomic(flag, '{"welcomed":true}\n');
+  } catch {
+    // Nothing is recorded: the welcome shows again on the next first-run start.
+  }
+}
+
 /**
  * Interactive main menu. Resolves with the process exit code (0) when the user quits or the input
  * ends (Ctrl+C / Ctrl+D). Every action runs a normal CLI command that takes and releases its own
@@ -1086,15 +1228,25 @@ async function showAccounts(menu: Menu): Promise<void> {
  */
 export async function runMenu(host: MenuHost): Promise<number> {
   const lang = resolveLang({ flag: host.langFlag, env: host.env, stored: host.readLanguage?.() });
-  const ui = createUi(host.io.output as typeof host.io.output & UiStream, host.env);
+  // The theme comes from --theme, then the config, then auto; a broken config only means the default.
+  let cfg: Config | undefined;
+  try {
+    cfg = host.loadConfig();
+  } catch {
+    // The banner's accounts strip and the welcome are the only users; both just stay absent.
+  }
+  const themeMode: ThemeMode = host.themeFlag ?? cfg?.theme ?? 'auto';
   const menu: Menu = {
     host,
     // Every line goes through wrap(): the plain tier wraps at the window like the rich one (r3 §3.6 item 1).
-    say: (text = '') => void host.io.output.write(`${wrap(text, ui.columns - 1).join('\n')}\n`),
+    say: (text = '') => void host.io.output.write(`${wrap(text, menu.ui.columns - 1).join('\n')}\n`),
     lang,
     last: {},
-    ui,
+    ui: createUi(host.io.output as typeof host.io.output & UiStream, host.env, resolveTheme(themeMode, host.env)),
+    themeMode,
+    themeOverride: host.themeFlag !== undefined,
   };
+  maybeWelcome(menu, cfg);
   try {
     for (;;) {
       const choice = await readChoice(menu);
@@ -1112,10 +1264,10 @@ export async function runMenu(host: MenuHost): Promise<number> {
           await viewReport(menu);
           break;
         case '5':
-          await showDoctor(menu);
+          await showGuide(menu);
           break;
         case '6':
-          await showGuide(menu);
+          await showSettings(menu);
           break;
         case 'l':
         case 'L':

@@ -84,14 +84,14 @@ async function run(args: string[], deps: Partial<CliDeps> = {}, banned = false):
 }
 
 describe('check output when it is not a terminal (compatibility)', () => {
-  it('is exactly what it was: no ANSI, no progress lines, no box, summary text unchanged', async () => {
+  it('is plain output as before: no ANSI, no progress lines, no box, aligned summary text', async () => {
     await run(['check', csv, '--out', out]);
     const everything = [...logs, ...printed].join('\n');
     expect(everything).not.toContain(ESC);
     expect(logs.some((line) => line.startsWith('progress '))).toBe(false);
     expect(logs.some((line) => line.includes('Report saved to'))).toBe(false);
     expect(logs).toContain(`Report written to ${out}`);
-    expect(printed.join('\n')).toContain('app       yes  not_found  unknown  skipped  invalid');
+    expect(printed.join('\n')).toContain('app           yes  not_found  unknown  skipped  invalid');
     expect(screen).toEqual([]);
   });
 
@@ -161,8 +161,8 @@ describe('check on a rich terminal', () => {
     expect(text).toContain(`${ESC}[31m`);
     // Same layout as the plain table once the colours are removed.
     const plain = stripAnsi(text).split('\n');
-    expect(plain).toContain('app       yes  not_found  unknown  skipped  invalid');
-    expect(plain.find((line) => line.startsWith('telegram'))).toBe('telegram    1          1        0        0        1');
+    expect(plain).toContain('app           yes  not_found  unknown  skipped  invalid');
+    expect(plain.find((line) => line.startsWith('telegram'))).toBe('telegram  1 (33%)    1 (33%)   0 (0%)   0 (0%)  1 (33%)');
   });
 
   it('closes with the "Report saved to" box, translated, with the next steps', async () => {
@@ -194,6 +194,43 @@ describe('check on a rich terminal', () => {
     for (const line of logs.slice(boxStart)) {
       for (const part of stripAnsi(line).split('\n')) expect([...part].length).toBeLessThanOrEqual(49);
     }
+  });
+});
+
+describe('the --theme flag and the theme config key', () => {
+  it('accepts every theme value and the run still completes with its summary and box', async () => {
+    // Command output uses the semantic tones (ok/warn/error), not the accent — the accent itself is
+    // exercised per-theme in ui.test.ts and reaches the banner once the menu's Ui is themed (phase 4).
+    for (const theme of ['auto', 'dark', 'light', 'high-contrast']) {
+      await run(['check', csv, '--out', out, '--force', '--theme', theme], { display: display(), printDisplay: display(), env: RICH_ENV });
+      expect(logs.some((line) => stripAnsi(line).startsWith('╭─')), theme).toBe(true);
+      expect(logs, theme).toContain(`Report written to ${out}`);
+      logs.length = 0;
+      printed.length = 0;
+      screen.length = 0;
+    }
+  });
+
+  it('accepts the theme config key and keeps COLORFGBG-driven runs working', async () => {
+    writeFileSync(config, JSON.stringify({ ...JSON.parse(readFileSync(config, 'utf8')), theme: 'light' }));
+    await run(['check', csv, '--out', out], { display: display(), printDisplay: display(), env: { ...RICH_ENV, COLORFGBG: '0;15' } });
+    expect(logs.some((line) => stripAnsi(line).startsWith('╭─'))).toBe(true);
+    expect(logs).toContain(`Report written to ${out}`);
+  });
+
+  it('--plain wins over every theme: no ANSI anywhere', async () => {
+    await run(['check', csv, '--out', out, '--theme', 'high-contrast', '--plain'], { display: display(), printDisplay: display(), env: RICH_ENV });
+    expect([...logs, ...printed].join('\n')).not.toContain(ESC);
+  });
+
+  it('rejects an unknown theme the same way every bad option is rejected', async () => {
+    const program = createProgram({ env: RICH_ENV, exit: () => {} });
+    program.exitOverride();
+    program.configureOutput({ writeOut: () => {}, writeErr: () => {} });
+    await expect(program.parseAsync(['--config', config, '--theme', 'neon', 'check', csv, '--out', out], { from: 'user' })).rejects.toMatchObject({
+      code: 'commander.invalidArgument',
+    });
+    expect(program.helpInformation()).toContain('--theme <mode>');
   });
 });
 

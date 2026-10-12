@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CURRENT_CONFIG_VERSION, loadConfig } from '../src/config.ts';
-import { parseTelegramApiHash, parseTelegramApiId, saveTelegramCredentials } from '../src/config-write.ts';
+import { parseTelegramApiHash, parseTelegramApiId, saveTelegramCredentials, saveTheme } from '../src/config-write.ts';
 import { readTelegramCredentials } from '../src/adapters/telegram-credentials.ts';
 
 const HASH = '0123456789abcdef0123456789abcdef';
@@ -38,6 +38,7 @@ describe('saveTelegramCredentials', () => {
     expect(written).toEqual({
       configVersion: CURRENT_CONFIG_VERSION,
       defaultRegion: 'SG',
+      theme: 'auto',
       apps: { zalo: { enabled: false }, telegram: { dailyCap: 7, options: { apiId: 1234567, apiHash: HASH, other: 'kept' } } },
     });
     expect(statSync(file).mode & 0o777).toBe(0o600);
@@ -52,12 +53,14 @@ describe('saveTelegramCredentials', () => {
     saveTelegramCredentials(file, 42, HASH);
     expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({
       configVersion: CURRENT_CONFIG_VERSION,
+      theme: 'auto',
       apps: { telegram: { options: { apiId: 42, apiHash: HASH } } },
     });
     writeFileSync(file, `\uFEFF${JSON.stringify({ maxAgeDays: 3 })}`);
     saveTelegramCredentials(file, 43, HASH);
     expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({
       configVersion: CURRENT_CONFIG_VERSION,
+      theme: 'auto',
       maxAgeDays: 3,
       apps: { telegram: { options: { apiId: 43, apiHash: HASH } } },
     });
@@ -106,5 +109,37 @@ describe('saveTelegramCredentials', () => {
     mkdirSync(join(dir, 'sub'));
     expect(() => saveTelegramCredentials(join(dir, 'missing', 'c.json'), 1, HASH)).toThrow();
     expect(readdirSync(join(dir, 'sub'))).toEqual([]);
+  });
+});
+
+describe('saveTheme', () => {
+  it('writes the theme, keeps every other setting, and the file stays owner-only', () => {
+    writeFileSync(file, JSON.stringify({ defaultRegion: 'SG', apps: { zalo: { enabled: false } } }));
+    saveTheme(file, 'light');
+    const written = JSON.parse(readFileSync(file, 'utf8'));
+    expect(written).toEqual({ configVersion: CURRENT_CONFIG_VERSION, defaultRegion: 'SG', theme: 'light', apps: { zalo: { enabled: false } } });
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    expect(loadConfig(file).theme).toBe('light');
+    expect(readdirSync(dir)).toEqual(['checker.config.json']);
+  });
+
+  it('creates the file when it is missing', () => {
+    saveTheme(file, 'dark');
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ configVersion: CURRENT_CONFIG_VERSION, theme: 'dark' });
+  });
+
+  it.each([['bad JSON', '{ "theme"'], ['not an object', '[1]']])('refuses %s without touching it', (_name, text) => {
+    writeFileSync(file, text);
+    expect(() => saveTheme(file, 'dark')).toThrow();
+    expect(readFileSync(file, 'utf8')).toBe(text);
+  });
+
+  it('refuses a value outside the theme modes and a file written by a newer version', () => {
+    saveTheme(file, 'auto');
+    expect(() => saveTheme(file, 'neon' as never)).toThrow(/theme must be one of/);
+    writeFileSync(file, JSON.stringify({ configVersion: CURRENT_CONFIG_VERSION + 1 }));
+    const before = readFileSync(file, 'utf8');
+    expect(() => saveTheme(file, 'dark')).toThrow(/needs a newer version/);
+    expect(readFileSync(file, 'utf8')).toBe(before);
   });
 });

@@ -70,7 +70,7 @@ function makeConfig(pacing: Partial<PacingSettings> = {}): Config {
       pacing,
     );
   }
-  return { defaultRegion: 'VN', dataDir: '/unused', maxAgeDays: 30, apps };
+  return { defaultRegion: 'VN', dataDir: '/unused', maxAgeDays: 30, theme: 'auto', apps };
 }
 
 const allYes: Handler = (_account, batch) => new Map(batch.map((n) => [n.e164, 'yes' as const]));

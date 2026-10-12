@@ -146,7 +146,7 @@ function sentLines(path: string): string[] {
 
 /** Everything the data directory may legitimately contain once no process is running. */
 function strayFiles(ws: Workspace): string[] {
-  return readdirSync(ws.dataDir).filter((name) => !['checker.db', 'checker.db-wal', 'checker.db-shm', 'sessions'].includes(name));
+  return readdirSync(ws.dataDir).filter((name) => !['checker.db', 'checker.db-wal', 'checker.db-shm', 'sessions', 'runs.json'].includes(name));
 }
 
 function expectedRows(ws: Workspace): string[] {

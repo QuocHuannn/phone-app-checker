@@ -1,8 +1,9 @@
 {
-  "configVersion": 2,
+  "configVersion": 3,
   "defaultRegion": "VN",
   "dataDir": "./data",
   "maxAgeDays": 30,
+  "theme": "auto",
   "apps": {
     "telegram": {
       "enabled": true,

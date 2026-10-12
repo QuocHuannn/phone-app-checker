@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { migrateConfigObject } from './config.ts';
 import { writePrivateFileAtomic } from './private-file.ts';
+import { THEME_MODES, type ThemeMode } from './ui.ts';
 
 /** Telegram `api_id`: digits only, a positive number that is still exact as a JSON number. */
 export function parseTelegramApiId(text: string): number | undefined {
@@ -21,12 +22,11 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Store the Telegram API credentials in the config file at `file` (created when missing): every other
- * setting is kept, the file is replaced atomically with mode 0600. Messages never quote the file or the
- * credentials. Throws when the existing file is not a JSON object with object-valued `apps.telegram`.
+ * Read the config file at `file` into a plain object (an empty one when the file is missing),
+ * upgraded to the current format version. Throws when the file exists but is not valid JSON,
+ * not an object, or newer than this program: every writer refuses to touch it in that state.
  */
-export function saveTelegramCredentials(file: string, apiId: number, apiHash: string): void {
-  let root: Record<string, unknown> = {};
+function readConfigRoot(file: string): Record<string, unknown> {
   let text: string | undefined;
   try {
     text = readFileSync(file, 'utf8');
@@ -35,22 +35,28 @@ export function saveTelegramCredentials(file: string, apiId: number, apiHash: st
       throw new Error(`cannot read the config file (${(error as NodeJS.ErrnoException).code ?? 'read error'})`);
     }
   }
-  if (text !== undefined) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text.replace(/^\uFEFF/, ''));
-    } catch {
-      throw new Error('the config file is not valid JSON; fix it first');
-    }
-    if (!isObject(parsed)) throw new Error('the config file must contain a JSON object');
-    try {
-      root = migrateConfigObject(parsed);
-    } catch (error) {
-      throw new Error(`${(error as Error).message}; not writing`);
-    }
-  } else {
-    root = migrateConfigObject(root);
+  if (text === undefined) return migrateConfigObject({});
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text.replace(/^\uFEFF/, ''));
+  } catch {
+    throw new Error('the config file is not valid JSON; fix it first');
   }
+  if (!isObject(parsed)) throw new Error('the config file must contain a JSON object');
+  try {
+    return migrateConfigObject(parsed);
+  } catch (error) {
+    throw new Error(`${(error as Error).message}; not writing`);
+  }
+}
+
+/**
+ * Store the Telegram API credentials in the config file at `file` (created when missing): every other
+ * setting is kept, the file is replaced atomically with mode 0600. Messages never quote the file or the
+ * credentials. Throws when the existing file is not a JSON object with object-valued `apps.telegram`.
+ */
+export function saveTelegramCredentials(file: string, apiId: number, apiHash: string): void {
+  const root = readConfigRoot(file);
   const apps = root.apps ?? {};
   if (!isObject(apps)) throw new Error('"apps" in the config file must be an object');
   const telegram = apps.telegram ?? {};
@@ -59,5 +65,16 @@ export function saveTelegramCredentials(file: string, apiId: number, apiHash: st
   if (!isObject(options)) throw new Error('"apps.telegram.options" in the config file must be an object');
 
   root.apps = { ...apps, telegram: { ...telegram, options: { ...options, apiId, apiHash } } };
+  writePrivateFileAtomic(file, `${JSON.stringify(root, null, 2)}\n`);
+}
+
+/**
+ * Store the menu's theme preference in the config file at `file` (created when missing): every other
+ * setting is kept, the file is replaced atomically with mode 0600. Throws on any read/write failure.
+ */
+export function saveTheme(file: string, theme: ThemeMode): void {
+  if (!THEME_MODES.includes(theme)) throw new Error(`theme must be one of ${THEME_MODES.join(', ')}`);
+  const root = readConfigRoot(file);
+  root.theme = theme;
   writePrivateFileAtomic(file, `${JSON.stringify(root, null, 2)}\n`);
 }

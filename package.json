@@ -1,6 +1,6 @@
 {
   "name": "phone-app-checker",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Check which messaging apps (Telegram, WhatsApp, Zalo, Viber, LINE) a list of consenting people's phone numbers is registered on and export a CSV report.",
   "license": "GPL-3.0-or-later",

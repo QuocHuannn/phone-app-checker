@@ -8,6 +8,7 @@ import {
   truncate,
   truncatePath,
   type DrawStream,
+  type Paint,
   type Ui,
 } from './ui.ts';
 
@@ -93,9 +94,9 @@ const padW = (text: string, width: number): string => {
  * Progress of a `check` run.
  *
  * `bar` mode draws a multi-line dashboard on a rich terminal and redraws it at most once a second:
- * a title rule, elapsed/rate/ETA, one row per account (state word + icon, done/target, per-status
- * counts, last batch latency, cooldown countdown in local time) or per app when the window is short,
- * a totals bar, running status counts and the stop hint. There is no spinner; the clock and the
+ * a title rule, elapsed/rate/ETA, a labelled table with one row per account (state word + icon
+ * colour-coded by state, done/target, per-status counts, last batch latency, cooldown countdown in
+ * local time) or per app when the window is short, a state legend, a totals bar with the percentage,
  * countdown carry the activity. `wrapLog` erases the frame, prints and redraws it so log lines never
  * collide with it.
  *
@@ -161,6 +162,7 @@ export class ProgressRenderer {
       at - this.lastLineAt >= (this.options.lineIntervalMs ?? 10_000)
     ) {
       this.lastLineAt = at;
+      if (!this.lineWritten) for (const line of this.preamble()) this.options.line(line);
       this.lineWritten = true;
       this.options.line(this.lineText(snapshot));
     }
@@ -289,34 +291,80 @@ export class ProgressRenderer {
     return `${pad2(at.getHours())}:${pad2(at.getMinutes())} ${text}`;
   }
 
+  /**
+   * What the `lines`/`plain` tiers write once before the first progress line: the dashboard's column
+   * header and the state-icon legend, both plain (no colour, no cursor movement), so the tiers carry
+   * the same facts the framed dashboard shows.
+   */
+  private preamble(): string[] {
+    const labels = [this.tr('dashColApp'), this.tr('dashColAccount'), this.tr('dashColState'), this.tr('dashColDone'), this.tr('dashColStatus'), this.tr('dashColLast')];
+    return [labels.join(' · '), this.legendLine(false)];
+  }
+
   // ---- dashboard frame ---------------------------------------------------
 
-  /** The state cell of one account row: icon + word; a countdown in local time while it rests. */
+  /** The state cell of one account row: icon + word coloured by state; a countdown in local time while it rests. */
   private stateCell(row: AccountProgress): string {
     const { icons } = this.options.ui;
+    const paint = this.statePaint(row.state);
     const t = this.now();
     const until = row.waitingUntil;
     if ((row.state === 'cooldown' || row.state === 'waiting') && until !== undefined) {
       const left = Math.max(0, until - t);
-      return `${icons.waiting} ${this.tr('dashResting', { clock: formatLocalTime(until, t), left: formatDuration(left) })}`;
+      return paint(`${icons.waiting} ${this.tr('dashResting', { clock: formatLocalTime(until, t), left: formatDuration(left) })}`);
     }
     switch (row.state) {
       case 'working':
-        return `${icons.working} ${this.tr('dashWorking')}`;
+        return paint(`${icons.working} ${this.tr('dashWorking')}`);
       case 'waiting':
-        return `${icons.waiting} ${this.tr('dashWaiting')}`;
+        return paint(`${icons.empty} ${this.tr('dashWaiting')}`);
       case 'cooldown':
-        return `${icons.waiting} ${this.tr('dashResting', { clock: formatLocalTime(row.waitingUntil ?? t, t), left: formatDuration(Math.max(0, (row.waitingUntil ?? t) - t)) })}`;
+        return paint(`${icons.waiting} ${this.tr('dashResting', { clock: formatLocalTime(row.waitingUntil ?? t, t), left: formatDuration(Math.max(0, (row.waitingUntil ?? t) - t)) })}`);
       case 'disabled':
-        return `${icons.fail} ${this.tr('dashDisabled')}`;
+        return paint(`${icons.fail} ${this.tr('dashDisabled')}`);
       case 'done':
-        return `${icons.ready} ${this.tr('dashDone')}`;
+        return paint(`${icons.ready} ${this.tr('dashDone')}`);
+    }
+  }
+
+  /** The colour one account state is drawn in: green while it works or is done, yellow on cooldown, red when dropped, dim when idle. */
+  private statePaint(state: AccountProgress['state']): Paint {
+    const { ui } = this.options;
+    switch (state) {
+      case 'working':
+        return ui.green;
+      case 'cooldown':
+        return ui.yellow;
+      case 'disabled':
+        return ui.red;
+      case 'done':
+        return (text) => ui.green(ui.bold(text));
+      default:
+        return ui.dim;
     }
   }
 
   /** `12y 3nf 0u` for one account's per-status counts. */
   private statusCell(row: AccountProgress): string {
     return this.tr('dashStatusCounts', { yes: row.counts.yes, notFound: row.counts.not_found, unknown: row.counts.unknown });
+  }
+
+  /**
+   * One line naming every state icon as the rows use it: `● working  ○ waiting  ◷ cooldown  ✕ disabled  ✔ done`.
+   * `colored` paints each entry the same colour its rows get; the `lines`/`plain` tiers pass false.
+   * `cooldown` has no catalog word (the rows show `dashResting`), so it travels as the untranslated
+   * reason token used elsewhere (`cooldown:` in run summaries); the other four use the state keys.
+   */
+  private legendLine(colored: boolean): string {
+    const { icons } = this.options.ui;
+    const entries: [Paint, string][] = [
+      [this.statePaint('working'), `${icons.working} ${this.tr('dashWorking')}`],
+      [this.statePaint('waiting'), `${icons.empty} ${this.tr('dashWaiting')}`],
+      [this.statePaint('cooldown'), `${icons.waiting} cooldown`],
+      [this.statePaint('disabled'), `${icons.fail} ${this.tr('dashDisabled')}`],
+      [this.statePaint('done'), `${icons.ready} ${this.tr('dashDone')}`],
+    ];
+    return entries.map(([paint, entry]) => (colored ? paint(entry) : entry)).join('  ');
   }
 
   /**
@@ -354,15 +402,18 @@ export class ProgressRenderer {
         const working = (event?.accounts ?? []).some((a) => a.state === 'working');
         const resting = (event?.accounts ?? []).filter((a) => a.state === 'cooldown' || (a.state === 'waiting' && a.waitingUntil !== undefined));
         const soonest = resting.reduce<number | undefined>((min, a) => (min === undefined || (a.waitingUntil ?? 0) < min ? a.waitingUntil : min), undefined);
+        // Pacing waits stay dim; only a real cooldown turns the aggregate yellow.
+        const onCooldown = resting.some((a) => a.state === 'cooldown');
         let state: string;
-        if (working) state = `${ui.icons.working} ${this.tr('dashWorking')}`;
-        else if (soonest !== undefined)
-          state = `${ui.icons.waiting} ${this.tr('dashResting', {
+        if (working) state = ui.green(`${ui.icons.working} ${this.tr('dashWorking')}`);
+        else if (soonest !== undefined) {
+          const cell = `${ui.icons.waiting} ${this.tr('dashResting', {
             clock: formatLocalTime(soonest, t),
             left: formatDuration(Math.max(0, soonest - t)),
           })}`;
-        else if (entry.done >= entry.needed) state = `${ui.icons.ready} ${this.tr('dashDone')}`;
-        else state = `${ui.icons.waiting} ${this.tr('dashWaiting')}`;
+          state = (onCooldown ? ui.yellow : ui.dim)(cell);
+        } else if (entry.done >= entry.needed) state = ui.green(ui.bold(`${ui.icons.ready} ${this.tr('dashDone')}`));
+        else state = ui.dim(`${ui.icons.empty} ${this.tr('dashWaiting')}`);
         const status = detailed
           ? this.tr('dashStatusCounts', {
               yes: sumCounts(event, 'yes'),
@@ -380,7 +431,7 @@ export class ProgressRenderer {
           rows.push([
             entry.app,
             '—',
-            `${ui.icons.waiting} ${this.tr('dashWaiting')}`,
+            ui.dim(`${ui.icons.empty} ${this.tr('dashWaiting')}`),
             `${entry.done}/${entry.needed}`,
             detailed ? this.tr('dashStatusCounts', { yes: 0, notFound: 0, unknown: 0 }) : '',
             '',
@@ -402,6 +453,7 @@ export class ProgressRenderer {
     const cols = labels.map((label, i) => Math.max(displayWidth(label), ...rows.map((cells) => displayWidth(cells[i]!))));
     lines.push(ui.dim(this.tableRow(labels.slice(0, shown), cols, width)));
     for (const cells of rows) lines.push(this.tableRow(cells.slice(0, shown), cols, width));
+    lines.push(truncate(this.legendLine(true), width, ui.icons.ellipsis));
 
     lines.push('');
     lines.push(this.totalsLine(snapshot, width));

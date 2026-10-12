@@ -7,6 +7,7 @@ import {
   formatDuration,
   isRich,
   PLAIN_UI,
+  resolveTheme,
   Spinner,
   stripAnsi,
   strip,
@@ -21,6 +22,59 @@ const RICH_ENV = { TERM: 'xterm-256color' };
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('resolveTheme / accent', () => {
+  it('auto reads the last COLORFGBG segment: a bright background means light, anything else dark', () => {
+    expect(resolveTheme('auto', { COLORFGBG: '7;0' })).toBe('dark');
+    expect(resolveTheme('auto', { COLORFGBG: '0;15' })).toBe('light');
+    expect(resolveTheme('auto', { COLORFGBG: '12;8;15' })).toBe('light');
+    expect(resolveTheme('auto', { COLORFGBG: ' 9 ' })).toBe('light');
+    for (const value of [undefined, '', 'junk', '7;', ';', '7;-1', '0;15junk', '1;2;']) {
+      expect(resolveTheme('auto', { COLORFGBG: value }), JSON.stringify(value)).toBe('dark');
+    }
+    expect(resolveTheme('auto', {})).toBe('dark');
+  });
+
+  it('explicit modes pass through untouched', () => {
+    for (const mode of ['dark', 'light', 'high-contrast'] as const) {
+      expect(resolveTheme(mode, { COLORFGBG: '0;15' })).toBe(mode);
+      expect(resolveTheme(mode, {})).toBe(mode);
+    }
+  });
+
+  it('the accent follows the resolved theme and the theme is visible on the Ui', () => {
+    const dark = createUi(TTY, RICH_ENV, 'dark');
+    const light = createUi(TTY, RICH_ENV, 'light');
+    const contrast = createUi(TTY, RICH_ENV, 'high-contrast');
+    expect(dark.theme).toBe('dark');
+    expect(light.theme).toBe('light');
+    expect(contrast.theme).toBe('high-contrast');
+    expect(dark.accent('x')).toBe(`${ESC}[36mx${ESC}[39m`);
+    expect(light.accent('x')).toBe(`${ESC}[34mx${ESC}[39m`);
+    expect(contrast.accent('x')).toBe(`${ESC}[7m${ESC}[1mx${ESC}[22m${ESC}[27m`);
+    expect(createUi(TTY, RICH_ENV).accent('x')).toBe(`${ESC}[36mx${ESC}[39m`); // 'dark' stays the default
+    // Semantic tones are not the accent: a warn frame stays yellow on the light theme.
+    expect(box(light, 't', ['line'], 'warn').join('\n')).toContain(`${ESC}[33m`);
+  });
+
+  it('info box frames (banner, report box) pick up the accent colour', () => {
+    const frame = (theme: 'dark' | 'light' | 'high-contrast') => box(createUi(TTY, RICH_ENV, theme), 'Title', ['body'])[0] ?? '';
+    expect(frame('dark')).toContain(`${ESC}[36m`);
+    expect(frame('light')).toContain(`${ESC}[34m`);
+    expect(frame('high-contrast')).toContain(`${ESC}[7m`);
+    expect(stripAnsi(frame('light'))).toBe(stripAnsi(frame('dark')));
+  });
+
+  it('the plain tier ignores the theme: identity paints, ASCII icons', () => {
+    for (const theme of ['dark', 'light', 'high-contrast'] as const) {
+      const ui = createUi({}, {}, theme);
+      for (const paint of [ui.accent, ui.bold, ui.inverse, ui.cyan]) expect(paint('t'), theme).toBe('t');
+    }
+    expect(PLAIN_UI.theme).toBe('dark');
+    expect(PLAIN_UI.accent).toBe(PLAIN_UI.bold);
+    expect(box(PLAIN_UI, 't', ['l']).join('\n')).not.toContain(ESC);
+  });
 });
 
 describe('isRich / createUi: when ANSI is allowed', () => {

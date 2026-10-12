@@ -93,6 +93,34 @@ export interface Ui {
   cyan: Paint;
   /** Reverse video: the current line of a selection list, legible on any theme. */
   inverse: Paint;
+  /** Highlight colour of the resolved theme (cyan on dark, blue on light, bold+inverse on high-contrast). */
+  accent: Paint;
+  /** The resolved theme this UI draws with; `auto` never reaches a `Ui`. */
+  readonly theme: ResolvedTheme;
+}
+
+/** A theme preference: the `theme` config key and the `--theme` flag take these values. */
+export type ThemeMode = 'auto' | 'dark' | 'light' | 'high-contrast';
+
+/** Every accepted value of `theme` / `--theme`, in the order help and validation list them. */
+export const THEME_MODES: readonly ThemeMode[] = ['auto', 'dark', 'light', 'high-contrast'];
+
+/** The theme a `Ui` actually draws with; `auto` is resolved away before a `Ui` exists. */
+export type ResolvedTheme = 'dark' | 'light' | 'high-contrast';
+
+/**
+ * Resolve a theme preference. `auto` reads `COLORFGBG` (`fg;bg`, e.g. `7;0` on a dark terminal):
+ * the last number is the background colour, and the dark standard colours (0–8) mean a dark
+ * theme while the bright ones (9–15) mean a light theme. Unset, empty or unreadable values fall
+ * back to `dark`. The plain tier never sees the result.
+ */
+export function resolveTheme(mode: ThemeMode, env: NodeJS.ProcessEnv): ResolvedTheme {
+  if (mode !== 'auto') return mode;
+  const raw = env.COLORFGBG;
+  if (raw === undefined) return 'dark';
+  const segment = raw.trim().split(';').at(-1)?.trim() ?? '';
+  const bg = /^\d+$/.test(segment) ? Number.parseInt(segment, 10) : NaN;
+  return bg > 8 ? 'light' : 'dark';
 }
 
 const DEFAULT_COLUMNS = 80;
@@ -129,12 +157,17 @@ export function isRich(stream: UiStream, env: NodeJS.ProcessEnv): boolean {
 }
 
 /** A `Ui` for one stream; width and height are read from the stream each time they are asked for. */
-export function createUi(stream: UiStream, env: NodeJS.ProcessEnv): Ui {
+export function createUi(stream: UiStream, env: NodeJS.ProcessEnv, theme: ResolvedTheme = 'dark'): Ui {
   const rich = isRich(stream, env);
   const style = (open: number, close: number): Paint =>
     rich ? (text) => `${ESC}[${open}m${text}${ESC}[${close}m` : (text) => text;
+  const bold = style(1, 22);
+  const inverse = style(7, 27);
+  // Plain tier: every paint is the identity, and accent is `bold` (also the identity there).
+  const accent: Paint = !rich ? bold : theme === 'high-contrast' ? (text) => inverse(bold(text)) : theme === 'light' ? style(34, 39) : style(36, 39);
   return {
     rich,
+    theme,
     get columns() {
       const columns = stream.columns;
       return typeof columns === 'number' && Number.isFinite(columns) && columns > 0 ? Math.max(MIN_COLUMNS, Math.floor(columns)) : DEFAULT_COLUMNS;
@@ -144,13 +177,14 @@ export function createUi(stream: UiStream, env: NodeJS.ProcessEnv): Ui {
       return typeof rows === 'number' && Number.isFinite(rows) && rows > 0 ? Math.floor(rows) : DEFAULT_ROWS;
     },
     icons: rich ? UNICODE_ICONS : ASCII_ICONS,
-    bold: style(1, 22),
+    bold,
     dim: style(2, 22),
     red: style(31, 39),
     green: style(32, 39),
     yellow: style(33, 39),
     cyan: style(36, 39),
-    inverse: style(7, 27),
+    inverse,
+    accent,
   };
 }
 
@@ -335,7 +369,7 @@ const BOX_MAX = 72;
  * (CJK, Hangul, emoji) can never push a border out of line. Lines are wrapped to the window; `tone` colours the frame.
  */
 export function box(ui: Ui, title: string, lines: readonly (string | BoxLine)[], tone: Tone = 'info'): string[] {
-  const frame: Paint = { info: ui.cyan, ok: ui.green, warn: ui.yellow, error: ui.red }[tone];
+  const frame: Paint = { info: ui.accent, ok: ui.green, warn: ui.yellow, error: ui.red }[tone];
   const total = Math.max(MIN_COLUMNS, Math.min(ui.columns - 1, BOX_MAX));
   const { icons } = ui;
   const heading = truncate(title, total - 6, icons.ellipsis);

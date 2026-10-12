@@ -355,11 +355,12 @@ main() {
   [ "$macho_count" -ge 4 ] || fail $id $label "inspected only $macho_count Mach-O files (expected node, better_sqlite3.node, sharp .node, libvips dylib)"
   pass $id "$label ($macho_count Mach-O files, all minos <= $MACOS_FLOOR; load commands only, not a run on macOS $MACOS_FLOOR)"
 
-  # --- V20 upgrade from a 0.1.0 home --------------------------------------------
+  # --- V20 upgrade from a 0.1.0 and a 0.2.0 home --------------------------------
   # Install again, then replace the fresh home with the committed 0.1.0 fixtures (a
   # config without configVersion, a seeded checker.db): the next commands must migrate
-  # both, keep a mode-600 backup, name it on stderr, and run offline.
-  id=V20 label=upgrade-from-0.1.0-home
+  # both, keep a mode-600 backup, name it on stderr, and run offline. A second pass
+  # seeds a configVersion-2 file (the 0.2.0 format) over the upgraded home.
+  id=V20 label=upgrade-from-0.1.0-and-0.2.0-home
   cr /bin/bash "$bundle/install.sh" >"$T/reinstall5.log" 2>&1 || fail $id $label "install.sh for the upgrade check exited non-zero" "$T/reinstall5.log"
   fixtures="$root/tests/fixtures/v0.1.0"
   [ -f "$fixtures/checker.config.json" ] && [ -f "$fixtures/seed-checker-db.mjs" ] || fail $id $label "0.1.0 fixtures missing under tests/fixtures/v0.1.0"
@@ -377,7 +378,7 @@ main() {
   [ -f "$backup" ] || fail $id $label "config backup $backup was not created" "$T/doctor-upgrade.err"
   [ "$(mode_of "$backup")" = "600" ] || fail $id $label "config backup mode is $(mode_of "$backup"), expected 600"
   grep -qF 'checker.config.json.v1.bak' "$T/doctor-upgrade.err" || fail $id $label "stderr did not name the backup file" "$T/doctor-upgrade.err"
-  [ "$(/usr/bin/plutil -extract configVersion raw -o - "$data_home/checker.config.json" 2>"$log")" = "2" ] || fail $id $label "configVersion is not 2 after the upgrade" "$log"
+  [ "$(/usr/bin/plutil -extract configVersion raw -o - "$data_home/checker.config.json" 2>"$log")" = "3" ] || fail $id $label "configVersion is not 3 after the upgrade" "$log"
   if awk '$1 == "FAIL" { bad = 1 } END { exit bad ? 0 : 1 }' "$T/doctor-upgrade.out"; then fail $id $label "doctor reports a FAIL row on the upgraded home" "$T/doctor-upgrade.out"; fi
   (cd "$T/work" && crp phone-app-checker report numbers.csv --apps telegram,zalo) >"$log" 2>&1 || fail $id $label "report on the upgraded home exited non-zero" "$log"
   [ -f "$T/work/report.csv" ] || fail $id $label "report.csv not written on the upgraded home" "$log"
@@ -389,6 +390,25 @@ main() {
   [ "$db_version" = "$db_want" ] && [ "$db_results $db_accounts" = "3 1" ] \
     || fail $id $label "unexpected database state after the upgrade: '$db_check' (expected 'schema schema 3 1': the bundle's own schema version with 3 results and 1 account kept)"
   [ ! -e "$data_home/checker.config.json.v1-2.bak" ] || fail $id $label "a second config load created another backup (migration is not idempotent)"
+  # The same V20 check from a 0.2.0 home: a configVersion-2 file upgrades to 3 with a
+  # `.v2.bak` backup and `theme: "auto"` added; the already-schema-3 database is not
+  # touched again but must still read correctly.
+  cp "$fixtures/checker.config.json" "$data_home/checker.config.json" || fail $id $label "cannot seed the 0.2.0 config"
+  chmod 600 "$data_home/checker.config.json"
+  cr /usr/bin/plutil -insert configVersion -integer 2 "$data_home/checker.config.json" >"$log" 2>&1 || fail $id $label "could not stamp configVersion 2 into the seeded config" "$log"
+  crp phone-app-checker doctor --deep >"$T/doctor-upgrade2.out" 2>"$T/doctor-upgrade2.err" || fail $id $label "doctor --deep on an upgraded 0.2.0 home exited non-zero" "$T/doctor-upgrade2.err"
+  backup2="$data_home/checker.config.json.v2.bak"
+  [ -f "$backup2" ] || fail $id $label "config backup $backup2 was not created" "$T/doctor-upgrade2.err"
+  [ "$(mode_of "$backup2")" = "600" ] || fail $id $label "0.2.0 config backup mode is $(mode_of "$backup2"), expected 600"
+  grep -qF 'checker.config.json.v2.bak' "$T/doctor-upgrade2.err" || fail $id $label "stderr did not name the .v2 backup file" "$T/doctor-upgrade2.err"
+  [ "$(/usr/bin/plutil -extract configVersion raw -o - "$data_home/checker.config.json" 2>"$log")" = "3" ] || fail $id $label "configVersion is not 3 after the 0.2.0 upgrade" "$log"
+  [ "$(/usr/bin/plutil -extract theme raw -o - "$data_home/checker.config.json" 2>"$log")" = "auto" ] || fail $id $label "theme was not added as \"auto\" by the 0.2.0 upgrade" "$log"
+  if awk '$1 == "FAIL" { bad = 1 } END { exit bad ? 0 : 1 }' "$T/doctor-upgrade2.out"; then fail $id $label "doctor reports a FAIL row on the upgraded 0.2.0 home" "$T/doctor-upgrade2.out"; fi
+  db_check="$(cr "$installed/runtime/bin/node" -e 'const { DatabaseSync } = require("node:sqlite"); const { Store } = require(process.argv[2] + "/src/store.js"); const fresh = new Store(":memory:"); const want = fresh.db.prepare("PRAGMA user_version").get().user_version; fresh.close(); const db = new DatabaseSync(process.argv[1]); const uv = db.prepare("PRAGMA user_version").get().user_version; const r = db.prepare("SELECT COUNT(*) AS n FROM results").get().n; const a = db.prepare("SELECT COUNT(*) AS n FROM accounts").get().n; db.close(); process.stdout.write(`${uv} ${want} ${r} ${a}`);' "$data_home/data/checker.db" "$installed/app" 2>"$log")" \
+    || fail $id $label "could not read checker.db after the 0.2.0 upgrade" "$log"
+  read -r db_version db_want db_results db_accounts <<<"$db_check"
+  [ "$db_version" = "$db_want" ] && [ "$db_results $db_accounts" = "3 1" ] \
+    || fail $id $label "unexpected database state after the 0.2.0 upgrade: '$db_check' (expected the bundle's schema with the 3 results and 1 account kept)"
   cr /bin/bash "$base/current/uninstall.sh" --purge-data --yes >"$T/purge4.log" 2>&1 || fail $id $label "uninstall.sh --purge-data --yes after the upgrade exited non-zero" "$T/purge4.log"
   [ ! -e "$data_home" ] || fail $id $label "$data_home still exists after the upgrade check"
   pass $id $label

@@ -14,8 +14,9 @@ import {
   loadConfig,
   type Config,
 } from './config.ts';
-import { saveTelegramCredentials } from './config-write.ts';
+import { saveTelegramCredentials, saveTheme as writeThemeToConfig } from './config-write.ts';
 import { formatDoctor, runDoctor } from './doctor.ts';
+import { openRunHistory } from './history.ts';
 import { bootstrapHome, ensureHomeDirectory, packageVersion } from './home.ts';
 import { LANG_ENV, resolveLang, translate, translator, type Lang, type Translator } from './i18n/index.ts';
 import { LANG_FILE, readLanguageFile, writeLanguageFile } from './i18n/store.ts';
@@ -26,7 +27,7 @@ import { openUrl, revealPath } from './open-url.ts';
 import { ProgressRenderer, type ProgressEvent } from './progress.ts';
 import type { PromptIo } from './prompt.ts';
 import { reportBox } from './screens.ts';
-import { createUi, PLAIN_ENV, PLAIN_UI, type DrawStream, type Ui, type UiStream } from './ui.ts';
+import { createUi, PLAIN_ENV, PLAIN_UI, resolveTheme, THEME_MODES, type DrawStream, type ResolvedTheme, type ThemeMode, type Ui, type UiStream } from './ui.ts';
 import {
   buildReport,
   checkReportTarget,
@@ -87,6 +88,7 @@ export interface CliDeps {
 interface GlobalOptions {
   config?: string;
   plain?: boolean;
+  theme?: ThemeMode;
 }
 
 interface ReportOptions {
@@ -210,10 +212,14 @@ export function createProgram(deps: CliDeps = {}): Command {
   const display = deps.display ?? (deps.log === undefined ? process.stderr : undefined);
   // Built lazily: --plain is parsed inside the action and must be honoured before the first draw.
   let uiCache: Ui | undefined;
-  const getUi = (): Ui => (uiCache ??= display === undefined ? PLAIN_UI : createUi(display, env));
+  const getUi = (cfg: Config): Ui => (uiCache ??= display === undefined ? PLAIN_UI : createUi(display, env, resolvedTheme(cfg)));
   let printUiCache: Ui | undefined;
-  const getPrintUi = (): Ui =>
-    (printUiCache ??= deps.printDisplay !== undefined ? createUi(deps.printDisplay, env) : deps.print === undefined ? createUi(process.stdout, env) : PLAIN_UI);
+  const getPrintUi = (cfg: Config): Ui =>
+    (printUiCache ??= deps.printDisplay !== undefined
+      ? createUi(deps.printDisplay, env, resolvedTheme(cfg))
+      : deps.print === undefined
+        ? createUi(process.stdout, env, resolvedTheme(cfg))
+        : PLAIN_UI);
 
   const program = new Command();
   program
@@ -222,6 +228,7 @@ export function createProgram(deps: CliDeps = {}): Command {
     .option('--config <path>', 'config file (default: ./checker.config.json, or $PHONE_APP_CHECKER_HOME/checker.config.json when set)')
     .version(packageVersion(), '-V, --version')
     .option('--plain', 'plain output tier: no colour, no cursor movement (also NO_COLOR, TERM=dumb or PHONE_APP_CHECKER_PLAIN)')
+    .addOption(new Option('--theme <mode>', 'theme: auto (detect the terminal background via COLORFGBG), dark, light or high-contrast').choices(THEME_MODES as string[]))
     // One error style for everything the command line says: commander's "error: ..." becomes "Error: ...".
     .configureOutput({ outputError: (message, write) => write(message.replace(/^error: /, 'Error: ')) })
     .addHelpText('after', `\nRun with no arguments in a terminal to open an interactive menu: no commands to remember. English by default; press L in the menu to switch language (saved), or set ${LANG_ENV}=<en|vi|id|ms|ko|zh>.`);
@@ -259,6 +266,9 @@ export function createProgram(deps: CliDeps = {}): Command {
     return loadConfig(program.opts<GlobalOptions>().config, home);
   };
 
+  /** --theme beats the config's theme, which defaults to `auto`; the resolved theme never re-reads the file. */
+  const resolvedTheme = (cfg: Config): ResolvedTheme => resolveTheme(program.opts<GlobalOptions>().theme ?? cfg.theme, env);
+
   /** A path from the command line or the customer's file system can hold ESC/CR/LF/bidi: print a bounded, control-stripped copy; file operations keep the original. */
   const shownPath = (path: string): string => terminalSafe(path, DISPLAY_PATH_MAX);
 
@@ -280,6 +290,7 @@ export function createProgram(deps: CliDeps = {}): Command {
   }
 
   function emitReport(
+    cfg: Config,
     store: Store,
     input: ParsedInput,
     apps: App[],
@@ -294,14 +305,14 @@ export function createProgram(deps: CliDeps = {}): Command {
     const rows = buildReport(store, input.entries, apps, freshness, stored);
     writeReport(out, rows, target);
     const tr = translator(loginLanguage(undefined));
-    print(formatSummary(summarize(rows), getPrintUi(), { apps, tr, ...extras }));
+    print(formatSummary(summarize(rows), getPrintUi(cfg), { apps, tr, ...extras }));
     log(tr('cliReportWritten', { path: shownPath(resolve(out)) }));
   }
 
   /** Tell the caller a report was written and, on a terminal, close with the "Report saved to ..." box. */
-  function announceReport(path: string, inconclusive: number): void {
+  function announceReport(cfg: Config, path: string, inconclusive: number): void {
     deps.onReport?.({ path, inconclusive });
-    const ui = getUi();
+    const ui = getUi(cfg);
     if (ui.rich && !deps.embedded) for (const line of reportBox(ui, loginLanguage(undefined), { path, inconclusive })) log(line);
   }
 
@@ -410,7 +421,7 @@ export function createProgram(deps: CliDeps = {}): Command {
       const { store, lock } = openLockedStore(cfg.dataDir);
       const abort = new AbortController();
       const numbers = input.entries.flatMap((entry) => (entry.phone ? [entry.phone] : []));
-      const ui = getUi();
+      const ui = getUi(cfg);
       const bar = options.progress === 'auto' && ui.rich && display !== undefined;
       const runLog = bar ? openRunLog(cfg.dataDir, csv, numbers.length) : undefined;
       const fileLine = (message: string): void => {
@@ -490,6 +501,7 @@ export function createProgram(deps: CliDeps = {}): Command {
         const run = describeRun(summaries, tr, now());
         for (const line of run.lines) say(line);
         emitReport(
+          cfg,
           store,
           input,
           apps,
@@ -502,9 +514,17 @@ export function createProgram(deps: CliDeps = {}): Command {
             accountsUsed: Object.fromEntries([...accountsUsed].map(([app, names]) => [app, [...names].sort()])),
           },
         );
+        openRunHistory(cfg.dataDir)?.add({
+          at: now(),
+          csv,
+          apps,
+          rows: input.entries.length,
+          report: resolve(options.out),
+          log: runLog?.path ?? '',
+        });
         // Exit code is unchanged (0 = the command produced its report); the banner is the warning.
         for (const line of run.banner) say(ui.bold(ui.red(line)));
-        announceReport(resolve(options.out), summaries.reduce((total, s) => total + s.inconclusive, 0));
+        announceReport(cfg, resolve(options.out), summaries.reduce((total, s) => total + s.inconclusive, 0));
         if (abort.signal.aborted) process.exitCode = 130;
       } finally {
         progress?.finish();
@@ -532,8 +552,8 @@ export function createProgram(deps: CliDeps = {}): Command {
       const maxAgeMs = (options.maxAge ?? cfg.maxAgeDays) * DAY_MS;
       const store = Store.open(cfg.dataDir);
       try {
-        emitReport(store, input, apps, options.out, target, { now: now(), maxAgeMs });
-        announceReport(resolve(options.out), 0);
+        emitReport(cfg, store, input, apps, options.out, target, { now: now(), maxAgeMs });
+        announceReport(cfg, resolve(options.out), 0);
         // The report is still written (its invalid rows show what went wrong), but an input without a
         // single valid number must not look like a successful report: same failure as `check`.
         if (validCount(input) === 0) {
@@ -665,7 +685,7 @@ async function execute(argv: string[], deps: CliDeps): Promise<{ code: number; e
  * `langFlag` is the value of `--lang`. In release mode the language choice lives in the app home; without one
  * (a source checkout) there is nowhere private to keep it, so a choice only lasts for the session.
  */
-function menuHost(io: PromptIo, deps: CliDeps, langFlag?: string): MenuHost {
+function menuHost(io: PromptIo, deps: CliDeps, flags: { langFlag?: string; themeFlag?: ThemeMode }): MenuHost {
   const env = deps.env ?? process.env;
   const home = env[HOME_ENV] || undefined;
   const lifecycle = deps.lifecycleDir ?? lifecycleDir(env.HOME || undefined);
@@ -677,7 +697,8 @@ function menuHost(io: PromptIo, deps: CliDeps, langFlag?: string): MenuHost {
     cwd: process.cwd(),
     homeDir: homedir(),
     env,
-    langFlag,
+    langFlag: flags.langFlag,
+    themeFlag: flags.themeFlag,
     loadConfig: () => {
       // Same exclusion as every command that reads the config or creates the app home (see `guarded`).
       const hold = acquireLifecycleShared(lifecycle);
@@ -714,6 +735,15 @@ function menuHost(io: PromptIo, deps: CliDeps, langFlag?: string): MenuHost {
               hold.release();
             }
           },
+          saveTheme: (theme: ThemeMode) => {
+            const hold = acquireLifecycleShared(lifecycle);
+            try {
+              ensureHomeDirectory(appHome);
+              writeThemeToConfig(configFilePath(undefined, home), theme);
+            } finally {
+              hold.release();
+            }
+          },
         }),
     openUrl: (url) => openUrl(url),
     revealPath: (path) => revealPath(path),
@@ -738,14 +768,37 @@ function menuHost(io: PromptIo, deps: CliDeps, langFlag?: string): MenuHost {
 
 /**
  * Arguments that still mean "open the menu": none at all, or only the hidden `--lang <code>` /
- * `--lang=<code>` (the language the menu starts in), possibly with `--plain`. `undefined` for any other command line.
+ * `--lang=<code>` (the language the menu starts in) and `--theme <mode>` / `--theme=<mode>`
+ * (the theme it draws with), possibly with `--plain`. `undefined` for any other command line —
+ * an unknown value then reaches commander's own error for the flag.
  */
-function menuArguments(args: string[]): { langFlag?: string } | undefined {
+function menuArguments(args: string[]): { langFlag?: string; themeFlag?: ThemeMode } | undefined {
+  const flags: { langFlag?: string; themeFlag?: ThemeMode } = {};
   const rest = args.filter((arg) => arg !== '--plain');
-  if (rest.length === 0) return {};
-  if (rest.length === 2 && rest[0] === '--lang' && rest[1] !== undefined) return { langFlag: rest[1] };
-  if (rest.length === 1 && rest[0]?.startsWith('--lang=')) return { langFlag: rest[0].slice('--lang='.length) };
-  return undefined;
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index] as string;
+    if (arg === '--lang') {
+      const value = rest[index + 1];
+      if (value === undefined || value.startsWith('--')) return undefined;
+      flags.langFlag = value;
+      index += 1;
+    } else if (arg.startsWith('--lang=')) {
+      flags.langFlag = arg.slice('--lang='.length);
+    } else if (arg === '--theme') {
+      const value = rest[index + 1];
+      if (value === undefined || value.startsWith('--')) return undefined;
+      if (!(THEME_MODES as readonly string[]).includes(value)) return undefined;
+      flags.themeFlag = value as ThemeMode;
+      index += 1;
+    } else if (arg.startsWith('--theme=')) {
+      const value = arg.slice('--theme='.length);
+      if (!(THEME_MODES as readonly string[]).includes(value)) return undefined;
+      flags.themeFlag = value as ThemeMode;
+    } else {
+      return undefined;
+    }
+  }
+  return flags;
 }
 
 /** Run the CLI; resolves with the process exit code. No arguments (or only `--lang <code>`) on a terminal opens the menu. */
@@ -754,7 +807,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
   const env = deps.env ?? process.env;
   if (argv.slice(2).includes('--plain')) env[PLAIN_ENV] = '1';
   const menuArgs = menuArguments(argv.slice(2));
-  if (menuArgs !== undefined && isInteractive(terminal)) return runMenu(menuHost(terminal, deps, menuArgs.langFlag));
+  if (menuArgs !== undefined && isInteractive(terminal)) return runMenu(menuHost(terminal, deps, menuArgs));
   const result = await execute(argv, deps);
   if (result.error !== undefined) console.error(`Error: ${result.error}`);
   return result.code;

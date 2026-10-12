@@ -34,7 +34,7 @@ function configOf(prng: Prng): Config {
       errorCooldownMs: prng.range(1, 5) * 1000,
     });
   }
-  return { defaultRegion: 'VN', dataDir: '/unused', maxAgeDays: 30, apps };
+  return { defaultRegion: 'VN', dataDir: '/unused', maxAgeDays: 30, theme: 'auto', apps };
 }
 
 describe('INCOMPLETE is shown iff work stays inconclusive (independent oracle over the store)', () => {

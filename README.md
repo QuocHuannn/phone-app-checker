@@ -47,7 +47,7 @@ phone-app-checker reads a CSV of phone numbers, normalises them to E.164, and as
 | **Threema** | The official [Threema Gateway](https://gateway.threema.ch) `lookup/phone_hash` call, over plain HTTPS: no unofficial client, no new dependency. Needs a Threema Gateway ID and API secret (Gateway is a paid service; whether lookups use credits is not verified). | Finds only people who **linked a phone number** to their Threema ID, so `not_found` mostly means "not linked". The hash key is public: the number is effectively disclosed to Threema. Disabled by default. Default cap 100/day. | Tests against stubbed HTTP responses only; **not verified live** |
 | **Matrix** | The Matrix [identity-service](https://spec.matrix.org/v1.19/identity-service-api/) 3PID lookup (salted SHA-256 of the number), over plain HTTPS: no `matrix-js-sdk`, no new dependency. Needs a Matrix account to obtain an identity-server token. | Finds only people who **linked their phone number to an identity server**, which many servers no longer keep; current coverage is unknown. The number's hash goes to the identity server. Disabled by default. Default cap 100/day. | Tests against stubbed HTTP responses only; **not verified live** |
 
-Also: phone-column auto-detection (header names or content), delimiter and encoding sniffing (including Excel's UTF-16 export), de-duplication, result cache (`maxAgeDays`), several accounts per app with opt-in parallel accounts (`maxParallelAccounts`), resumable runs (Ctrl-C finishes the batch and writes the report), a live per-account run dashboard, masked phone numbers in logs, private file permissions, spreadsheet-formula neutralisation, an interactive menu in six languages with recent files and a CSV preview, versioned config with automatic migration, and an offline `doctor` self-check.
+Also: phone-column auto-detection (header names or content), delimiter and encoding sniffing (including Excel's UTF-16 export), de-duplication, result cache (`maxAgeDays`), several accounts per app with opt-in parallel accounts (`maxParallelAccounts`), resumable runs (Ctrl-C finishes the batch and writes the report), a live per-account run dashboard, masked phone numbers in logs, private file permissions, spreadsheet-formula neutralisation, an interactive menu in six languages with recent files, a CSV preview, run history and theme preferences, versioned config with automatic migration, and an offline `doctor` self-check.
 
 ## Quick start
 
@@ -57,14 +57,14 @@ Requires an Apple Silicon Mac, macOS 13.5 or newer. Download the archive and its
 
 ```sh
 cd ~/Downloads
-shasum -a 256 -c phone-app-checker-0.2.0-macos-arm64.tar.gz.sha256   # must print: ...tar.gz: OK
-tar -xzf phone-app-checker-0.2.0-macos-arm64.tar.gz
-bash phone-app-checker-0.2.0-macos-arm64/install.sh
+shasum -a 256 -c phone-app-checker-0.3.0-macos-arm64.tar.gz.sha256   # must print: ...tar.gz: OK
+tar -xzf phone-app-checker-0.3.0-macos-arm64.tar.gz
+bash phone-app-checker-0.3.0-macos-arm64/install.sh
 ```
 
 Open a **new** Terminal window and run `phone-app-checker`. The archive carries its own official Node.js runtime and precompiled JavaScript, installs under `~/Applications/phone-app-checker`, and keeps config, sessions and results in `~/Library/Application Support/phone-app-checker`. The archive is not signed or notarised; `install.sh` clears the download quarantine flag. Step-by-step guide for non-developers: [docs/install-macos.md](docs/install-macos.md) (Vietnamese: [docs/install-macos.vi.md](docs/install-macos.vi.md)). Uninstall: `~/Applications/phone-app-checker/current/uninstall.sh` (add `--purge-data` to delete data as well).
 
-**Upgrading from 0.1.0:** run the new `install.sh`; it keeps your config, sessions and results. The first 0.2.0 start upgrades `checker.config.json` and `checker.db` in place and keeps a mode-600 backup of the old config, `checker.config.json.v1.bak`. **0.1.0 cannot open the upgraded database**, so to go back restore that backup and the old version together; see [Configuration](#configuration) and the [CHANGELOG](CHANGELOG.md#020---2026-10-10).
+**Upgrading:** run the new `install.sh`; it keeps your config, sessions and results. From **0.2.0**, the first 0.3.0 start adds `"theme": "auto"` and bumps `configVersion` to 3 in `checker.config.json`, keeping `checker.config.json.v2.bak` (mode 600); the database is untouched and **0.2.0 cannot read the upgraded config** — restore the `.v2.bak` if you go back. From **0.1.0**, config and `checker.db` are both upgraded (backups `.v1.bak`, and **0.1.0 cannot open the upgraded database**). See [Configuration](#configuration) and the [CHANGELOG](CHANGELOG.md#030---2026-10-12).
 
 ### Option B: from source (Node.js >= 22.18)
 
@@ -92,7 +92,7 @@ Replace `npm run cli --` with `phone-app-checker` if you installed the macOS arc
 With no arguments in a terminal the tool opens a numbered, arrow-key menu (a plain numbered tier when colours or raw mode are unavailable). The sample below is the real output at 80 x 24 with two accounts logged in:
 
 ```text
-╭─ Phone App Checker 0.2.0 ─────────────────────────────────────────────
+╭─ Phone App Checker 0.3.0 ─────────────────────────────────────────────
 │ Accounts ready:
 │ ✔ telegram 1 account · ✔ whatsapp 1 account · ○ zalo none
 │ ○ viber none · ○ line none · ○ threema none · ○ matrix none
@@ -102,17 +102,21 @@ With no arguments in a terminal the tool opens a numbered, arrow-key menu (a pla
   2 Log in an app account
   3 View logged-in accounts
   4 Rebuild the latest report
-  5 Check this Mac is ready (doctor)
+  5 View run history
   6 Guide / warnings
+  7 Settings
   L Language / Ngôn ngữ / Bahasa / 언어 / 语言: English
   0 Quit
-↑↓ move · Enter select · q quit
+↑↓ move · Enter select · q quit · 1-7, L, 0
 ```
 
 - **One back key.** `b` goes back on every prompt (Esc and `q` do the same in lists); Enter takes the default shown in the prompt.
-- **Check a CSV file.** Drag the file from Finder into the window, or pick one of the **last 5 files** you used. The menu then shows a **preview** (detected phone column, row counts, usable and unusable numbers, countries) and asks you to confirm before anything runs. A checklist (Space ticks) chooses the apps. "Clear the list and stop remembering files" is in the file picker; the list is a private file (mode 600) in the app folder.
+- **Check a CSV file.** Drag the file from Finder into the window, or pick one of the **last 5 files** you used. The menu then shows a **preview** (detected phone column, row counts, usable and unusable numbers, countries) and asks you to confirm before anything runs. A checklist (Space ticks) chooses the apps. "Clear the list and stop remembering files" is offered in the picker (`c`) and under item 7 (Settings); the list is a private file (mode 600) in the data folder.
 - **QR login.** The menu checks the window size **before** it starts a QR login and tells you how many columns x rows the code needs, with a pairing-code alternative where the app has one.
 - **Accounts view.** `r` resets a cooling-down account, `l` goes to login.
+- **Run history.** Item 5 lists the last 20 runs, newest first; Enter re-shows that run's summary (re-read from its report file) and `o` reveals the report. When the report is gone the row says so and the run's log is offered instead. Runs are recorded in `runs.json` in the data folder (mode 600, written atomically).
+- **Settings.** Item 7 toggles the theme (`auto` / `dark` / `light` / `high-contrast`, saved to `checker.config.json`; session-only without an app home, e.g. a source checkout), changes the menu language, clears and stops the recent-files list, and shows the config and data paths.
+- **First run.** With no account logged in and no results database yet, a one-time welcome box points at the guide (item 6).
 - **Run dashboard.** While a check runs, a live panel shows one row per account (state, done, per-status counts, last batch time), rate, ETA and a cooldown countdown in local time, plus the path of the run log:
 
 ```text
@@ -122,6 +126,7 @@ With no arguments in a terminal the tool opens a numbered, arrow-key menu (a pla
 │ APP       ACCOUNT  STATE   DONE  RESULTS    LAST
 │ telegram  a        ✔ done  4/4   0y 4nf 0u  0.7s
 │ zalo      z        ✔ done  3/3   0y 3nf 0u  0.7s
+│ ● working  ○ waiting  ◷ cooldown  ✖ disabled  ✔ done
 │
 │ ████████████████████████████  100%  7 of 7 checks (4 numbers x 2 apps)
 │ yes 0 · not_found 7 · unknown 0
@@ -130,15 +135,16 @@ With no arguments in a terminal the tool opens a numbered, arrow-key menu (a pla
 ╰──────────────────────────────────────────────────────────────────────────────
 ```
 
-  The panel redraws at most once a second and shrinks on short windows. A run ends with `Done in 3 s · 4 numbers · 0 unfinished`, the apps' result table, `Accounts used: ...` and a `Report saved` box; press `o` there to reveal the report in Finder. The run log (`check-*.log` in the data folder, mode 600, last 5 kept) holds the per-batch detail. This sample was captured from a run with test-only adapters on the maintainer's Mac.
+  The panel redraws at most once a second, colour-codes each account's state (working and done green, cooldown yellow, disabled red, an idle wait dim) with a legend under the rows, and shrinks on short windows. `◷` means resting only — a cooldown or a wait with a known resume time; a plainly waiting account shows `○`. A run ends with `Done in 3 s · 4 numbers · 0 unfinished`, the apps' result table with per-app percentages (share of input rows), a `TOTAL` line whose percentages are the share of all shown app-cells, `Accounts used: ...` and a `Report saved` box; press `o` there to reveal the report in Finder. The run log (`check-*.log` in the data folder, mode 600, last 5 kept) holds the per-batch detail. This sample was captured from a run with test-only adapters on the maintainer's Mac.
 - **Plain tier.** `--plain` (or `PHONE_APP_CHECKER_PLAIN=1`, `NO_COLOR`, `TERM=dumb`) turns off colour and all cursor movement: prompts are numbered, the run prints timestamped lines (`05:54 progress 100% 7/7 | telegram 4/4, zalo 3/3`) with the same facts as the dashboard.
+- **Theme.** `--theme dark|light|high-contrast` or the `theme` key in `checker.config.json` picks the colour set; the default `auto` detects the terminal background from `COLORFGBG` and falls back to dark. `high-contrast` draws accents as bold + inverse. Menu item 7 toggles it and saves the choice when there is an app home (session-only otherwise). The plain tier is unaffected either way.
 
 English is the default; press `L` for Vietnamese, Bahasa Indonesia, Bahasa Melayu, Korean or Simplified Chinese (the last four are first-draft machine translations that need native review). Details: [docs/reference.md](docs/reference.md#interactive-menu).
 
 ## CLI reference
 
 ```text
-phone-app-checker [--config <path>] [--plain] <command>
+phone-app-checker [--config <path>] [--plain] [--theme <mode>] <command>
 
   login <app> [--account <name>] [--method qr|code] [--phone <number>]
       Log an account in (QR / pairing code / OTP / API credentials); the session is stored under data/sessions.
@@ -155,7 +161,7 @@ phone-app-checker [--config <path>] [--plain] <command>
       Offline readiness check; exit 1 when something blocks use. --deep also loads every adapter module.
 ```
 
-`--apps` takes `telegram,whatsapp,zalo,viber,line,threema,matrix`. Exit codes: `0` success, `1` error or no valid numbers, `130` interrupted (the report is still written). `--help` on any command lists every option. `--plain` is a global flag; `--progress` only chooses how `check` reports progress (`auto` = the dashboard on a rich terminal and nothing extra elsewhere, `lines` = plain progress lines, `off`).
+`--apps` takes `telegram,whatsapp,zalo,viber,line,threema,matrix`. Exit codes: `0` success, `1` error or no valid numbers, `130` interrupted (the report is still written). `--help` on any command lists every option. `--plain` and `--theme` are global flags; `--theme auto` (the default) reads the terminal background from `COLORFGBG` and falls back to dark. `--progress` only chooses how `check` reports progress (`auto` = the dashboard on a rich terminal and nothing extra elsewhere, `lines` = plain progress lines, `off`).
 
 **Report.** One row per unique number: `input, e164, country, telegram, whatsapp, zalo, viber, line, threema, matrix, last_checked_at`, then `<app>_checked_at` and `<app>_stale` per app.
 
@@ -175,10 +181,11 @@ An `INCOMPLETE` banner is printed last when some numbers have no fresh answer; r
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `configVersion` | `2` | Written by the tool. A file without it is a 0.1.0 file and is upgraded automatically (below). A file with a newer number than this build knows is refused untouched. |
+| `configVersion` | `3` | Written by the tool. A file without it is a 0.1.0 file and is upgraded automatically (below). A file with a newer number than this build knows is refused untouched. |
 | `defaultRegion` | `"VN"` | ISO-3166 alpha-2 country used for numbers without a country code (`0901234567`). |
 | `dataDir` | `"./data"` | Sessions (secrets) and the SQLite result database. |
 | `maxAgeDays` | `30` | `yes` / `not_found` younger than this are reused, not re-checked. |
+| `theme` | `"auto"` | Colour theme of the rich terminal tier: `auto` (detect the background from `COLORFGBG`, fall back to dark), `dark`, `light` or `high-contrast` (bold + inverse accents). `--theme <mode>` on the command line overrides it for that run; menu item 7 toggles it and saves the choice when there is an app home (session-only otherwise). |
 | `apps.<app>.enabled` | telegram, whatsapp, zalo: `true`; viber, line, threema, matrix: `false` | Apps checked when `--apps` is not given. |
 | `apps.<app>.batchSize` | 10 / 20 / 1 / 100 / 1 / 1 / 1 | Numbers per call (telegram / whatsapp / zalo / viber / line / threema / matrix). |
 | `apps.<app>.dailyCap` | 200 / 300 / 100 / 1000 / 50 / 100 / 100 | Numbers per account per local day. |
@@ -189,7 +196,7 @@ An `INCOMPLETE` banner is printed last when some numbers have no fresh answer; r
 
 Throughput is accounts x `dailyCap` per day: 10 000 numbers on one Telegram account at the default cap takes 50 days. The defaults are conservative guesses; platforms publish no limits. Raising `maxParallelAccounts` only helps when a batch takes long compared with the pacing pause; the `accounts` command shows each account's real batch time, so measure before you raise it, and remember that more simultaneous sessions raise the ban exposure. Details, data layout and secrets handling: [docs/reference.md](docs/reference.md).
 
-**Migration and backup.** The first time 0.2.0 reads a 0.1.0 config it writes the upgraded file (mode 600, atomically) and keeps the old one as `checker.config.json.v1.bak` next to it (mode 600; an existing backup is never overwritten, a numbered one is added), then prints one line naming the backup. The SQLite database is upgraded in place by explicit per-version steps (schema 3 adds per-account batch times). Running again changes nothing. Both upgrades are **one way**: 0.1.0 refuses the new config keys and a database written by a newer schema. To go back, install 0.1.0 again, put the `.v1.bak` back as `checker.config.json`, and restore a copy of `checker.db` made before upgrading.
+**Migration and backup.** The first time a new version reads an old config it validates the upgraded content, writes the file atomically (mode 600) and keeps the old one next to it (mode 600, created exclusively; an existing backup is never overwritten, a numbered one is added), then prints one line naming the backup. 0.3.0 upgrades a 0.2.0 file to `"configVersion": 3` with `"theme": "auto"` and leaves `checker.config.json.v2.bak`; a 0.1.0 file goes through both steps and leaves `checker.config.json.v1.bak`. The SQLite database is upgraded in place by explicit per-version steps (schema 3, unchanged since 0.2.0). Running again changes nothing. Both upgrades are **one way**: an older build refuses a newer `configVersion` (`the config file needs a newer version of this program`), and 0.1.0 cannot open the schema-3 database. To go back, install the older version again and copy the `.v2.bak` (or `.v1.bak`) over `checker.config.json`; to return to 0.1.0 also restore a copy of `checker.db` made before that upgrade.
 
 ## Performance
 
@@ -229,7 +236,7 @@ What has and has not been checked. Nothing here is a guarantee about live platfo
 | CSV parsing, phone normalisation, config validation and migration, scheduler and dispatcher, SQLite store and its migrations, report writer, run lock, file permissions, CLI end to end (with a test-only injected adapter) | Automated tests (`npm test`, over 1 700 tests); CI runs them on macOS and Ubuntu |
 | Each adapter's error classification (yes / not_found / rate limit / ban) | Tested against **test doubles** of the third-party clients, and for Threema and Matrix against stubbed HTTP responses |
 | Performance numbers in [docs/performance.md](docs/performance.md) | Measured with the offline bench harness (`npm run bench`) and fake adapters on one Mac; real platform latency is unknown |
-| macOS arm64 archive: install, `doctor --deep`, offline `report`, reinstall, the upgrade from a 0.1.0 home, uninstall, minimum-OS load commands, no secrets or data shipped | `npm run release:verify` (checks V1-V20) on a development Mac. Not run on macOS 13.5 itself, on Intel Macs, or under Gatekeeper |
+| macOS arm64 archive: install, `doctor --deep`, offline `report`, reinstall, the upgrade from a 0.1.0 and a 0.2.0 home, uninstall, minimum-OS load commands, no secrets or data shipped | `npm run release:verify` (checks V1-V20) on a development Mac. Not run on macOS 13.5 itself, on Intel Macs, or under Gatekeeper |
 | **WhatsApp** against the live service | One real account linked with a pairing code; a handful of lookups returned the expected answers. QR linking on a real phone is unconfirmed (WhatsApp changed its flow in 2026-07; see the [guide](docs/whatsapp-setup.md)). No 20-number known-answer trial yet |
 | **Zalo** against the live service | QR login completed once on the maintainer's machine; lookups not verified |
 | **Telegram, Viber, LINE** against the live platforms | **Not verified** |
@@ -255,7 +262,7 @@ Please run your own known-answer trial and open an issue with what you learn (wi
 
 **Does it run on Windows or Linux?** The portable archive is macOS Apple Silicon only. From source it needs Node >= 22.18; CI runs the tests on Ubuntu. Windows is untested. Viber needs `adb` and an Android device or emulator.
 
-**Will my 0.1.0 config and results still work?** Yes: they are upgraded automatically on first use, with a backup of the config. The upgrade is one way; see [Configuration](#configuration).
+**Will my 0.1.0 or 0.2.0 config and results still work?** Yes: they are upgraded automatically on first use, with a mode-600 backup of the config. The upgrade is one way; see [Configuration](#configuration).
 
 **Where is my data?** In `dataDir` (default `./data`; packaged app: `~/Library/Application Support/phone-app-checker`): login sessions (treat like passwords), a SQLite database of checked numbers, the run logs and reports you asked for. It refuses cloud-synced folders such as iCloud Drive or Dropbox. Delete it when done.
 
@@ -283,7 +290,7 @@ Apps that were looked at and rejected for lack of a lawful, practical lookup pat
 - Platforms publish no limits; bans can happen at any time. Parallel accounts raise the exposure.
 - Zalo: Vietnam only. LINE: a handful of regions. Viber: requires root and per-version SQL; no official API. Threema and Matrix: only people who linked a phone number can be found.
 - Results are point-in-time observations; `not_found` is never proof of absence.
-- Upgrading from 0.1.0 is one way; 0.1.0 cannot open an upgraded database.
+- Upgrades are one way: 0.2.0 cannot read a `configVersion` 3 file, and 0.1.0 cannot open the schema-3 database a newer build created.
 - The macOS archive is for Apple Silicon only and is neither code-signed nor notarised.
 
 ## Contributing

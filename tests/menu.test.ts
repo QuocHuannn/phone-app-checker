@@ -6,11 +6,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { main } from '../src/cli.ts';
 import { loadConfig } from '../src/config.ts';
 import { saveTelegramCredentials } from '../src/config-write.ts';
-import { DOCTOR_FOOTER } from '../src/doctor.ts';
+import { openRunHistory } from '../src/history.ts';
 import { LANGS, LANGUAGE_LABEL, LANGUAGE_NAMES, translate, type Lang, type MessageArgs, type MessageKey } from '../src/i18n/index.ts';
 import { isInteractive, normalizeDroppedPath, parseYesNo, runMenu, type CommandResult, type MenuHost } from '../src/menu.ts';
+import { openRecentFiles } from '../src/recent.ts';
 import { APPS, type Adapter, type App } from '../src/types.ts';
 import { scriptedTerminal, type ScriptedTerminal } from './helpers/menu-io.ts';
+import { REPORT_HEADER, reportLine } from './helpers/report-rows.ts';
 
 const REPO = resolve(import.meta.dirname, '..');
 const CSV = ['name,phone', 'An,0901234567', 'Binh,+65 9123 4567', ''].join('\n');
@@ -131,7 +133,7 @@ describe('menu navigation', () => {
     const f = fixture(['6', '', '0']);
     expect(await runMenu(f.host)).toBe(0);
     const screen = f.screen();
-    for (const entry of ['1. Check a CSV file', '2. Log in an app account', '3. View logged-in accounts', '4. Rebuild the latest report', '5. Check this Mac is ready', '6. Guide / warnings', 'L. Language / Ngôn ngữ / Bahasa / 언어 / 语言: English', '0. Quit', 'v9.9.9']) {
+    for (const entry of ['1. Check a CSV file', '2. Log in an app account', '3. View logged-in accounts', '4. Rebuild the latest report', '5. View run history', '6. Guide / warnings', '7. Settings', 'L. Language / Ngôn ngữ / Bahasa / 언어 / 语言: English', '0. Quit', 'v9.9.9']) {
       expect(screen).toContain(entry);
     }
     for (const warning of ['agreed to be contacted', 'not_found', '(privacy)', 'HK / JP / KR / TW / TH', 'Zalo only checks Vietnamese numbers (+84)', 'restricted or banned']) {
@@ -194,31 +196,27 @@ describe('simple actions', () => {
     expect(f.runs).toEqual([]);
   });
 
-  it('5 runs `doctor` once and adds only the menu\'s own hint (the offline-readiness note is part of the doctor output)', async () => {
-    const f = fixture(['5', '', '0']);
+  it('7 opens the settings screen; Enter (or b) goes back without running anything', async () => {
+    const f = fixture(['7', '', '0']);
     await runMenu(f.host);
-    expect(f.runs).toEqual([['doctor']]);
-    // The note is printed by `doctor` itself; the menu must not say it a second time.
-    expect(f.screen()).not.toContain('does NOT verify real accounts');
-    expect(DOCTOR_FOOTER).toContain('offline readiness only');
+    expect(f.flat()).toContain('Settings');
+    expect(f.flat()).toContain('Theme:');
+    expect(f.flat()).toContain('Data folder:');
+    expect(f.runs).toEqual([]);
   });
 
   it('a failing command shows its message and the menu keeps going', async () => {
-    const f = fixture(['3', '', '5', '', '6', '', '0'], {
-      results: [
-        { code: 1, error: 'database is locked' },
-        { code: 1 },
-      ],
+    const f = fixture(['3', '', '6', '', '0'], {
+      results: [{ code: 1, error: 'database is locked' }],
       accounts: { telegram: ['a'] },
     });
     expect(await runMenu(f.host)).toBe(0);
     const screen = f.flat();
     expect(screen).toContain('Error: database is locked');
     expect(screen).toContain('The command did not succeed (code 1)');
-    expect(screen).toContain('A line says FAIL');
     expect(screen).toContain('GUIDE AND WARNINGS');
     expect(screen).toContain('Goodbye.');
-    expect(f.runs).toEqual([['accounts'], ['doctor']]);
+    expect(f.runs).toEqual([['accounts']]);
   });
 
   it('shows a broken config as a message instead of leaving the menu', async () => {
@@ -617,6 +615,220 @@ describe('4 - view the latest report', () => {
   });
 });
 
+describe('5 - run history', () => {
+  const stamp = Date.UTC(2026, 9, 12, 12, 30, 0);
+  const ISO_STAMP = '2026-10-12T12:30:00.000Z';
+  /** A small report in the tool's own CSV layout, as `check` would have written it. */
+  const writeReportCsv = (path: string): void => {
+    writeFileSync(
+      path,
+      [
+        REPORT_HEADER,
+        reportLine({
+          input: '0901234567',
+          e164: '+84901234567',
+          country: 'VN',
+          statuses: { telegram: 'yes', zalo: 'yes' },
+          otherwise: 'skipped',
+          lastChecked: ISO_STAMP,
+          checked: { telegram: ISO_STAMP, zalo: ISO_STAMP },
+          stale: { telegram: 'no', zalo: 'no' },
+        }),
+        reportLine({ input: 'abc', e164: '', country: '', statuses: {}, otherwise: 'invalid' }),
+        '',
+      ].join('\n'),
+    );
+  };
+
+  it('shows the empty hint instead of a list when nothing was checked yet', async () => {
+    const f = fixture(['5', '0']);
+    await runMenu(f.host);
+    expect(f.flat()).toContain('No check has run yet. History lists the last 20 runs.');
+    expect(f.runs).toEqual([]);
+  });
+
+  it('lists runs and a number re-shows the summary rebuilt for the run\'s own apps', async () => {
+    const data = join(dir, 'data');
+    const report = join(work, 'old-report.csv');
+    writeReportCsv(report);
+    openRunHistory(data)?.add({ at: stamp, csv: CSV_PATH(), apps: ['telegram', 'zalo'], rows: 2, report, log: '' });
+    const f = fixture(['5', '1', '', '', '0'], { accounts: { telegram: ['a'] } });
+    await runMenu(f.host);
+    const screen = f.flat();
+    expect(screen).toContain('RUN HISTORY');
+    expect(screen).toMatch(/customers\.csv · 2 apps · 2 rows · old-report\.csv/);
+    const summary = screen.slice(screen.indexOf('Numbers:'), screen.indexOf('Press Enter for the menu.'));
+    expect(summary).toContain('2 unique (1 valid, 1 invalid)');
+    expect(summary).toContain('zalo');
+    // Only the run's apps get columns: whatsapp was not part of this run.
+    expect(summary).not.toContain('whatsapp');
+    expect(f.runs).toEqual([]);
+  });
+
+  it('says the report is missing and offers the run log when the report file is gone', async () => {
+    const data = join(dir, 'data');
+    const log = join(data, 'check-2026-10-12.log');
+    mkdirSync(data, { recursive: true });
+    writeFileSync(log, '# check log\n');
+    openRunHistory(data)?.add({ at: stamp, csv: CSV_PATH(), apps: ['telegram'], rows: 2, report: join(dir, 'deleted-report.csv'), log });
+    const f = fixture(['5', '1', '', '', '0'], { accounts: { telegram: ['a'] } });
+    await runMenu(f.host);
+    const screen = f.flat();
+    expect(screen).toContain('The report file is missing or unreadable.');
+    expect(screen.replace(/\s+/g, '')).toContain('check-2026-10-12.log');
+    expect(screen).not.toContain('Numbers:');
+  });
+
+  it('says there is no log either when both files are gone, and b goes straight back', async () => {
+    openRunHistory(join(dir, 'data'))?.add({ at: stamp, csv: CSV_PATH(), apps: ['telegram'], rows: 2, report: join(dir, 'gone.csv'), log: join(dir, 'gone.log') });
+    const f = fixture(['5', 'b', '0'], { accounts: { telegram: ['a'] } });
+    await runMenu(f.host);
+    const screen = f.flat();
+    expect(screen).toContain('RUN HISTORY');
+    expect(screen).not.toContain('No log of this run is left.');
+
+    const again = fixture(['5', '1', '', '0'], { accounts: { telegram: ['a'] } });
+    await runMenu(again.host);
+    expect(again.flat()).toContain('No log of this run is left.');
+  });
+
+  it('a report or log path that cannot be stated still gets the missing-file notice, not a crash', async () => {
+    const data = join(dir, 'data');
+    const loop = join(data, 'self-link.csv');
+    mkdirSync(data, { recursive: true });
+    symlinkSync(loop, loop);
+    const loopLog = join(data, 'self-link.log');
+    symlinkSync(loopLog, loopLog);
+    openRunHistory(data)?.add({ at: stamp, csv: CSV_PATH(), apps: ['telegram'], rows: 2, report: loop, log: loopLog });
+    const f = fixture(['5', '1', '', '0'], { accounts: { telegram: ['a'] } });
+    await runMenu(f.host);
+    const screen = f.flat();
+    expect(screen).toContain('The report file is missing or unreadable.');
+    expect(screen).toContain('No log of this run is left.');
+  });
+
+  it('a corrupt runs.json is an empty list, not a crash', async () => {
+    const data = join(dir, 'data');
+    mkdirSync(data, { recursive: true });
+    writeFileSync(join(data, 'runs.json'), 'nope{{');
+    const f = fixture(['5', '0'], { accounts: { telegram: ['a'] } });
+    await runMenu(f.host);
+    expect(f.flat()).toContain('No check has run yet');
+  });
+
+  it('a run checked in this same session shows up when History is opened again', async () => {
+    const out = join(work, 'fresh-report.csv');
+    const f = fixture(['5', '1', CSV_PATH(), '', '', '', '5', '', '0'], {
+      accounts: { telegram: ['a'] },
+      host: {
+        run: async (args) => {
+          if (args[0] === 'check') {
+            openRunHistory(join(dir, 'data'))?.add({ at: stamp, csv: CSV_PATH(), apps: ['telegram'], rows: 2, report: out, log: '' });
+            return { code: 0, report: { path: out, inconclusive: 0 } };
+          }
+          return { code: 0 };
+        },
+      },
+    });
+    await runMenu(f.host);
+    const screen = f.flat();
+    // The first History visit was empty; after the check the same session must list the run.
+    expect(screen).toMatch(/customers\.csv · 1 app · 2 rows · fresh-report\.csv/);
+    expect(screen.lastIndexOf('No check has run yet')).toBeLessThan(screen.indexOf('RUN HISTORY'));
+  });
+});
+
+describe('7 - settings', () => {
+  it('shows the theme, language, recents and the two paths; Enter goes back', async () => {
+    const f = fixture(['7', '', '0']);
+    await runMenu(f.host);
+    const screen = f.flat();
+    expect(screen).toContain('Theme: Auto (detect from terminal)');
+    expect(screen).toContain('Language: English');
+    expect(screen).toContain('Remember recent files: on');
+    expect(screen).toContain(`Data folder: ${join(dir, 'data')}`);
+    expect(screen).toContain(`Config file: ${join(dir, 'config.json')}`);
+    expect(f.runs).toEqual([]);
+  });
+
+  it('toggles the theme through the four modes and saves each pick through the host', async () => {
+    const saved: string[] = [];
+    const f = fixture(['7', '1', '1', '1', '1', '', '0'], { host: { saveTheme: (theme) => void saved.push(theme) } });
+    await runMenu(f.host);
+    expect(saved).toEqual(['dark', 'light', 'high-contrast', 'auto']);
+    const screen = f.flat();
+    expect(screen).toContain('Theme saved to the config file.');
+    expect(screen).toContain('Theme: High contrast');
+  });
+
+  it('a theme choice without a way to save it applies to the session and says so', async () => {
+    const f = fixture(['7', '1', '', '0']);
+    await runMenu(f.host);
+    expect(f.flat()).toContain('it applies to this session only');
+    // And the session override reaches the commands the menu runs.
+    const next = fixture(['1', CSV_PATH(), '', '', '', '0'], { accounts: { telegram: ['a'] }, host: { themeFlag: 'light' } });
+    await runMenu(next.host);
+    expect(next.runs[0]?.slice(0, 2)).toEqual(['--theme', 'light']);
+  });
+
+  it('clears recents only after a yes; a no leaves them on', async () => {
+    const recents = openRecentFiles(join(dir, 'data'));
+    recents?.add(CSV_PATH());
+    const f = fixture(['7', '3', 'n', '', '7', '3', 'y', '', '0']);
+    await runMenu(f.host);
+    const screen = f.flat();
+    expect(screen).toContain('Clear the recent files and stop remembering them?');
+    expect(screen).toContain('Recent files cleared; remembering is now off.');
+    expect(JSON.parse(readFileSync(join(dir, 'data', 'recent-files.json'), 'utf8')).enabled).toBe(false);
+  });
+
+  it('the language row opens the same chooser as L', async () => {
+    const f = fixture(['7', '2', '', '0']);
+    await runMenu(f.host);
+    expect(f.flat()).toContain('Choose a language:');
+    expect(f.runs).toEqual([]);
+  });
+});
+
+describe('first-run welcome', () => {
+  it('shows once when nothing is logged in and no check ran, then never again', async () => {
+    const f = fixture(['0']);
+    await runMenu(f.host);
+    expect(f.flat()).toContain('Welcome to Phone App Checker.');
+    expect(f.flat()).toContain('Press 2 to log in an app account.');
+    const flag = join(dir, 'data', 'welcomed.json');
+    expect(readFileSync(flag, 'utf8')).toContain('"welcomed":true');
+    expect(statSync(flag).mode & 0o777).toBe(0o600);
+
+    const again = fixture(['0']);
+    await runMenu(again.host);
+    expect(again.flat()).not.toContain('Welcome to Phone App Checker.');
+  });
+
+  it('stays silent when an account is logged in or a results database already exists', async () => {
+    const withAccount = fixture(['0'], { accounts: { telegram: ['a'] } });
+    await runMenu(withAccount.host);
+    expect(withAccount.flat()).not.toContain('Welcome to Phone App Checker.');
+    expect(existsSync(join(dir, 'data', 'welcomed.json'))).toBe(false);
+
+    mkdirSync(join(dir, 'data'), { recursive: true });
+    writeFileSync(join(dir, 'data', 'checker.db'), '');
+    const afterRun = fixture(['0']);
+    await runMenu(afterRun.host);
+    expect(afterRun.flat()).not.toContain('Welcome to Phone App Checker.');
+  });
+
+  it('stays silent when the config cannot be read', async () => {
+    const f = fixture(['0'], {
+      loadConfig: () => {
+        throw new Error('bad json');
+      },
+    });
+    await runMenu(f.host);
+    expect(f.flat()).not.toContain('Welcome to Phone App Checker.');
+  });
+});
+
 describe('menu through main()', () => {
   function fakeAdapter(app: App): Adapter {
     return {
@@ -713,6 +925,30 @@ describe('menu through main()', () => {
     const terminal = scriptedTerminal([], true);
     expect(await main(['node', 'phone-app-checker'], deps(terminal, [], []))).toBe(0);
   });
+
+  it('a forced --theme reaches the real command parser: a check and a rebuild both run', async () => {
+    const appHome = join(dir, 'app-home');
+    mkdirSync(join(appHome, 'data', 'sessions', 'telegram', 'a'), { recursive: true });
+    const csv = CSV_PATH();
+    const out1 = join(work, 'themed-check.csv');
+    const out2 = join(work, 'themed-report.csv');
+    // Check under --theme dark (report at out1); then the Settings theme row cycles dark -> light, saves it,
+    // and the rebuild at out2 runs under that same forced theme — all through the real command parser.
+    const terminal = scriptedTerminal(['1', csv, '', out1, '', '7', '1', '', '4', csv, '', out2, '', '0'], true);
+    const printed: string[] = [];
+    const logged: string[] = [];
+    const d = deps(terminal, printed, logged);
+    expect(await main(['node', 'phone-app-checker', '--theme', 'dark'], d)).toBe(0);
+    const screen = terminal.screen();
+    expect(screen).not.toMatch(/too many arguments|unknown option/);
+    // The check really traversed the parser and the adapter pipeline.
+    expect(readFileSync(out1, 'utf8')).toContain('+84901234567');
+    // The Settings pick was saved and the rebuild ran with the same forced theme, no argument errors.
+    expect(JSON.parse(readFileSync(join(appHome, 'checker.config.json'), 'utf8')).theme).toBe('light');
+    expect(screen).toContain('Theme saved');
+    expect(existsSync(out2)).toBe(true);
+    expect(screen).toContain('Goodbye.');
+  });
 });
 
 describe('real process without a terminal', () => {
@@ -732,7 +968,7 @@ describe('real process without a terminal', () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('Usage: phone-app-checker [options] [command]');
     expect(result.stderr).toContain('Commands:');
-    expect(result.stderr).not.toContain('Choose (0-6');
+    expect(result.stderr).not.toContain('Choose (0-7');
     expect(result.stdout).toBe('');
   });
 
@@ -781,7 +1017,7 @@ describe('language', () => {
     await runMenu(f.host);
     const screen = f.screen();
     expect(screen).toContain('1. Check a CSV file');
-    expect(screen).toContain('Choose 0-6 or L, then Enter:');
+    expect(screen).toContain('Choose 0-7 or L, then Enter:');
     expect(screen).toContain('L. Language / Ngôn ngữ / Bahasa / 언어 / 语言: English');
     expect(screen).toContain('Goodbye.');
     expect(screen).not.toMatch(/Kiểm tra|Thoát/);
@@ -881,13 +1117,13 @@ describe('language', () => {
     it('renders the main menu and every screen without throwing', async () => {
       const secret = 'deadbeefcafe0123deadbeefcafe0123';
       const f = fixture(
-        ['', 'x', '6', '', '3', '', '5', '', '1', 'nope.csv', 'b', 'L', 'zz', '', '2', '9', '1', 'a b', 'tg1', 'b', '4', 'b', '0'],
+        ['', 'x', '5', '6', '', '3', '', '7', 'b', '1', 'nope.csv', 'b', 'L', 'zz', '', '2', '9', '1', 'a b', 'tg1', 'b', '4', 'b', '0'],
         { accounts: { telegram: ['a'], zalo: ['z'] }, results: [{ code: 1, error: 'boom' }, { code: 1 }], host: { langFlag: lang } },
       );
       expect(await runMenu(f.host)).toBe(0);
       const screen = f.flat();
       expect(screen).toContain(`=== Phone App Checker v9.9.9 ===`);
-      for (const [number, key] of [[1, 'menuCheck'], [2, 'menuLogin'], [3, 'menuAccounts'], [4, 'menuReport'], [5, 'menuDoctor'], [6, 'menuGuide'], [0, 'menuQuit']] as const) {
+      for (const [number, key] of [[1, 'menuCheck'], [2, 'menuLogin'], [3, 'menuAccounts'], [4, 'menuReport'], [5, 'menuHistory'], [6, 'menuGuide'], [7, 'menuSettings'], [0, 'menuQuit']] as const) {
         expect(screen).toContain(`${number}. ${msg(key)}`);
       }
       expect(screen).toContain(`L. ${LANGUAGE_LABEL}: ${LANGUAGE_NAMES[lang]}`);
@@ -898,7 +1134,6 @@ describe('language', () => {
       }
       expect(screen).toContain(msg('commandError', { error: 'boom' }));
       expect(screen).toContain(msg('commandFailed', { code: 1 }));
-      expect(screen).toContain(msg('doctorFailHint'));
       expect(screen).toContain(msg('goodbye'));
       expect(screen).not.toContain(secret);
       expect(f.remaining()).toEqual([]);
@@ -1027,7 +1262,7 @@ describe('language through main()', () => {
     expect(statSync(langFile()).mode & 0o777).toBe(0o600);
     expect(statSync(appHome()).mode & 0o777).toBe(0o700);
     // Only the language file was written: no stray temporary file, no config.
-    expect(readdirSync(appHome()).sort()).toEqual(['checker.config.json', 'menu-language']);
+    expect(readdirSync(appHome()).sort()).toEqual(['checker.config.json', 'data', 'menu-language']);
 
     const second = await start(['0']);
     expect(second).toContain('1. Kiểm tra file CSV');
@@ -1044,7 +1279,7 @@ describe('language through main()', () => {
     await start(['L', '6', '0']);
     expect(readFileSync(langFile(), 'utf8')).toBe('zh\n');
     expect(statSync(langFile()).mode & 0o777).toBe(0o600);
-    expect(readdirSync(appHome()).sort()).toEqual(['checker.config.json', 'menu-language']);
+    expect(readdirSync(appHome()).sort()).toEqual(['checker.config.json', 'data', 'menu-language']);
   });
 
   it('the environment variable beats the saved file, and --lang beats both', async () => {
@@ -1122,7 +1357,7 @@ describe('language through main()', () => {
     expect(screen).toContain('Pilihan bahasa tidak dapat disimpan');
     expect(screen).toContain('PANDUAN DAN PERINGATAN');
     expect(screen).toContain('Sampai jumpa.');
-    expect(readdirSync(appHome()).sort()).toEqual(['checker.config.json', 'menu-language']);
+    expect(readdirSync(appHome()).sort()).toEqual(['checker.config.json', 'data', 'menu-language']);
     // Nothing valid saved, so the next start is English again.
     expect(await start(['0'])).toContain('0. Quit');
   });

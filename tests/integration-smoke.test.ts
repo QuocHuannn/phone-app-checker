@@ -70,7 +70,7 @@ describe('CLI end to end (injected test adapter, real everything else)', () => {
 
   it('prints a summary with per-app counts and a yes-by-country table', () => {
     expect(result.summary).toContain('Numbers: 6 unique (4 valid, 2 invalid)');
-    expect(result.summary).toMatch(/telegram\s+2\s+2\s+0\s+0\s+2/);
+    expect(result.summary).toMatch(/telegram\s+2 \(33%\)\s+2 \(33%\)\s+0 \(0%\)\s+0 \(0%\)\s+2 \(33%\)/);
     expect(result.summary).toContain('Registered (yes) by country:');
     expect(result.accounts).toMatch(/telegram\s+tg1\s+ready\s+5\/200/);
   });

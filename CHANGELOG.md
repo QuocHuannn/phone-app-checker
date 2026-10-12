@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-12
+
+### Upgrading from 0.2.0
+
+Install 0.3.0 over 0.2.0 with its `install.sh`; config, sessions and results are kept.
+
+- **Config.** The first run rewrites `checker.config.json` with `"configVersion": 3` and `"theme": "auto"` added, and keeps your old file next to it as `checker.config.json.v2.bak` (mode 600; an existing backup is never overwritten, a numbered one is added). One line on stderr names the backup. Running again changes nothing. A 0.1.0 file (no `configVersion`) upgrades through both steps and leaves `checker.config.json.v1.bak`. Unknown keys are still rejected.
+- **Database.** Unchanged: `checker.db` is already schema 3 since 0.2.0, so no migration runs and 0.2.0 can still open the database.
+- **One way.** 0.2.0 refuses a `configVersion` 3 file as a newer format (`the config file needs a newer version of this program (configVersion 3, supported 2); upgrade instead of editing it`). To go back: install 0.2.0 again and copy `checker.config.json.v2.bak` over `checker.config.json`; the database needs nothing.
+- **Menu.** The numbered rows are now 1-7: 5 is run history, 6 the guide, 7 Settings. `doctor` is no longer a menu item (the command is unchanged). A theme or language chosen in Settings is saved and survives the upgrade.
+
+### Added
+
+- **Terminal theme.** The `theme` config key and the `--theme` global flag take `auto` (default), `dark`, `light` or `high-contrast`. `auto` detects the terminal background from `COLORFGBG` and falls back to dark. The accent colour follows the theme (cyan on dark, blue on light, bold + inverse on high-contrast); the plain tier is unaffected. Menu item 7 toggles it and saves the choice.
+- **Run history (menu item 5).** Each `check` records the run — time, CSV, apps, row count, report and log paths — in `runs.json` in the data folder (mode 600, the 20 newest kept, written atomically). Enter re-draws that run's summary from its report; when the report is gone the row says so and the run's log is offered instead.
+- **Settings (menu item 7).** View and change the theme (saved to `checker.config.json`), the menu language (`menu-language`), and recent-file remembering (`recent-files.json`), and see the config and data paths. The theme is written to the config file (mode 600, atomic); without an app home (a source checkout) a Settings change is session-only and says so.
+- **First-run welcome.** A one-time welcome box points new users at the guide (shown once, when no account is logged in and no `checker.db` exists in the data folder yet; `welcomed.json` there is the flag).
+- **Dashboard.** Account rows are colour-coded by state (working and done green, cooldown yellow, disabled red, an idle wait dim), columns are labelled, and a legend line names every state icon. The same header and legend print once on the lines and plain tiers.
+- **Richer summary.** Per-app cells show `N (P%)` where P is the share of input rows; a bold `TOTAL` line sums each status over all shown app-cells; a country table (top 10) adds a `%` column that is likewise a share of all shown app-cells, not a within-country rate.
+- **Persistent key hints.** Every arrow-key list and the main menu draws a hint line naming its keys (`↑↓ move · Enter select · Esc, q or b back`; the main menu's is `↑↓ move · Enter select · q quit · 1-7, L, 0`).
+
+### Changed
+
+- **Menu order.** The numbered rows run 1-7 (above); `doctor` was removed from the menu — use the `doctor` command.
+- **Waiting icon.** `◷` now means resting only: a cooldown or a wait with a known resume time. A plainly waiting account shows `○`.
+- `configVersion` is `3` (see Upgrading). `checker.config.example.json` documents `theme`.
+
+### Security
+
+- `runs.json`, `welcomed.json`, the saved menu language and the theme setting are stored mode 600; history writes are atomic.
+- No new runtime dependency. `npm audit --omit=dev` reports 0 vulnerabilities.
+
 ## [0.2.0] - 2026-10-10
 
 ### Upgrading from 0.1.0
@@ -85,6 +117,7 @@ First public release.
 - The release archive is Apple Silicon only, not code-signed or notarised, and was not run on macOS 13.5 or Intel Macs.
 - Licensed GPL-3.0-or-later because the bundled `baileys` dependency tree includes the GPL-3.0 package `libsignal`.
 
-[Unreleased]: https://github.com/QuocHuannn/phone-app-checker/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/QuocHuannn/phone-app-checker/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/QuocHuannn/phone-app-checker/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/QuocHuannn/phone-app-checker/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/QuocHuannn/phone-app-checker/releases/tag/v0.1.0

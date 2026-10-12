@@ -16,6 +16,7 @@ import {
 } from './config.ts';
 import { saveTelegramCredentials, saveTheme as writeThemeToConfig } from './config-write.ts';
 import { formatDoctor, runDoctor } from './doctor.ts';
+import { openRunHistory } from './history.ts';
 import { bootstrapHome, ensureHomeDirectory, packageVersion } from './home.ts';
 import { LANG_ENV, resolveLang, translate, translator, type Lang, type Translator } from './i18n/index.ts';
 import { LANG_FILE, readLanguageFile, writeLanguageFile } from './i18n/store.ts';
@@ -513,6 +514,14 @@ export function createProgram(deps: CliDeps = {}): Command {
             accountsUsed: Object.fromEntries([...accountsUsed].map(([app, names]) => [app, [...names].sort()])),
           },
         );
+        openRunHistory(cfg.dataDir)?.add({
+          at: now(),
+          csv,
+          apps,
+          rows: input.entries.length,
+          report: resolve(options.out),
+          log: runLog?.path ?? '',
+        });
         // Exit code is unchanged (0 = the command produced its report); the banner is the warning.
         for (const line of run.banner) say(ui.bold(ui.red(line)));
         announceReport(cfg, resolve(options.out), summaries.reduce((total, s) => total + s.inconclusive, 0));

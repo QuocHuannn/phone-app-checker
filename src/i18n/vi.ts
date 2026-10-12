@@ -6,11 +6,12 @@ export const vi = {
   menuLogin: 'Đăng nhập tài khoản app',
   menuAccounts: 'Xem tài khoản đã đăng nhập',
   menuReport: 'Xem lại báo cáo gần nhất',
+  menuHistory: 'Xem lịch sử kiểm tra',
   menuGuide: 'Hướng dẫn / cảnh báo',
   menuSettings: 'Cài đặt',
   menuQuit: 'Thoát',
-  menuPrompt: 'Chọn (0-6 hoặc L) rồi nhấn Enter: ',
-  menuInvalid: ({ choice }) => `Lựa chọn không hợp lệ: "${choice}". Gõ một số từ 0 đến 6, hoặc L, rồi nhấn Enter.`,
+  menuPrompt: 'Chọn (0-7 hoặc L) rồi nhấn Enter: ',
+  menuInvalid: ({ choice }) => `Lựa chọn không hợp lệ: "${choice}". Gõ một số từ 0 đến 7, hoặc L, rồi nhấn Enter.`,
   goodbye: 'Tạm biệt.',
 
   languageHeader: 'Chọn ngôn ngữ:',
@@ -206,8 +207,16 @@ export const vi = {
   welcomeTitle: 'CHÀO MỪNG',
   welcomeBody: 'Chào mừng bạn đến với Phone App Checker. Chưa có tài khoản nào đăng nhập; cần ít nhất một tài khoản để kiểm tra.',
   welcomeLogin: 'Nhấn 2 để đăng nhập một tài khoản app.',
-  welcomeGuide: 'Nhấn 5 để đọc hướng dẫn và cảnh báo trước.',
+  welcomeGuide: 'Nhấn 6 để đọc hướng dẫn và cảnh báo trước.',
 
+
+  historyTitle: 'LỊCH SỬ KIỂM TRA',
+  historyRow: ({ when, csv, appCount, rows, report }) =>
+    `${when} · ${csv} · ${appCount} app · ${rows} dòng · ${report}`,
+  historyPrompt: ({ max }) => `Lần kiểm tra cần mở (1-${max}, Enter = quay lại): `,
+  historyReportMissing: 'File báo cáo không còn hoặc không đọc được.',
+  historyLogMissing: 'Không còn nhật ký của lần chạy này.',
+  historyEmpty: 'Chưa chạy lần kiểm tra nào. Lịch sử liệt kê 20 lần gần nhất.',
   guideTitle: 'HƯỚNG DẪN VÀ CẢNH BÁO',
   guideConsent: '- Chỉ kiểm tra số của người đã đồng ý được liên hệ. Công cụ không tự kiểm tra sự đồng ý giúp bạn.',
   guideNotFound: '- "not_found" chưa chắc là không có tài khoản: người dùng có thể ẩn số điện thoại khỏi tìm kiếm (quyền riêng tư).',

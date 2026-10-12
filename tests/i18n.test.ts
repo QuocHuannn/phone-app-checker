@@ -85,8 +85,8 @@ describe('catalogs', () => {
 
     it('keeps the technical tokens that users must still recognise', () => {
       const tokens: Record<string, string[]> = {
-        menuPrompt: ['0-6', 'L'],
-        menuInvalid: ['0', '6', 'L'],
+        menuPrompt: ['0-7', 'L'],
+        menuInvalid: ['0', '7', 'L'],
         configFixHint: ['doctor'],
         guideNotFound: ['not_found'],
         guideLine: ['HK / JP / KR / TW / TH'],

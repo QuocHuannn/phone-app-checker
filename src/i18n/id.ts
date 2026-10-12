@@ -6,11 +6,12 @@ export const id = {
   menuLogin: 'Masuk ke akun aplikasi',
   menuAccounts: 'Lihat akun yang sudah masuk',
   menuReport: 'Buat ulang laporan terakhir',
+  menuHistory: 'Lihat riwayat pemeriksaan',
   menuGuide: 'Panduan / peringatan',
   menuSettings: 'Pengaturan',
   menuQuit: 'Keluar',
-  menuPrompt: 'Pilih 0-6 atau L, lalu Enter: ',
-  menuInvalid: ({ choice }) => `Pilihan tidak valid: "${choice}". Ketik angka dari 0 sampai 6, atau L, lalu tekan Enter.`,
+  menuPrompt: 'Pilih 0-7 atau L, lalu Enter: ',
+  menuInvalid: ({ choice }) => `Pilihan tidak valid: "${choice}". Ketik angka dari 0 sampai 7, atau L, lalu tekan Enter.`,
   goodbye: 'Sampai jumpa.',
 
   languageHeader: 'Pilih bahasa:',
@@ -206,8 +207,16 @@ export const id = {
   welcomeTitle: 'SELAMAT DATANG',
   welcomeBody: 'Selamat datang di Phone App Checker. Belum ada akun yang masuk; pemeriksaan memerlukan setidaknya satu akun.',
   welcomeLogin: 'Tekan 2 untuk masuk ke akun aplikasi.',
-  welcomeGuide: 'Tekan 5 untuk membaca panduan dan peringatan dulu.',
+  welcomeGuide: 'Tekan 6 untuk membaca panduan dan peringatan dulu.',
 
+
+  historyTitle: 'RIWAYAT PEMERIKSAAN',
+  historyRow: ({ when, csv, appCount, rows, report }) =>
+    `${when} · ${csv} · ${appCount} aplikasi · ${rows} baris · ${report}`,
+  historyPrompt: ({ max }) => `Pemeriksaan yang dibuka (1-${max}, Enter = kembali): `,
+  historyReportMissing: 'File laporan sudah tidak ada atau tidak dapat dibaca.',
+  historyLogMissing: 'Tidak ada log tersisa untuk pemeriksaan ini.',
+  historyEmpty: 'Belum ada pemeriksaan yang dijalankan. Riwayat menampilkan 20 pemeriksaan terakhir.',
   guideTitle: 'PANDUAN DAN PERINGATAN',
   guideConsent: '- Hanya periksa nomor orang yang setuju untuk dihubungi. Alat ini tidak memeriksa persetujuan untuk Anda.',
   guideNotFound: '- "not_found" belum tentu berarti tidak punya akun: pengguna bisa menyembunyikan nomor teleponnya dari pencarian (privasi).',

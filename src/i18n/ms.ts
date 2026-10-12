@@ -6,11 +6,12 @@ export const ms = {
   menuLogin: 'Log masuk akaun aplikasi',
   menuAccounts: 'Lihat akaun yang telah log masuk',
   menuReport: 'Bina semula laporan terkini',
+  menuHistory: 'Lihat sejarah semakan',
   menuGuide: 'Panduan / amaran',
   menuSettings: 'Tetapan',
   menuQuit: 'Keluar',
-  menuPrompt: 'Pilih 0-6 atau L, kemudian Enter: ',
-  menuInvalid: ({ choice }) => `Pilihan tidak sah: "${choice}". Taip nombor dari 0 hingga 6, atau L, kemudian tekan Enter.`,
+  menuPrompt: 'Pilih 0-7 atau L, kemudian Enter: ',
+  menuInvalid: ({ choice }) => `Pilihan tidak sah: "${choice}". Taip nombor dari 0 hingga 7, atau L, kemudian tekan Enter.`,
   goodbye: 'Selamat tinggal.',
 
   languageHeader: 'Pilih bahasa:',
@@ -206,8 +207,16 @@ export const ms = {
   welcomeTitle: 'SELAMAT DATANG',
   welcomeBody: 'Selamat datang ke Phone App Checker. Belum ada akaun yang log masuk; sekurang-kurangnya satu akaun diperlukan untuk menyemak.',
   welcomeLogin: 'Tekan 2 untuk log masuk ke akaun aplikasi.',
-  welcomeGuide: 'Tekan 5 untuk membaca panduan dan amaran dahulu.',
+  welcomeGuide: 'Tekan 6 untuk membaca panduan dan amaran dahulu.',
 
+
+  historyTitle: 'SEJARAH SEMAKAN',
+  historyRow: ({ when, csv, appCount, rows, report }) =>
+    `${when} · ${csv} · ${appCount} aplikasi · ${rows} baris · ${report}`,
+  historyPrompt: ({ max }) => `Semakan untuk dibuka (1-${max}, Enter = kembali): `,
+  historyReportMissing: 'Fail laporan sudah tiada atau tidak dapat dibaca.',
+  historyLogMissing: 'Tiada log yang tinggal untuk semakan ini.',
+  historyEmpty: 'Belum ada semakan yang dijalankan. Sejarah menyenaraikan 20 semakan terakhir.',
   guideTitle: 'PANDUAN DAN AMARAN',
   guideConsent: '- Semak hanya nombor orang yang bersetuju untuk dihubungi. Alat ini tidak menyemak persetujuan untuk anda.',
   guideNotFound: '- "not_found" belum tentu bermaksud tiada akaun: pengguna boleh menyembunyikan nombor telefonnya daripada carian (privasi).',

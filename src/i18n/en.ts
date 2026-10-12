@@ -13,11 +13,12 @@ export const en = {
   menuLogin: 'Log in an app account',
   menuAccounts: 'View logged-in accounts',
   menuReport: 'Rebuild the latest report',
+  menuHistory: 'View run history',
   menuGuide: 'Guide / warnings',
   menuSettings: 'Settings',
   menuQuit: 'Quit',
-  menuPrompt: 'Choose 0-6 or L, then Enter: ',
-  menuInvalid: ({ choice }: { choice: string }) => `Invalid choice: "${choice}". Type a number from 0 to 6, or L, then press Enter.`,
+  menuPrompt: 'Choose 0-7 or L, then Enter: ',
+  menuInvalid: ({ choice }: { choice: string }) => `Invalid choice: "${choice}". Type a number from 0 to 7, or L, then press Enter.`,
   goodbye: 'Goodbye.',
 
   // Language chooser.
@@ -246,8 +247,17 @@ export const en = {
   welcomeTitle: 'WELCOME',
   welcomeBody: 'Welcome to Phone App Checker. No accounts are logged in yet; a check needs at least one.',
   welcomeLogin: 'Press 2 to log in an app account.',
-  welcomeGuide: 'Press 5 to read the guide and warnings first.',
+  welcomeGuide: 'Press 6 to read the guide and warnings first.',
 
+
+  // 5 - run history.
+  historyTitle: 'RUN HISTORY',
+  historyRow: ({ when, csv, appCount, rows, report }: { when: string; csv: string; appCount: number; rows: number; report: string }) =>
+    `${when} · ${csv} · ${appCount} ${appCount === 1 ? 'app' : 'apps'} · ${rows} ${rows === 1 ? 'row' : 'rows'} · ${report}`,
+  historyPrompt: ({ max }: { max: number }) => `Run to open (1-${max}, Enter = back): `,
+  historyReportMissing: 'The report file is missing or unreadable.',
+  historyLogMissing: 'No log of this run is left.',
+  historyEmpty: 'No check has run yet. History lists the last 20 runs.',
   // 6 - guide and warnings.
   guideTitle: 'GUIDE AND WARNINGS',
   guideConsent: '- Only check numbers of people who agreed to be contacted. The tool does not verify consent for you.',

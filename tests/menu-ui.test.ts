@@ -151,7 +151,7 @@ describe('rich main menu (arrow keys on a real terminal)', () => {
     // Icon and word together: the state never rests on a symbol or a colour alone.
     expect(screen).toContain('✔ whatsapp 1 account');
     for (const app of ['telegram', 'zalo', 'viber', 'line']) expect(screen).toContain(`○ ${app} none`);
-    for (const row of ['1 Check a CSV file', '2 Log in an app account', '3 View logged-in accounts', '5 Guide / warnings', '6 Settings', '0 Quit']) {
+    for (const row of ['1 Check a CSV file', '2 Log in an app account', '3 View logged-in accounts', '4 Rebuild the latest report', '5 View run history', '6 Guide / warnings', '7 Settings', '0 Quit']) {
       expect(screen).toContain(row);
     }
     expect(screen).toContain('L Language / Ngôn ngữ / Bahasa / 언어 / 语言: English');
@@ -193,7 +193,7 @@ describe('rich main menu (arrow keys on a real terminal)', () => {
     const tty = fakeTty();
     const { host, runs } = build(tty.io);
     const done = runMenu(host);
-    let at = await answer(tty, 'q quit', '5');
+    let at = await answer(tty, 'q quit', '6');
     at = await until(tty, '╭─ GUIDE AND WARNINGS', at);
     expect(view(tty)).toContain('│ - Only check numbers of people who agreed to be contacted.');
     at = await answer(tty, 'Press Enter for the menu.', '\r', at);
@@ -245,7 +245,7 @@ describe('rich main menu (arrow keys on a real terminal)', () => {
     const tty = fakeTty({ rawMode: false });
     const { host } = build(tty.io);
     const done = runMenu(host);
-    await until(tty, 'Choose 0-6 or L, then Enter: ');
+    await until(tty, 'Choose 0-7 or L, then Enter: ');
     const screen = view(tty);
     expect(screen).toContain('╭─ Phone App Checker v9.9.9');
     expect(screen).toContain('1. Check a CSV file');
@@ -266,7 +266,7 @@ describe('rich main menu (arrow keys on a real terminal)', () => {
     const tty = fakeTty();
     const { host } = build(tty.io, { env });
     const done = runMenu(host);
-    await until(tty, 'Choose 0-6 or L, then Enter: ');
+    await until(tty, 'Choose 0-7 or L, then Enter: ');
     expect(tty.screen()).toContain('=== Phone App Checker v9.9.9 ===');
     expect(tty.screen()).not.toMatch(/\u001b\[(?!\?)/);
     expect(tty.screen()).not.toContain('╭');
@@ -312,19 +312,19 @@ describe('the menu on a screen grid (what the user actually sees)', () => {
     const tty = fakeTty({ columns, rows: 24 });
     const { host } = build(tty.io, { env: { NO_COLOR: '1' }, accounts: { telegram: ['a'] } });
     const done = runMenu(host);
-    const prompt = await until(tty, 'Choose 0-6 or L, then Enter: ');
-    const menu = stripAnsi(tty.screen()).slice(0, stripAnsi(tty.screen()).indexOf('Choose 0-6 or L, then Enter: '));
+    const prompt = await until(tty, 'Choose 0-7 or L, then Enter: ');
+    const menu = stripAnsi(tty.screen()).slice(0, stripAnsi(tty.screen()).indexOf('Choose 0-7 or L, then Enter: '));
     for (const line of menu.split('\n')) expect(displayWidth(line)).toBeLessThanOrEqual(columns - 1);
     expect(view(tty)).toContain('Accounts ready: [ok] telegram 1 account');
     expect(view(tty)).toContain('[ ] whatsapp none');
 
-    await tty.send('5\r');
+    await tty.send('6\r');
     const paused = await until(tty, 'Press Enter for the menu.', prompt);
     const guide = stripAnsi(tty.screen()).slice(stripAnsi(tty.screen()).indexOf('GUIDE AND WARNINGS'), stripAnsi(tty.screen()).lastIndexOf('Press Enter for the menu.'));
     expect(guide.length).toBeGreaterThan(100);
     for (const line of guide.split('\n')) expect(displayWidth(line)).toBeLessThanOrEqual(columns - 1);
     await tty.send('\r');
-    await answer(tty, 'Choose 0-6 or L, then Enter: ', '0\r', paused);
+    await answer(tty, 'Choose 0-7 or L, then Enter: ', '0\r', paused);
     await done;
   });
 });
@@ -335,7 +335,7 @@ describe('settings', () => {
     const tty = fakeTty({ columns: 80, rows: 24 });
     const { host } = build(tty.io, { accounts: { telegram: ['a'] }, saveTheme: (theme) => void saved.push(theme) });
     const done = runMenu(host);
-    let at = await answer(tty, 'q quit', '6');
+    let at = await answer(tty, 'q quit', '7');
     at = await until(tty, 'Esc, q or b back', at);
     for (const row of ['Theme: Auto', 'Language: English', 'Remember recent files: on', 'Data folder:', 'Config file:']) {
       expect(view(tty)).toContain(row);
@@ -358,7 +358,7 @@ describe('guide pages', () => {
     const tty = fakeTty({ columns: 80, rows: 14 });
     const { host } = build(tty.io);
     const done = runMenu(host);
-    let at = await answer(tty, 'q quit', '5');
+    let at = await answer(tty, 'q quit', '6');
     at = await until(tty, 'Guide and warnings · page 1 of 2', at);
     const first = view(tty).slice(at);
     expect(first).toContain('agreed to be contacted');
@@ -375,7 +375,7 @@ describe('guide pages', () => {
     const tty = fakeTty({ columns: 80, rows: 14 });
     const { host } = build(tty.io);
     const done = runMenu(host);
-    let at = await answer(tty, 'q quit', '5');
+    let at = await answer(tty, 'q quit', '6');
     at = await answer(tty, 'Enter = next page · b back', 'b\r', at);
     await answer(tty, 'q quit', '0', at);
     expect(await done).toBe(0);

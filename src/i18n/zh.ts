@@ -6,11 +6,12 @@ export const zh = {
   menuLogin: '登录应用账号',
   menuAccounts: '查看已登录的账号',
   menuReport: '重新生成最近的报告',
+  menuHistory: '查看运行历史',
   menuGuide: '指南 / 警告',
   menuSettings: '设置',
   menuQuit: '退出',
-  menuPrompt: '请选择 0-6 或 L，然后按 Enter: ',
-  menuInvalid: ({ choice }) => `无效的选择: "${choice}"。请输入 0 到 6 的数字或 L，然后按 Enter。`,
+  menuPrompt: '请选择 0-7 或 L，然后按 Enter: ',
+  menuInvalid: ({ choice }) => `无效的选择: "${choice}"。请输入 0 到 7 的数字或 L，然后按 Enter。`,
   goodbye: '再见。',
 
   languageHeader: '请选择语言:',
@@ -203,8 +204,16 @@ export const zh = {
   welcomeTitle: '欢迎',
   welcomeBody: '欢迎使用 Phone App Checker。目前还没有已登录的账号；进行检查至少需要一个账号。',
   welcomeLogin: '按 2 登录应用账号。',
-  welcomeGuide: '按 5 先阅读指南和警告。',
+  welcomeGuide: '按 6 先阅读指南和警告。',
 
+
+  historyTitle: '运行历史',
+  historyRow: ({ when, csv, appCount, rows, report }) =>
+    `${when} · ${csv} · ${appCount} 个应用 · ${rows} 行 · ${report}`,
+  historyPrompt: ({ max }) => `要打开的运行 (1-${max}, Enter = 返回): `,
+  historyReportMissing: '报告文件已不存在或无法读取。',
+  historyLogMissing: '本次运行没有留下日志。',
+  historyEmpty: '还没有运行过检查。历史记录列出最近 20 次运行。',
   guideTitle: '指南和警告',
   guideConsent: '- 只检查同意被联系的人的号码。本工具不会替你核实对方是否同意。',
   guideNotFound: '- “not_found”不一定表示没有账号: 用户可能在搜索中隐藏了自己的手机号码 (隐私设置)。',

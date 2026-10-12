@@ -5,6 +5,7 @@ import { readTelegramCredentials } from './adapters/telegram-credentials.ts';
 import { assertAccountName, listAccountNames, type Config } from './config.ts';
 import { parseTelegramApiHash, parseTelegramApiId } from './config-write.ts';
 import { readPhoneCsv, type ParsedInput } from './csv.ts';
+import { openRunHistory, readReportRows, type RunEntry, type RunHistory } from './history.ts';
 import {
   LANGS,
   LANGUAGE_LABEL,
@@ -12,6 +13,7 @@ import {
   parseLang,
   resolveLang,
   translate,
+  translator,
   type Lang,
   type MessageArgs,
   type MessageKey,
@@ -22,6 +24,7 @@ import { writePrivateFileAtomic } from './private-file.ts';
 import { askHidden, askVisible, PromptCancelled, type PromptIo } from './prompt.ts';
 import { qrWindowNeed, type QrStream } from './qr.ts';
 import { openRecentFiles, type RecentEntry, type RecentFiles } from './recent.ts';
+import { formatSummary, summarize } from './report.ts';
 import { APP_TITLE, banner, reportBox, statusStrip } from './screens.ts';
 import { canSelect, selectMany, selectMenu, type SelectItem, type SelectResult } from './select.ts';
 import { APPS, terminalSafe, type App, type LoginMethod } from './types.ts';
@@ -122,9 +125,9 @@ function backHint(menu: Menu): string {
   return `${t(menu, 'keyHintNavigate')} · ${t(menu, 'keyHintSelect')} · ${t(menu, 'keyHintBack')}`;
 }
 
-/** The persistent hint line under the main menu's arrow-key list: the row keys (1-6, L, 0) are named too. */
+/** The persistent hint line under the main menu's arrow-key list: the row keys (1-7, L, 0) are named too. */
 function menuHint(menu: Menu): string {
-  return `${t(menu, 'keyHintNavigate')} · ${t(menu, 'keyHintSelect')} · ${t(menu, 'keyHintQuit')} · 1-6, L, 0`;
+  return `${t(menu, 'keyHintNavigate')} · ${t(menu, 'keyHintSelect')} · ${t(menu, 'keyHintQuit')} · 1-7, L, 0`;
 }
 
 /** Run a command for a menu action; when the theme was forced (--theme or a Settings toggle) the command sees it too. */
@@ -211,6 +214,22 @@ async function pauseForMenu(menu: Menu): Promise<void> {
 function recentsFor(menu: Menu, cfg: Config): RecentFiles | null {
   if (menu.recents?.dir !== cfg.dataDir) menu.recents = { dir: cfg.dataDir, files: openRecentFiles(cfg.dataDir) };
   return menu.recents.files;
+}
+
+/** A file that exists and can be stated; permission errors, ENOTDIR and link loops all read as absent. */
+function fileExists(path: string): boolean {
+  try {
+    return statSync(path, { throwIfNoEntry: false })?.isFile() === true;
+  } catch {
+    return false;
+  }
+}
+
+/** `2026-10-12 22:30` in local time — the stamp a history row leads with. */
+function historyWhen(at: number): string {
+  const date = new Date(at);
+  const two = (n: number): string => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
 }
 
 /** "just now / n min ago / n h ago / yesterday / a date" for a recent-file row. */
@@ -883,6 +902,82 @@ async function viewReport(menu: Menu): Promise<void> {
   if (result.code === 0) showReportDone(menu, out, result, false);
 }
 
+/**
+ * Re-show one remembered run: the summary is re-read from the report file and drawn with the run's
+ * own app list and the menu's live translator and Ui, then `o` reveals the report. A report that is
+ * missing (or no longer readable as ours) yields a notice and the run's log is offered instead.
+ */
+async function showRun(menu: Menu, run: RunEntry): Promise<void> {
+  const { say } = menu;
+  if (fileExists(run.report)) {
+    try {
+      const rows = readReportRows(run.report);
+      for (const line of formatSummary(summarize(rows), menu.ui, { apps: run.apps, tr: translator(menu.lang) }).split('\n')) say(line);
+      await pauseOrReveal(menu, run.report);
+      return;
+    } catch {
+      // A report that cannot be parsed as ours counts as missing.
+    }
+  }
+  say(t(menu, 'historyReportMissing'));
+  if (fileExists(run.log)) {
+    say(`  ${shown(run.log)}`);
+    await pauseOrReveal(menu, run.log);
+  } else {
+    say(t(menu, 'historyLogMissing'));
+  }
+}
+
+/**
+ * "5 History": the last twenty check runs, newest first. Enter re-shows the run's summary (re-read
+ * from its report, `o` reveals it); when the report is gone the row says so and the log is offered.
+ * `b` goes back; on a plain terminal the rows are numbered and Enter leaves.
+ */
+async function showHistory(menu: Menu): Promise<void> {
+  const { host, say } = menu;
+  const cfg = configOrReport(menu);
+  if (cfg === undefined) return;
+  const runs = openRunHistory(cfg.dataDir)?.list() ?? [];
+  if (runs.length === 0) {
+    say(t(menu, 'historyEmpty'));
+    return;
+  }
+  const rows = runs.map((run) => ({
+    run,
+    exists: fileExists(run.report),
+    label: t(menu, 'historyRow', {
+      when: historyWhen(run.at),
+      csv: shown(basename(run.csv)),
+      appCount: run.apps.length,
+      rows: run.rows,
+      report: shown(basename(run.report)),
+    }),
+  }));
+  if (canSelect(host.io, menu.ui)) {
+    for (;;) {
+      const result = await selectMenu(host.io, menu.ui, {
+        title: t(menu, 'historyTitle'),
+        items: rows.map((row): SelectItem<RunEntry> => ({ value: row.run, label: row.label, ...(row.exists ? {} : { detail: t(menu, 'historyReportMissing') }) })),
+        hint: backHint(menu),
+      });
+      if (!result.picked) return;
+      await showRun(menu, result.value);
+    }
+  }
+  for (;;) {
+    say(t(menu, 'historyTitle'));
+    rows.forEach((row, index) => say(`  ${index + 1}. ${row.label}${row.exists ? '' : ` (${t(menu, 'historyReportMissing')})`}`));
+    const answer = (await askVisible(t(menu, 'historyPrompt', { max: rows.length }), host.io)).trim();
+    if (answer === '' || BACK_CHAR.test(answer)) return;
+    const num = /^\d+$/.test(answer) ? Number(answer) : 0;
+    if (num < 1 || num > rows.length) {
+      say(t(menu, 'loginMethodInvalid', { max: rows.length }));
+      continue;
+    }
+    await showRun(menu, (rows[num - 1] as (typeof rows)[number]).run);
+  }
+}
+
 
 const GUIDE = [
   'guideTitle',
@@ -987,8 +1082,9 @@ function showMenuRows(menu: Menu): void {
   menu.say(`  2. ${t(menu, 'menuLogin')}`);
   menu.say(`  3. ${t(menu, 'menuAccounts')}`);
   menu.say(`  4. ${t(menu, 'menuReport')}`);
-  menu.say(`  5. ${t(menu, 'menuGuide')}`);
-  menu.say(`  6. ${t(menu, 'menuSettings')}`);
+  menu.say(`  5. ${t(menu, 'menuHistory')}`);
+  menu.say(`  6. ${t(menu, 'menuGuide')}`);
+  menu.say(`  7. ${t(menu, 'menuSettings')}`);
   // Not translated on purpose: it must stay findable whatever language the menu is stuck in.
   menu.say(`  L. ${LANGUAGE_LABEL}: ${LANGUAGE_NAMES[menu.lang]}`);
   menu.say(`  0. ${t(menu, 'menuQuit')}`);
@@ -1010,7 +1106,7 @@ function showMenu(menu: Menu): void {
   showMenuRows(menu);
 }
 
-/** The main menu as an arrow-key list: each row has the key that picks it at once (1-6, L, 0). */
+/** The main menu as an arrow-key list: each row has the key that picks it at once (1-7, L, 0). */
 function menuItems(menu: Menu): SelectItem<string>[] {
   const row = (value: string, key: string, label: string): SelectItem<string> => ({ value, key, label });
   return [
@@ -1018,8 +1114,9 @@ function menuItems(menu: Menu): SelectItem<string>[] {
     row('2', '2', t(menu, 'menuLogin')),
     row('3', '3', t(menu, 'menuAccounts')),
     row('4', '4', t(menu, 'menuReport')),
-    row('5', '5', t(menu, 'menuGuide')),
-    row('6', '6', t(menu, 'menuSettings')),
+    row('5', '5', t(menu, 'menuHistory')),
+    row('6', '6', t(menu, 'menuGuide')),
+    row('7', '7', t(menu, 'menuSettings')),
     // Not translated on purpose: it must stay findable whatever language the menu is stuck in.
     row('l', 'L', `${LANGUAGE_LABEL}: ${LANGUAGE_NAMES[menu.lang]}`),
     row('0', '0', t(menu, 'menuQuit')),
@@ -1264,9 +1361,12 @@ export async function runMenu(host: MenuHost): Promise<number> {
           await viewReport(menu);
           break;
         case '5':
-          await showGuide(menu);
+          await showHistory(menu);
           break;
         case '6':
+          await showGuide(menu);
+          break;
+        case '7':
           await showSettings(menu);
           break;
         case 'l':

@@ -6,11 +6,12 @@ export const ko = {
   menuLogin: '앱 계정 로그인',
   menuAccounts: '로그인된 계정 보기',
   menuReport: '최근 보고서 다시 만들기',
+  menuHistory: '검사 기록 보기',
   menuGuide: '안내 / 주의사항',
   menuSettings: '설정',
   menuQuit: '종료',
-  menuPrompt: '0-6 또는 L을 선택하고 Enter를 누르세요: ',
-  menuInvalid: ({ choice }) => `잘못된 선택입니다: "${choice}". 0부터 6까지의 숫자 또는 L을 입력하고 Enter를 누르세요.`,
+  menuPrompt: '0-7 또는 L을 선택하고 Enter를 누르세요: ',
+  menuInvalid: ({ choice }) => `잘못된 선택입니다: "${choice}". 0부터 7까지의 숫자 또는 L을 입력하고 Enter를 누르세요.`,
   goodbye: '안녕히 가세요.',
 
   languageHeader: '언어를 선택하세요:',
@@ -206,8 +207,16 @@ export const ko = {
   welcomeTitle: '환영합니다',
   welcomeBody: 'Phone App Checker에 오신 것을 환영합니다. 아직 로그인된 계정이 없습니다. 확인하려면 계정이 하나 이상 필요합니다.',
   welcomeLogin: '2를 눌러 앱 계정에 로그인하세요.',
-  welcomeGuide: '5를 눌러 안내와 주의사항을 먼저 읽으세요.',
+  welcomeGuide: '6을 눌러 안내와 주의사항을 먼저 읽으세요.',
 
+
+  historyTitle: '검사 기록',
+  historyRow: ({ when, csv, appCount, rows, report }) =>
+    `${when} · ${csv} · ${appCount}개 앱 · ${rows}행 · ${report}`,
+  historyPrompt: ({ max }) => `열 검사 (1-${max}, Enter = 돌아가기): `,
+  historyReportMissing: '보고서 파일이 없거나 읽을 수 없습니다.',
+  historyLogMissing: '이 실행의 로그가 남아 있지 않습니다.',
+  historyEmpty: '아직 실행된 검사가 없습니다. 기록에는 최근 20회 실행이 표시됩니다.',
   guideTitle: '안내 및 주의사항',
   guideConsent: '- 연락하는 데 동의한 사람의 번호만 확인하세요. 이 도구는 동의 여부를 대신 확인해 주지 않습니다.',
   guideNotFound: '- "not_found"가 반드시 계정이 없다는 뜻은 아닙니다. 사용자가 검색에서 전화번호를 숨겼을 수 있습니다(개인정보 보호).',

@@ -51,7 +51,7 @@
     "@evex/linejs": "npm:@jsr/evex__linejs@^3.4.2",
     "@mtcute/node": "^0.32.4",
     "baileys": "^7.0.0-rc14",
-    "commander": "^15.0.0",
+    "commander": "^15.1.0",
     "csv-parse": "^7.0.3",
     "csv-stringify": "^6.9.0",
     "libphonenumber-js": "^1.13.15",
